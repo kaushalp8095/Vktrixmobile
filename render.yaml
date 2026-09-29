@@ -1,0 +1,32 @@
+# Render Blueprint: backend + PostgreSQL ek click me
+services:
+  - type: web
+    name: vktrix-backend
+    runtime: node
+    region: singapore
+    plan: starter            # free bhi chalega, par 15 min baad so jata hai
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: DB_CLIENT
+        value: pg
+      - key: DATABASE_URL
+        fromDatabase:
+          name: vktrix-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SUPERADMIN_USERNAME
+        value: superadmin
+      - key: SUPERADMIN_PASSWORD
+        sync: false          # Render dashboard me khud daalein
+databases:
+  - name: vktrix-db
+    region: singapore
+    plan: basic-256mb
+    databaseName: mobileshop
+    user: shopuser
