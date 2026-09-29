@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Server ka address login screen par set hota hai (e.g. https://api.yourdomain.com)
-String baseUrl = 'http://192.168.1.100:4000';
+String baseUrl = 'https://vktrixmobile.onrender.com';
 
 class Api {
   static String? token;
