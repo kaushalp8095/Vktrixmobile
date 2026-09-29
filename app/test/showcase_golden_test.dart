@@ -23,7 +23,10 @@ void main() {
     t.view.devicePixelRatio = 2.625;
     await t.pumpWidget(MaterialApp(debugShowCheckedModeBanner: false,
         theme: AppTheme.build(AppTheme.lightScheme), home: const DesignSystemShowcase()));
-    await t.pumpAndSettle();
+    await t.pump(const Duration(milliseconds: 500));
+    await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
+    await t.pump(const Duration(milliseconds: 300));
     await expectLater(find.byType(DesignSystemShowcase), matchesGoldenFile('goldens/showcase.png'));
+    await t.pumpWidget(const SizedBox());
   });
 }

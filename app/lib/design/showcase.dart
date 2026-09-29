@@ -2,6 +2,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
+import 'components/components.dart';
 import 'design.dart';
 
 double contrast(Color a, Color b) {
@@ -53,10 +54,10 @@ class _ThemePanel extends StatelessWidget {
           ]),
           _TextOn(bg: s.surface),
           const _Header('Semantic · status chips'),
-          Wrap(spacing: Space.x8, runSpacing: Space.x8, children: [
-            _Chip('Success', Icons.check_circle_outline, c.success, c.successInk),
-            _Chip('Warning', Icons.error_outline, c.warning, c.warningInk),
-            _Chip('Error', Icons.cancel_outlined, c.error, c.errorInk),
+          const Wrap(spacing: Space.x8, runSpacing: Space.x8, children: [
+            StatusChip(label: 'Success', tone: ChipTone.success),
+            StatusChip(label: 'Warning', tone: ChipTone.warning),
+            StatusChip(label: 'Error', tone: ChipTone.error),
           ]),
           const _Header('Glass · over brand backdrop'),
           const _GlassDemo(),
@@ -147,77 +148,36 @@ class _TextOn extends StatelessWidget {
   }
 }
 
-class _Chip extends StatelessWidget {
-  final String label; final IconData icon; final Color tint, ink;
-  const _Chip(this.label, this.icon, this.tint, this.ink);
-  @override
-  Widget build(BuildContext context) => Container(
-        constraints: const BoxConstraints(minHeight: 32),
-        padding: const EdgeInsets.symmetric(horizontal: Space.x12, vertical: Space.x4),
-        decoration: BoxDecoration(
-          color: tint.withValues(alpha: .12), borderRadius: Shapes.pill,
-          border: Border.all(color: tint.withValues(alpha: .24))),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 16, color: ink, semanticLabel: label),
-          const SizedBox(width: Space.x4),
-          Text(label, style: AppType.labelSmall.copyWith(color: ink)),
-        ]),
-      );
-}
-
 class _GlassDemo extends StatelessWidget {
   const _GlassDemo();
   @override
   Widget build(BuildContext context) {
-    final g = context.glass, c = context.colors, s = context.scheme;
-    return SizedBox(
-      height: 184,
-      child: Stack(children: [
-        // Backdrop: two brand blobs so the glass has something to blur.
-        Positioned(left: -20, top: -10, child: _Blob(color: s.primary.withValues(alpha: .55), size: 150)),
-        Positioned(right: -10, bottom: -20, child: _Blob(color: c.accent.withValues(alpha: .45), size: 130)),
-        Positioned.fill(child: Padding(
+    final g = context.glass, c = context.colors;
+    return ClipRRect(
+      borderRadius: Shapes.lg,
+      child: SizedBox(
+        height: 184,
+        child: AuroraBackground(child: Padding(
           padding: const EdgeInsets.all(Space.x20),
-          child: DecoratedBox(
-            decoration: BoxDecoration(borderRadius: Shapes.lg, boxShadow: g.elevation),
-            child: ClipRRect(
-              borderRadius: Shapes.lg,
-              child: BackdropFilter(
-                filter: g.filter,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(gradient: g.fill, borderRadius: Shapes.lg, border: Border.all(color: g.border)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(Space.x16),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      DecoratedBox(
-                        decoration: BoxDecoration(color: g.scrim, borderRadius: Shapes.sm),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: Space.x8, vertical: Space.x4),
-                          child: Text('Text on glass (scrim ${(g.scrimAlpha * 100).round()}%)',
-                              style: AppType.labelLarge.copyWith(color: c.textPrimary)),
-                        ),
-                      ),
-                      const Spacer(),
-                      Text('blur ${g.blurSigma.toInt()}dp · fill ${(g.fillTop * 100).round()}→${(g.fillBottom * 100).round()}% · border ${(g.borderAlpha * 100).round()}%',
-                          style: AppType.labelSmall.copyWith(color: c.textPrimary)),
-                    ]),
-                  ),
+          child: GlassSurface(
+            padding: const EdgeInsets.all(Space.x16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              DecoratedBox(
+                decoration: BoxDecoration(color: g.scrim, borderRadius: Shapes.sm),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: Space.x8, vertical: Space.x4),
+                  child: Text('Text on glass (scrim ${(g.scrimAlpha * 100).round()}%)', style: AppType.labelLarge.copyWith(color: c.textPrimary)),
                 ),
               ),
-            ),
+              const Spacer(),
+              Text('blur ${g.blurSigma.toInt()}dp · fill ${(g.fillTop * 100).round()}→${(g.fillBottom * 100).round()}% · border ${(g.borderAlpha * 100).round()}%',
+                  style: AppType.labelSmall.copyWith(color: c.textPrimary)),
+            ]),
           ),
         )),
-      ]),
+      ),
     );
   }
-}
-
-class _Blob extends StatelessWidget {
-  final Color color; final double size;
-  const _Blob({required this.color, required this.size});
-  @override
-  Widget build(BuildContext context) => Container(width: size, height: size,
-      decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [color, color.withValues(alpha: 0)])));
 }
 
 /// Plays each spring token on a dot so the feel can be compared side by side.
