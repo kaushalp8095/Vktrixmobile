@@ -22,8 +22,9 @@ class Dashboard extends StatefulWidget {
   /// Test hook: injected data skips the network.
   final Map<String, dynamic>? testSummary;
   final List<ActivityItem>? testRecent;
+  final String? greeting;
   const Dashboard({super.key, required this.onGo, required this.shopName,
-      this.isAdminView = false, this.testSummary, this.testRecent});
+      this.isAdminView = false, this.testSummary, this.greeting, this.testRecent});
   @override
   State<Dashboard> createState() => _DashboardState();
 }
@@ -96,7 +97,7 @@ class _DashboardState extends State<Dashboard> {
           children: [
             Padding(
               padding: const EdgeInsets.only(left: Space.x4, bottom: Space.x8),
-              child: Text('${_greeting()}, ${(Api.user?['name'] ?? widget.shopName)}', style: t.titleMedium?.copyWith(color: c.textSecondary)),
+              child: Text('${widget.greeting ?? _greeting()}, ${(Api.user?['name'] ?? widget.shopName)}', style: t.titleMedium?.copyWith(color: c.textSecondary)),
             ),
             if (_error != null)
               ErrorState(title: "Couldn't load dashboard",

@@ -20,7 +20,7 @@ final _recent = [
 Widget _home() => Scaffold(
       body: AuroraBackground(child: Stack(children: [
         Positioned.fill(bottom: 92,
-          child: Dashboard(onGo: _noop, shopName: 'Krishna Mobiles', testSummary: _summary, testRecent: _recent)),
+          child: Dashboard(onGo: _noop, shopName: 'Krishna Mobiles', greeting: 'Good afternoon', testSummary: _summary, testRecent: _recent)),
         const Positioned(left: 16, right: 16, bottom: 16,
           child: AnimatedTabBar(index: 0, onChanged: _noopInt, items: [
             TabItem(icon: Icons.space_dashboard_outlined, activeIcon: Icons.space_dashboard, label: 'Home'),
