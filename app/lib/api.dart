@@ -66,6 +66,14 @@ class Api {
   }
 
   static bool get isSuperAdmin => user?['role'] == 'superadmin';
+
+  // ---- Preferences (theme, onboarding) ----
+  static Future<String> themeMode() async => (await SharedPreferences.getInstance()).getString('theme_mode') ?? 'system';
+  static Future<void> setThemeMode(String m) async => (await SharedPreferences.getInstance()).setString('theme_mode', m);
+  static Future<bool> onboardingSeen() async => (await SharedPreferences.getInstance()).getBool('onboarding_seen') ?? false;
+  static Future<void> setOnboardingSeen() async => (await SharedPreferences.getInstance()).setBool('onboarding_seen', true);
+  static Future<void> changePassword(String oldPw, String newPw) async =>
+      post('/auth/change-password', {'old_password': oldPw, 'new_password': newPw});
 }
 
 String rs(dynamic v) {

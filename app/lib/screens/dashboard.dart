@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../api.dart';
 import '../design/components/components.dart';
 import '../design/design.dart';
+import 'profile.dart';
 
 class ActivityItem {
   final bool isSale;
@@ -160,6 +161,9 @@ class _DashboardState extends State<Dashboard> {
         leading: widget.isAdminView ? const BackButton() : const SizedBox(width: Space.x12),
         actions: [
           GlassIconButton(icon: Icons.refresh, semanticLabel: 'Refresh dashboard', onPressed: _load),
+          if (!widget.isAdminView)
+            GlassIconButton(icon: Icons.person_outline, semanticLabel: 'Profile and settings',
+                onPressed: () => SharedAxisRoute.push(context, (_) => const ProfileScreen())),
         ],
       )),
     ]);

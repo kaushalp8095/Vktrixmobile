@@ -4,6 +4,7 @@ import '../api.dart';
 import '../design/components/components.dart';
 import '../design/design.dart';
 import 'admin_home.dart';
+import 'onboarding.dart';
 import 'login.dart';
 import 'shop_home.dart';
 
@@ -35,9 +36,17 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     if (!widget.autoRoute || !mounted) return;
     await Future<void>.delayed(m.d(const Duration(milliseconds: 250)));
     if (!mounted) return;
-    SharedAxisRoute.replace(context, (_) => Api.token == null
-        ? const LoginScreen()
-        : (Api.isSuperAdmin ? const AdminHome() : const ShopHome()));
+    final seen = await Api.onboardingSeen();
+    if (!mounted) return;
+    SharedAxisRoute.replace(context, (_) => !seen
+        ? OnboardingScreen(onDone: () => _routeNext())
+        : (Api.token == null ? const LoginScreen() : (Api.isSuperAdmin ? const AdminHome() : const ShopHome())));
+  }
+
+  void _routeNext() {
+    if (!mounted) return;
+    SharedAxisRoute.replace(context, (_) =>
+        Api.token == null ? const LoginScreen() : (Api.isSuperAdmin ? const AdminHome() : const ShopHome()));
   }
 
   @override
