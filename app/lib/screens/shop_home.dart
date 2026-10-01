@@ -49,7 +49,7 @@ class _ShopHomeState extends State<ShopHome> {
               children: [
                 Dashboard(key: _keys[0], onGo: go, shopName: _name, isAdminView: widget.adminShopName != null),
                 KeyedSubtree(key: _keys[1], child: BuyForm(onSaved: () { go(2); })),
-                KeyedSubtree(key: _keys[2], child: const StockScreen()),
+                KeyedSubtree(key: _keys[2], child: StockScreen(onBuy: () => go(1))),
                 KeyedSubtree(key: _keys[3], child: const SalesScreen()),
                 KeyedSubtree(key: _keys[4], child: const ReportsScreen()),
               ],
