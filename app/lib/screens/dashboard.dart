@@ -229,7 +229,7 @@ class _ActivityRow extends StatelessWidget {
         const SizedBox(width: Space.x12),
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Text(rs(item.amount), style: t.titleSmall),
-          if (item.isSale) Text('+${rs(item.profit)}', style: t.labelSmall?.copyWith(color: c.success)),
+          if (item.isSale) Text('+${rs(item.profit)}', style: t.labelSmall?.copyWith(color: c.successInk)),
         ]),
       ]),
     );

@@ -119,7 +119,7 @@ class _SaleRow extends StatelessWidget {
             Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
               Text(rs(s['sell_price']), style: t.titleSmall),
               Text(profit >= 0 ? '+${rs(profit)}' : '−${rs(-profit)}',
-                  style: t.labelSmall?.copyWith(color: profit >= 0 ? c.success : c.errorInk)),
+                  style: t.labelSmall?.copyWith(color: profit >= 0 ? c.successInk : c.errorInk)),
             ]),
           ]),
         ),

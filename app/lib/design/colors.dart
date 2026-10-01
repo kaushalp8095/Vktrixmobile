@@ -69,7 +69,7 @@ class AppColors extends ThemeExtension<AppColors> {
     successInk: IndigoMint.ink(IndigoMint.successLight, IndigoMint.inkLight, .35), // 5.0:1+
     warningInk: IndigoMint.ink(IndigoMint.warningLight, IndigoMint.inkLight, .35),
     errorInk: IndigoMint.ink(IndigoMint.errorLight, IndigoMint.inkLight, .20),
-    focusRing: IndigoMint.accentLight,
+    focusRing: IndigoMint.ink(IndigoMint.accentLight, IndigoMint.inkLight, .32), // 3.2:1+ on glass (raw #06B6D4 = 2.27)
   );
 
   static final dark = AppColors(
