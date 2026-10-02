@@ -59,9 +59,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (!mounted) return;
       setState(() => _passPhase = ButtonPhase.success);
       Haptics.success();
-      toast(context, 'Password changed');
-      await Future<void>.delayed(const Duration(seconds: 1));
-      if (mounted && _passPhase == ButtonPhase.success) setState(() => _passPhase = ButtonPhase.idle);
+      await Api.logout();
+      if (!mounted) return;
+      toast(context, 'Password changed. Please log in again.');
+      SharedAxisRoute.replace(context, (_) => const LoginScreen());
     } catch (e) {
       if (!mounted) return;
       setState(() => _passPhase = ButtonPhase.error);

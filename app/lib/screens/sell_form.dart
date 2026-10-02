@@ -23,7 +23,8 @@ class _SellFormState extends State<SellForm> {
   DateTime date = DateTime.now();
   ButtonPhase _phase = ButtonPhase.idle;
 
-  num get _profit => (num.tryParse(price.text) ?? 0) - (widget.phone['buy_price'] ?? 0);
+  num get _profit => (num.tryParse(price.text) ?? 0) -
+      (num.tryParse('${widget.phone['buy_price']}') ?? 0);
 
   @override
   void initState() {

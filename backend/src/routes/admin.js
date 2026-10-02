@@ -5,6 +5,7 @@ const multer = require('multer');
 const db = require('../db');
 const { requireAuth, requireRole } = require('../auth');
 const { wrap } = require('../util');
+const V = require('../validation');
 r.use(requireAuth, requireRole('superadmin'));
 
 r.get('/dashboard', wrap(async (req, res) => {
@@ -26,38 +27,52 @@ r.get('/shops', wrap(async (req, res) => {
 
 // Nayi shop + uska login ek saath
 r.post('/shops', wrap(async (req, res) => {
-  const { name, owner_name, phone, address, gst_no, username, password } = req.body;
-  if (!name || !username || !password) return res.status(400).json({ error: 'Shop name, username, password zaroori hai' });
-  if (await db('users').where({ username }).first()) return res.status(400).json({ error: 'Username pehle se hai' });
+  const b = V.body(req);
+  const data = V.shopData(b);
+  const username = V.text(b.username, 'username', { required: true, max: 64 });
+  if (!/^[A-Za-z0-9._-]{3,64}$/.test(username))
+    return res.status(400).json({ error: 'username must be 3-64 letters, numbers, dot, underscore or hyphen' });
+  const password = V.password(b.password);
+  if (await db('users').where({ username }).first()) return res.status(409).json({ error: 'Username pehle se hai' });
   const id = await db.transaction(async trx => {
-    const [row] = await trx('shops').insert({ name, owner_name, phone, address, gst_no }).returning('id');
+    const [row] = await trx('shops').insert(data).returning('id');
     const shopId = typeof row === 'object' ? row.id : row;
-    await trx('users').insert({ username, name: owner_name || name, role: 'shop_admin', shop_id: shopId,
-      password_hash: bcrypt.hashSync(password, 10) });
+    await trx('users').insert({ username, name: data.owner_name || data.name, role: 'shop_admin', shop_id: shopId,
+      password_hash: bcrypt.hashSync(password, 10), token_version: 0 });
     return shopId;
   });
   res.json({ id });
 }));
 
 r.put('/shops/:id', wrap(async (req, res) => {
-  const { name, owner_name, phone, address, gst_no, active } = req.body;
-  await db('shops').where({ id: req.params.id }).update({ name, owner_name, phone, address, gst_no, active });
+  const id = V.id(req.params.id, 'shop id');
+  const data = V.shopData(V.body(req), true);
+  const changed = await db('shops').where({ id }).update(data);
+  if (!changed) return res.status(404).json({ error: 'Shop nahi mila' });
   res.json({ ok: true });
 }));
 
 r.post('/shops/:id/reset-password', wrap(async (req, res) => {
-  const { password } = req.body;
-  if (!password || password.length < 6) return res.status(400).json({ error: 'Password kam se kam 6 character' });
-  await db('users').where({ shop_id: req.params.id }).update({ password_hash: bcrypt.hashSync(password, 10) });
-  res.json({ ok: true });
+  const shopId = V.id(req.params.id, 'shop id');
+  const b = V.body(req);
+  const password = V.password(b.password);
+  const changed = await db('users').where({ shop_id: shopId, role: 'shop_admin' }).update({
+    password_hash: bcrypt.hashSync(password, 10),
+    token_version: db.raw('?? + 1', ['token_version']),
+  });
+  if (!changed) return res.status(404).json({ error: 'Shop owner login nahi mila' });
+  res.json({ ok: true, sessions_revoked: true });
 }));
 
 r.delete('/shops/:id', wrap(async (req, res) => {
+  const shopId = V.id(req.params.id, 'shop id');
+  const exists = await db('shops').where({ id: shopId }).first();
+  if (!exists) return res.status(404).json({ error: 'Shop nahi mila' });
   await db.transaction(async trx => {
-    await trx('sales').where({ shop_id: req.params.id }).del();
-    await trx('phones').where({ shop_id: req.params.id }).del();
-    await trx('users').where({ shop_id: req.params.id }).del();
-    await trx('shops').where({ id: req.params.id }).del();
+    await trx('sales').where({ shop_id: shopId }).del();
+    await trx('phones').where({ shop_id: shopId }).del();
+    await trx('users').where({ shop_id: shopId }).del();
+    await trx('shops').where({ id: shopId }).del();
   });
   res.json({ ok: true });
 }));

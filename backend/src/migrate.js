@@ -20,6 +20,7 @@ async function migrate() {
       t.string('role').notNullable(); // superadmin | shop_admin | staff
       t.integer('shop_id').references('shops.id').onDelete('CASCADE');
       t.boolean('active').defaultTo(true);
+      t.integer('token_version').notNullable().defaultTo(0);
       t.timestamp('created_at').defaultTo(db.fn.now());
     });
   }
@@ -57,6 +58,7 @@ async function migrate() {
       t.integer('shop_id').notNullable().references('shops.id').onDelete('CASCADE');
       t.integer('phone_id').notNullable().references('phones.id').onDelete('CASCADE');
       t.decimal('sell_price', 12, 2).notNullable();
+      t.decimal('buy_price_at_sale', 12, 2);
       t.date('sell_date').notNullable();
       t.string('customer_name'); t.string('customer_phone'); t.string('customer_address');
       t.string('payment_mode').defaultTo('cash'); // cash | upi | card | credit
@@ -67,6 +69,26 @@ async function migrate() {
       t.index(['shop_id', 'sell_date']);
     });
   }
+
+  // Additive, idempotent migrations for existing deployments.
+  if (!(await db.schema.hasColumn('users', 'token_version'))) {
+    await db.schema.alterTable('users', t => t.integer('token_version').notNullable().defaultTo(0));
+  }
+  if (!(await db.schema.hasColumn('sales', 'buy_price_at_sale'))) {
+    await db.schema.alterTable('sales', t => t.decimal('buy_price_at_sale', 12, 2));
+  }
+  // Old sale rows predate cost snapshots. Backfill the best available current
+  // phone cost; historical edits already made cannot be reconstructed.
+  await db.raw('UPDATE sales SET buy_price_at_sale = (SELECT phones.buy_price FROM phones WHERE phones.id = sales.phone_id) WHERE buy_price_at_sale IS NULL');
+
+  // Fail safely (without dropping/changing sale data) if old race bugs already
+  // created multiple active sale rows for one phone. Resolve these before deploy.
+  const duplicateSale = await db('sales').select('phone_id').count('* as n')
+    .groupBy('phone_id').havingRaw('COUNT(*) > 1').first();
+  if (duplicateSale) {
+    throw new Error(`Cannot enforce one-sale-per-phone: phone_id ${duplicateSale.phone_id} has ${duplicateSale.n} sales. Audit those rows before restarting.`);
+  }
+  await db.raw('CREATE UNIQUE INDEX IF NOT EXISTS sales_phone_id_unique ON sales (phone_id)');
 
   // Super admin seed
   const u = process.env.SUPERADMIN_USERNAME || 'superadmin';
