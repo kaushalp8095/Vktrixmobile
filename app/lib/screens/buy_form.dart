@@ -50,7 +50,7 @@ class _BuyFormState extends State<BuyForm> {
         final i = r['info'];
         brand.text = '${i['brand'] ?? ''}'; model.text = '${i['model'] ?? ''}';
         ram.text = '${i['ram'] ?? ''}'; storage.text = '${i['storage'] ?? ''}';
-        if (i['color'] != null && '$color'.isEmpty) color.text = '${i['color']}';
+        if (i['color'] != null && color.text.isEmpty) color.text = '${i['color']}';
         _imeiState = _ImeiState.found; _imeiLabel = '${i['brand']} ${i['model']} · details auto-filled';
       } else { _imeiState = _ImeiState.newModel; _imeiLabel = 'New model — fill once, auto-fills next time'; }
       Haptics.tick();

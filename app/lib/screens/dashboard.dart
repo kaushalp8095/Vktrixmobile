@@ -54,13 +54,14 @@ class _DashboardState extends State<Dashboard> {
           ActivityItem(isSale: false, id: p['id'] as int,
               title: '${p['brand'] ?? ''} ${p['model']}'.trim(),
               subtitle: 'Bought${p['seller_name'] != null ? ' · ${p['seller_name']}' : ''}',
-              date: '${p['buy_date']}', amount: p['buy_price'] ?? 0, profit: 0),
+              date: '${p['buy_date']}', amount: num.tryParse('${p['buy_price']}') ?? 0, profit: 0),
         for (final s in sales.take(4))
           ActivityItem(isSale: true, id: 1000000 + (s['id'] as int),
               title: '${s['brand'] ?? ''} ${s['model']}'.trim(),
               subtitle: 'Sold${s['customer_name'] != null ? ' · ${s['customer_name']}' : ''}',
-              date: '${s['sell_date']}', amount: s['sell_price'] ?? 0,
-              profit: (s['sell_price'] ?? 0) - (s['buy_price'] ?? 0)),
+              date: '${s['sell_date']}', amount: num.tryParse('${s['sell_price']}') ?? 0,
+              profit: (num.tryParse('${s['sell_price']}') ?? 0) -
+                  (num.tryParse('${s['buy_price']}') ?? 0)),
       ]..sort((a, b) => b.id.compareTo(a.id));
       if (!mounted) return;
       setState(() { _s = results[0] as Map<String, dynamic>; _recent = items.take(5).toList(); });

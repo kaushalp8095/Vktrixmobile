@@ -23,7 +23,7 @@ class Api {
     final p = await SharedPreferences.getInstance();
     await p.remove('token');
     await p.remove('user');
-    token = null; user = null;
+    token = null; user = null; viewShopId = null;
   }
 
   static Map<String, String> get _h => {
@@ -59,7 +59,7 @@ class Api {
 
   static Future<void> login(String u, String pw) async {
     final r = await post('/auth/login', {'username': u, 'password': pw});
-    token = r['token']; user = r['user'];
+    token = r['token']; user = r['user']; viewShopId = null;
     final p = await SharedPreferences.getInstance();
     await p.setString('token', token!);
     await p.setString('user', jsonEncode(user));

@@ -7,7 +7,10 @@ r.use(requireAuth);
 
 // shop_id nikalna: shop user -> apni shop; superadmin -> ?shop_id
 function shopId(req) {
-  if (req.user.role === 'superadmin') return +(req.query.shop_id || req.body.shop_id) || null;
+  if (req.user.role === 'superadmin') {
+    const id = Number(req.query?.shop_id ?? req.body?.shop_id);
+    return Number.isSafeInteger(id) && id > 0 ? id : null;
+  }
   return req.user.shop_id;
 }
 function needShop(req, res) {
