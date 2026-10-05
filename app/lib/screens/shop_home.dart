@@ -1,4 +1,5 @@
 // SHOP SHELL: aurora + page content + floating AnimatedTabBar (Home/Buy/Stock/Sales/Reports).
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../api.dart';
 import '../design/components/components.dart';
@@ -21,13 +22,14 @@ class _ShopHomeState extends State<ShopHome> {
   int tab = 0;
   final _keys = List.generate(5, (_) => GlobalKey());
   final _pager = PageController();
+  Timer? _updateTimer;
 
   String get _name => widget.adminShopName ?? (Api.user?['shop']?['name'] ?? 'My Shop');
 
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(seconds: 3), () {
+    _updateTimer = Timer(const Duration(seconds: 3), () {
       if (mounted) UpdateChecker.checkForUpdate(context);
     });
   }
@@ -39,7 +41,11 @@ class _ShopHomeState extends State<ShopHome> {
   }
 
   @override
-  void dispose() { _pager.dispose(); super.dispose(); }
+  void dispose() {
+    _pager.dispose();
+    _updateTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -1,4 +1,5 @@
 // SUPER ADMIN: overview stats + shops list (open as shop, edit, reset pass, toggle, delete).
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../api.dart';
 import '../design/components/components.dart';
@@ -22,6 +23,7 @@ class _AdminHomeState extends State<AdminHome> {
   bool loading = true;
   Object? _error;
   final _scroll = ScrollController();
+  Timer? _updateTimer;
 
   bool _on(v) => v == true || v == 1;
 
@@ -31,13 +33,17 @@ class _AdminHomeState extends State<AdminHome> {
     if (widget.testDash != null) { dash = widget.testDash; shops = widget.testShops ?? []; loading = false; }
     else _load();
 
-    Future.delayed(const Duration(seconds: 3), () {
+    _updateTimer = Timer(const Duration(seconds: 3), () {
       if (mounted) UpdateChecker.checkForUpdate(context);
     });
   }
 
   @override
-  void dispose() { _scroll.dispose(); super.dispose(); }
+  void dispose() {
+    _scroll.dispose();
+    _updateTimer?.cancel();
+    super.dispose();
+  }
 
   Future<void> _load() async {
     Api.viewShopId = null;

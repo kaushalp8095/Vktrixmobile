@@ -1,6 +1,5 @@
 // SPLASH: aurora → glass brand mark (Slow spring scale-in) → wordmark fade → route.
 import 'package:flutter/material.dart';
-import 'package:firebase_app_distribution/firebase_app_distribution.dart';
 import '../api.dart';
 import '../design/components/components.dart';
 import '../design/design.dart';
@@ -37,14 +36,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     if (!widget.autoRoute || !mounted) return;
     await Future<void>.delayed(m.d(const Duration(milliseconds: 250)));
     if (!mounted) return;
-    // Firebase App Distribution alerts are for invited testers. Fail open so
-    // a network/auth issue never prevents an owner from using the app.
-    try {
-      await updateIfNewReleaseAvailable();
-    } catch (e) {
-      debugPrint('Firebase App Distribution update check skipped: $e');
-    }
-    if (!mounted) return;
+
     final seen = await Api.onboardingSeen();
     if (!mounted) return;
     SharedAxisRoute.replace(context, (_) => !seen
