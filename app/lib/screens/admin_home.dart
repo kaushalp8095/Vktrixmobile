@@ -6,6 +6,7 @@ import '../design/design.dart';
 import 'common.dart';
 import 'login.dart';
 import 'shop_home.dart';
+import 'update_checker.dart';
 
 class AdminHome extends StatefulWidget {
   final Map<String, dynamic>? testDash; // test hooks
@@ -29,6 +30,10 @@ class _AdminHomeState extends State<AdminHome> {
     super.initState();
     if (widget.testDash != null) { dash = widget.testDash; shops = widget.testShops ?? []; loading = false; }
     else _load();
+
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) UpdateChecker.checkForUpdate(context);
+    });
   }
 
   @override

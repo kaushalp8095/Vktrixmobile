@@ -1,0 +1,82 @@
+name: Auto Release and Version JSON
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'app/**'
+      - '.github/workflows/auto-release.yml'
+      
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          
+      - name: Generate Version Code
+        id: version
+        run: |
+          EPOCH_SECONDS=$(date -u +%s)
+          # Generate a somewhat shorter build number based on days to fit in Android limits
+          BUILD_NUMBER=$(( (EPOCH_SECONDS / 86400) + GITHUB_RUN_NUMBER ))
+          VERSION_NAME="1.0.0.$BUILD_NUMBER"
+          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+          echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
+          
+      - name: Install dependencies
+        working-directory: app
+        run: flutter pub get
+        
+      - name: Build APK
+        working-directory: app
+        run: flutter build apk --release --build-name=${{ steps.version.outputs.version_name }} --build-number=${{ steps.version.outputs.build_number }}
+        
+      - name: Create version.json
+        run: |
+          cat > app/version.json << EOF
+          {
+            "versionCode": ${{ steps.version.outputs.build_number }},
+            "versionName": "${{ steps.version.outputs.version_name }}",
+            "downloadUrl": "https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version_name }}/app-release.apk",
+            "releaseNotes": "Auto-generated release v${{ steps.version.outputs.version_name }}",
+            "minVersionCode": 1,
+            "forceUpdate": false
+          }
+          EOF
+          
+      - name: Commit version.json
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add app/version.json
+          # Only commit if there are changes
+          git diff-index --quiet HEAD || git commit -m "chore: auto-update version.json to v${{ steps.version.outputs.version_name }}"
+          git push
+          
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version_name }}
+          name: Release v${{ steps.version.outputs.version_name }}
+          body: "Automated release of v${{ steps.version.outputs.version_name }}"
+          files: app/build/app/outputs/flutter-apk/app-release.apk
+          token: ${{ secrets.GITHUB_TOKEN }}

@@ -8,6 +8,7 @@ import 'buy_form.dart';
 import 'stock.dart';
 import 'sales.dart';
 import 'reports.dart';
+import 'update_checker.dart';
 
 class ShopHome extends StatefulWidget {
   final String? adminShopName; // super admin viewing a shop
@@ -22,6 +23,14 @@ class _ShopHomeState extends State<ShopHome> {
   final _pager = PageController();
 
   String get _name => widget.adminShopName ?? (Api.user?['shop']?['name'] ?? 'My Shop');
+
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) UpdateChecker.checkForUpdate(context);
+    });
+  }
 
   void go(int i) {
     if (i == tab) return;
