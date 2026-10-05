@@ -8,6 +8,15 @@ import 'onboarding.dart';
 import 'login.dart';
 import 'shop_home.dart';
 
+Widget _sessionScreen() => Api.token == null
+    ? const LoginScreen()
+    : (Api.isSuperAdmin ? const AdminHome() : const ShopHome());
+
+void _routeNext(BuildContext context) {
+  // The splash route has already been replaced; use onboarding's live context.
+  SharedAxisRoute.replace(context, (_) => _sessionScreen());
+}
+
 class SplashScreen extends StatefulWidget {
   /// Injected for previews/tests; production resolves from saved session.
   final bool autoRoute;
@@ -40,14 +49,8 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     final seen = await Api.onboardingSeen();
     if (!mounted) return;
     SharedAxisRoute.replace(context, (_) => !seen
-        ? OnboardingScreen(onDone: () => _routeNext())
-        : (Api.token == null ? const LoginScreen() : (Api.isSuperAdmin ? const AdminHome() : const ShopHome())));
-  }
-
-  void _routeNext() {
-    if (!mounted) return;
-    SharedAxisRoute.replace(context, (_) =>
-        Api.token == null ? const LoginScreen() : (Api.isSuperAdmin ? const AdminHome() : const ShopHome()));
+        ? OnboardingScreen(onDone: _routeNext)
+        : _sessionScreen());
   }
 
   @override

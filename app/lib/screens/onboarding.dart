@@ -5,7 +5,7 @@ import '../design/components/components.dart';
 import '../design/design.dart';
 
 class OnboardingScreen extends StatefulWidget {
-  final VoidCallback? onDone; // injection for tests/prod routing
+  final ValueChanged<BuildContext>? onDone; // route using the live onboarding context
   const OnboardingScreen({super.key, this.onDone});
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -14,6 +14,7 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final _pager = PageController();
   int _page = 0;
+  bool _finishing = false;
 
   static const _slides = [
     (Icons.add_shopping_cart, 'Buy in seconds',
@@ -25,8 +26,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   ];
 
   Future<void> _finish() async {
+    if (_finishing) return;
+    _finishing = true;
     await Api.setOnboardingSeen();
-    widget.onDone?.call();
+    if (!mounted) return;
+    widget.onDone?.call(context);
   }
 
   void _next() {
