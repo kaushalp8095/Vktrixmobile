@@ -73,6 +73,62 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "7.0.1"
+  firebase_app_distribution:
+    dependency: "direct main"
+    description:
+      name: firebase_app_distribution
+      sha256: bdb8d7f8fd4203b71bad85c0a75d085de5f3518d854d74b997b8c07fb5e24034
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.3.1"
+  firebase_app_distribution_android:
+    dependency: transitive
+    description:
+      name: firebase_app_distribution_android
+      sha256: afdc5fe199ee5b18a7177d155c10d5dde1138d1836d5688de4d5ad0f17e9875f
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.3.1"
+  firebase_app_distribution_ios:
+    dependency: transitive
+    description:
+      name: firebase_app_distribution_ios
+      sha256: "311df4f3b76997e011f725cea3da1c02e45b2eb35b1c609a43312477aa9e73b5"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.3.0"
+  firebase_app_distribution_platform_interface:
+    dependency: transitive
+    description:
+      name: firebase_app_distribution_platform_interface
+      sha256: "6a2b2f644e72d0ecb35da79e738c584fc3253ddedda751499c077f47daf54ca5"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.3.0"
+  firebase_core:
+    dependency: transitive
+    description:
+      name: firebase_core
+      sha256: "5fbbaa2aeb08a52feee559f92a62f5a6b04c9bdff81c8f608636771cf0d7b680"
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.15.0"
+  firebase_core_platform_interface:
+    dependency: transitive
+    description:
+      name: firebase_core_platform_interface
+      sha256: "9bfbc85faca09346471ac56fbcee00757ebcfd85887c6f602764eff0001902d8"
+      url: "https://pub.dev"
+    source: hosted
+    version: "8.1.1"
+  firebase_core_web:
+    dependency: transitive
+    description:
+      name: firebase_core_web
+      sha256: "8ed84f5001dbd7a0390e2818d46bc858ceebb970edededdfc8d6552c76fc2f6e"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.12.0"
   flutter:
     dependency: "direct main"
     description: flutter

@@ -1,4 +1,4 @@
-package com.mobileshop.mobile_shop
+package com.vktrix.mobileapp
 
 import io.flutter.embedding.android.FlutterActivity
 

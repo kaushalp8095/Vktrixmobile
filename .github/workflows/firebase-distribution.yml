@@ -1,0 +1,147 @@
+name: Firebase App Distribution
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_notes:
+        description: Notes shown to invited testers
+        required: false
+        type: string
+        default: Invited tester build
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firebase-app-distribution
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    name: Required backend and Flutter checks
+    uses: ./.github/workflows/ci.yml
+
+  distribute:
+    name: Build and distribute signed APK
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      GCP_WIF_PROVIDER: ${{ secrets.GCP_WIF_PROVIDER }}
+      FIREBASE_CI_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_CI_SERVICE_ACCOUNT }}
+      FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate Firebase config and required secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_STORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD GCP_WIF_PROVIDER FIREBASE_CI_SERVICE_ACCOUNT FIREBASE_APP_ID; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Missing required GitHub Actions secret: ${name}"
+              exit 1
+            fi
+          done
+
+          config_file="app/android/app/google-services.json"
+          if [[ ! -f "$config_file" ]]; then
+            echo "::error file=app/android/app/google-services.json::Add the Firebase google-services.json for com.vktrix.mobileapp before distributing."
+            exit 1
+          fi
+
+          python3 - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          gradle_file = Path("app/android/app/build.gradle.kts")
+          match = re.search(r'^\s*applicationId\s*=\s*"([^"]+)"', gradle_file.read_text(), re.MULTILINE)
+          if not match:
+              raise SystemExit("::error::Could not read applicationId from app/android/app/build.gradle.kts")
+          application_id = match.group(1)
+          config = json.loads(Path("app/android/app/google-services.json").read_text())
+          packages = {
+              client.get("client_info", {}).get("android_client_info", {}).get("package_name")
+              for client in config.get("client", [])
+          }
+          packages.discard(None)
+          if application_id not in packages:
+              raise SystemExit(
+                  f"::error::Gradle applicationId is {application_id}, but google-services.json contains: {', '.join(sorted(packages)) or '(none)'}"
+              )
+          print(f"Firebase config matches Android applicationId: {application_id}")
+          PY
+
+      - name: Prepare persistent Android signing key
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p keystore
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > keystore/release.jks
+          test -s keystore/release.jks
+          {
+            printf 'storeFile=%s\n' "$GITHUB_WORKSPACE/keystore/release.jks"
+            printf 'storePassword=%s\n' "$ANDROID_STORE_PASSWORD"
+            printf 'keyAlias=%s\n' "$ANDROID_KEY_ALIAS"
+            printf 'keyPassword=%s\n' "$ANDROID_KEY_PASSWORD"
+          } > keystore/key.properties
+
+      - name: Set monotonically increasing Android version code
+        shell: bash
+        run: |
+          set -euo pipefail
+          epoch_seconds=$(date -u +%s)
+          build_number=$((epoch_seconds + GITHUB_RUN_NUMBER + GITHUB_RUN_ATTEMPT))
+          if (( build_number > 2100000000 )); then
+            echo "::error::Generated Android version code exceeds the Play/App Distribution limit."
+            exit 1
+          fi
+          echo "BUILD_NUMBER=$build_number" >> "$GITHUB_ENV"
+          echo "Building APK with version code $build_number"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Resolve Flutter dependencies
+        working-directory: app
+        run: flutter pub get
+
+      - name: Build signed release APK
+        working-directory: app
+        run: flutter build apk --release --build-number "$BUILD_NUMBER"
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.FIREBASE_CI_SERVICE_ACCOUNT }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Firebase CLI
+        run: npm install --global firebase-tools@latest
+
+      - name: Upload to Firebase App Distribution
+        env:
+          RELEASE_NOTES: ${{ inputs.release_notes }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          notes="$RELEASE_NOTES"
+          if [[ -z "$notes" ]]; then
+            notes="GitHub run #${GITHUB_RUN_NUMBER}"
+          fi
+          firebase appdistribution:distribute app/build/app/outputs/flutter-apk/app-release.apk \
+            --app "$FIREBASE_APP_ID" \
+            --groups "shop-owners" \
+            --release-notes "$notes"
