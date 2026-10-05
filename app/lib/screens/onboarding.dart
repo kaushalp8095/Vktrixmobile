@@ -36,7 +36,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void _next() {
     if (_page == 2) { _finish(); return; }
     Haptics.tick();
-    _pager.nextPage(duration: Motion.of(context).d(Durations2.enter), curve: Curves2.enter);
+    final duration = Motion.of(context).d(Durations2.enter);
+    // PageController.animateToPage requires a positive duration.
+    if (duration == Duration.zero) {
+      _pager.jumpToPage(_page + 1);
+    } else {
+      _pager.nextPage(duration: duration, curve: Curves2.enter);
+    }
   }
 
   @override
