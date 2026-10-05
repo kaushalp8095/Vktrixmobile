@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "57647438575",
+    "project_id": "vktrix-mobile",
+    "storage_bucket": "vktrix-mobile.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:57647438575:android:2ce4f38623d90cee96191a",
+        "android_client_info": {
+          "package_name": "com.vktrix.mobileapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDJOgLv4IB-gBr1-KE_CgXlyCXN3wrZjpo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
