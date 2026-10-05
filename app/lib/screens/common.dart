@@ -18,7 +18,7 @@ Widget statCard(String title, String value, IconData icon, Color color) => Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Row(children: [
-          CircleAvatar(backgroundColor: color.withOpacity(.15), child: Icon(icon, color: color)),
+          CircleAvatar(backgroundColor: color.withValues(alpha: .15), child: Icon(icon, color: color)),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(title, style: const TextStyle(color: Colors.grey)),
