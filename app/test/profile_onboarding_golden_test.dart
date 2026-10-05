@@ -11,7 +11,7 @@ void main() {
   final cases = <String, Widget Function(bool)>{
     'onboarding': (dark) => MaterialApp(debugShowCheckedModeBanner: false,
         theme: AppTheme.build(dark ? AppTheme.darkScheme : AppTheme.lightScheme),
-        home: OnboardingScreen(onDone: () {})),
+        home: OnboardingScreen(onDone: (_) {})),
     'profile': (dark) => MaterialApp(debugShowCheckedModeBanner: false,
         theme: AppTheme.build(dark ? AppTheme.darkScheme : AppTheme.lightScheme),
         home: const ProfileScreen()),
