@@ -61,7 +61,7 @@ class UpdateChecker {
               children: [
                 Text('A new version ($versionName) is available!'),
                 const SizedBox(height: 12),
-                const Text('What\\'s new:', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text('What\'s new:', style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
                 Text(releaseNotes),
               ],
