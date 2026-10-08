@@ -58,7 +58,8 @@ r.post('/buy', wrap(async (req, res) => {
     const [ins] = await trx('phones').insert(row).returning('id');
     // App learns a TAC only after the inventory insert is safely in the same transaction.
     await trx('tac_models').insert({ tac: fields.imei.slice(0, 8), brand: fields.brand, model: fields.model,
-      ram: fields.ram, storage: fields.storage, color: fields.color }).onConflict('tac').merge();
+      ram: fields.ram, storage: fields.storage, color: fields.color, source: 'learned',
+      updated_at: new Date().toISOString() }).onConflict('tac').merge();
     return typeof ins === 'object' ? ins.id : ins;
   });
   res.json({ id });

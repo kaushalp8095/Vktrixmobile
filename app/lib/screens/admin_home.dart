@@ -1,4 +1,5 @@
-// SUPER ADMIN: overview stats + shops list (open as shop, edit, reset pass, toggle, delete).
+// SUPER ADMIN: overview stats + shops list (open as shop, edit, reset pass, toggle, delete)
+// + TAC catalog screen (free community IMEI model sync).
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../api.dart';
@@ -7,6 +8,7 @@ import '../design/design.dart';
 import 'common.dart';
 import 'login.dart';
 import 'shop_home.dart';
+import 'tac_catalog.dart';
 import 'update_checker.dart';
 
 class AdminHome extends StatefulWidget {
@@ -207,7 +209,11 @@ class _AdminHomeState extends State<AdminHome> {
         ),
         Positioned(top: 0, left: 0, right: 0, child: GlassTopBar(title: 'Super Admin', scroll: _scroll,
             leading: const SizedBox(width: Space.x12),
-            actions: [GlassIconButton(icon: Icons.logout, semanticLabel: 'Log out', onPressed: _logout)])),
+            actions: [
+              GlassIconButton(icon: Icons.manage_search, semanticLabel: 'TAC catalog (IMEI models)',
+                  onPressed: () => SharedAxisRoute.push(context, (_) => const TacCatalogScreen())),
+              GlassIconButton(icon: Icons.logout, semanticLabel: 'Log out', onPressed: _logout),
+            ])),
       ])),
     );
   }

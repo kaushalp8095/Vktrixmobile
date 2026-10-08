@@ -29,7 +29,23 @@ async function migrate() {
       t.string('tac', 8).primary();          // IMEI ke pehle 8 digit
       t.string('brand'); t.string('model');
       t.string('ram'); t.string('storage'); t.string('color');
+      t.string('source', 16);                // osmocom | learned | csv | seed | legacy
       t.timestamp('updated_at').defaultTo(db.fn.now());
+    });
+  }
+  if (!(await db.schema.hasTable('tac_sync_runs'))) {
+    await db.schema.createTable('tac_sync_runs', t => {
+      t.increments('id');
+      t.string('source', 16).notNullable();  // osmocom
+      t.string('url', 500);
+      t.string('status', 16).notNullable();  // running | success | failed
+      t.timestamp('started_at').notNullable();
+      t.timestamp('finished_at');
+      t.integer('started_by').references('users.id').onDelete('SET NULL');
+      t.integer('bytes'); t.integer('rows_seen'); t.integer('invalid');
+      t.integer('inserted'); t.integer('updated'); t.integer('unchanged'); t.integer('protected');
+      t.text('error');
+      t.index(['status']);
     });
   }
   if (!(await db.schema.hasTable('phones'))) {
@@ -74,6 +90,15 @@ async function migrate() {
   if (!(await db.schema.hasColumn('users', 'token_version'))) {
     await db.schema.alterTable('users', t => t.integer('token_version').notNullable().defaultTo(0));
   }
+  if (!(await db.schema.hasColumn('tac_models', 'source'))) {
+    await db.schema.alterTable('tac_models', t => t.string('source', 16));
+  }
+  // Rows from before provenance tracking (learned purchases or old CSV imports)
+  // are marked "legacy" so the community sync treats them as protected.
+  await db('tac_models').whereNull('source').update({ source: 'legacy' });
+  // A sync runs inside the API process; after a restart any "running" row is dead.
+  await db('tac_sync_runs').where({ status: 'running' })
+    .update({ status: 'failed', finished_at: new Date().toISOString(), error: 'Interrupted by server restart' });
   if (!(await db.schema.hasColumn('sales', 'buy_price_at_sale'))) {
     await db.schema.alterTable('sales', t => t.decimal('buy_price_at_sale', 12, 2));
   }
@@ -105,7 +130,7 @@ async function migrate() {
   ];
   for (const [tac, brand, model, ram, storage] of seed) {
     if (!(await db('tac_models').where({ tac }).first()))
-      await db('tac_models').insert({ tac, brand, model, ram, storage });
+      await db('tac_models').insert({ tac, brand, model, ram, storage, source: 'seed' });
   }
 }
 module.exports = migrate;
