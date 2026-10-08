@@ -40,4 +40,11 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: flutter analyze --no-pub
-      - run: flutter test --no-pub --reporter github
+      - name: flutter test (tmp diagnostics)
+        run: |
+          set -o pipefail
+          flutter test --no-pub --reporter expanded 2>&1 | tee /tmp/out.txt || {
+            msg=$(grep -nE "\[E\]|Expected|Actual|Which|EXCEPTION|was thrown|Failed|diff|test/.*dart" /tmp/out.txt | head -60 | cut -c1-220 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+            echo "::error title=flutter-test-diagnostics::$msg"
+            exit 1
+          }
