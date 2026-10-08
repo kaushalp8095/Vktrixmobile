@@ -17,7 +17,7 @@ class BuyForm extends StatefulWidget {
   State<BuyForm> createState() => _BuyFormState();
 }
 
-enum _ImeiState { none, looking, found, newModel, invalid, duplicate }
+enum _ImeiState { none, looking, found, community, newModel, invalid, duplicate }
 
 class _BuyFormState extends State<BuyForm> {
   final _form = GlobalKey<FormState>();
@@ -51,7 +51,12 @@ class _BuyFormState extends State<BuyForm> {
         brand.text = '${i['brand'] ?? ''}'; model.text = '${i['model'] ?? ''}';
         ram.text = '${i['ram'] ?? ''}'; storage.text = '${i['storage'] ?? ''}';
         if (i['color'] != null && color.text.isEmpty) color.text = '${i['color']}';
-        _imeiState = _ImeiState.found; _imeiLabel = '${i['brand']} ${i['model']} · details auto-filled';
+        // Community catalog rows are unverified and have no RAM/storage: say so instead of "auto-filled".
+        final community = i['source'] == 'osmocom';
+        _imeiState = community ? _ImeiState.community : _ImeiState.found;
+        _imeiLabel = community
+            ? '${i['brand']} ${i['model']} · community data, verify model & fill RAM/storage'
+            : '${i['brand']} ${i['model']} · details auto-filled';
       } else { _imeiState = _ImeiState.newModel; _imeiLabel = 'New model — fill once, auto-fills next time'; }
       Haptics.tick();
     } catch (e) { _imeiState = _ImeiState.invalid; _imeiLabel = 'Lookup failed — you can still enter details manually'; }
@@ -95,6 +100,7 @@ class _BuyFormState extends State<BuyForm> {
   (ChipTone, IconData, String) get _imeiChip => switch (_imeiState) {
         _ImeiState.found => (ChipTone.success, Icons.check_circle_outline, _imeiLabel),
         _ImeiState.newModel => (ChipTone.warning, Icons.info_outline, _imeiLabel),
+        _ImeiState.community => (ChipTone.warning, Icons.fact_check_outlined, _imeiLabel),
         _ImeiState.invalid || _ImeiState.duplicate => (ChipTone.error, Icons.cancel_outlined, _imeiLabel),
         _ => (ChipTone.neutral, Icons.search, _imeiLabel),
       };

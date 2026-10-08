@@ -9,7 +9,7 @@
 | Login security | JWT token + bcrypt password hashing | |
 
 ## Features
-- **Super Admin**: shops banana, har shop ko alag login dena, shop band/chalu karna, password reset, delete, har shop ka stock/sales/report dekhna, overall dashboard, TAC (IMEI model) CSV import
+- **Super Admin**: shops banana, har shop ko alag login dena, shop band/chalu karna, password reset, delete, har shop ka stock/sales/report dekhna, overall dashboard, TAC (IMEI model) CSV import + **free TAC catalog sync** (Osmocom community data)
 - **Shop Login**: sirf apni shop ka data dikhega (dusri shop ka nahi)
 - **Buy Form**: IMEI likhte hi/scan karte hi Brand, Model, RAM, Storage apne aap bhar jata hai, IMEI valid hai ya nahi (Luhn check), duplicate check, pehle kab aaya tha wo history, seller ki details + ID proof
 - **Save karte hi stock me add** → Stock list me "BECHO" button → Sell form (profit/loss live dikhega)
@@ -17,9 +17,28 @@
 - **Reports**: Aaj / 7 din / Mahina / Saal / Custom: kharidi, bikri, profit, stock value, payment mode, top models, roz ki sales
 
 ### IMEI auto-fill kaise kaam karta hai
-IMEI ke pehle 8 digit (TAC) model batate hain. Database `tac_models` me:
-1. Jab bhi koi phone pehli baar kharida jata hai, uska model/RAM/storage save ho jata hai, **agli baar same model par sab auto-fill** ho jayega (app khud seekhta hai, sabhi shops ke liye).
-2. Super admin ek CSV bhi import kar sakta hai (`tac,brand,model,ram,storage`), jaise free Osmocom TAC database: `POST /api/admin/tac/import` (form field `file`).
+IMEI ke pehle 8 digit (TAC) model batate hain. Database `tac_models` me har row ka `source` save hota hai:
+
+| source | Kahan se aaya | Sync overwrite karega? |
+|---|---|---|
+| `learned` | Kisi shop ne ye phone kharida (brand/model/RAM/storage) | **Kabhi nahi** |
+| `csv` | Super admin ka apna CSV import | **Kabhi nahi** |
+| `legacy` / `seed` | Is update se pehle ki rows / sample rows | **Kabhi nahi** |
+| `osmocom` | Free community TAC catalog sync | Haan, sirf agle sync me (brand/model) |
+
+1. Jab bhi koi phone kharida jata hai, uska model/RAM/storage save ho jata hai (`learned`), **agli baar same model par sab auto-fill** (sabhi shops ke liye).
+2. **Free TAC catalog sync (Super Admin):** app me Super Admin → top bar ka 🔍 *TAC catalog* button → **Sync free catalog now**. Server [Osmocom TAC database](http://tacdb.osmocom.org/) ka CSV download karke naye TAC add karta hai. Sync background me chalta hai (1-2 min); screen par coverage, last run (new / updated / kept / skipped) aur error dikhte hain.
+3. Super admin apna CSV bhi import kar sakta hai: `POST /api/admin/tac/import` (form field `file`). Format `tac,brand,model[,ram,storage]` (header optional). Khaali columns purani RAM/storage ko blank **nahi** karte. Raw Osmocom export upload karne par wahi non-destructive sync rules lagte hain.
+
+#### ⚠️ Free TAC catalog ki limitations (zaroor padhein)
+- **Data adhoora hai:** community catalog me bahut se naye aur India-only models (Redmi/Realme/Vivo/Oppo ke naye variants) **nahi** hain. Aise phone pehli baar manually bharne padenge; uske baad app khud seekh lega.
+- **Sirf brand + model:** RAM, storage, colour catalog me nahi hote, shop ko khud bharne honge.
+- **Naam hamesha marketing name nahi hota:** kabhi model code aata hai (jaise `SM-A515F/DSN` = Galaxy A51), aur ek TAC kai variants cover kar sakta hai.
+- **Verified nahi hai:** data crowd-sourced hai, GSMA official nahi. Buy form me aisi entry par chip dikhega *"community data, verify model & fill RAM/storage"*. Kharidne se pehle phone (Settings → About / `*#06#`) se match karein.
+- **Upstream sirf `http://` deta hai (HTTPS nahi):** isliye sync safety ke liye: file size limit, minimum valid rows check, sab ek transaction me, **koi row delete nahi hoti**, aur shop/CSV data kabhi overwrite nahi hota. Kharab/adhoora download par kuch nahi badalta (run "Failed" dikhega).
+- **Licence:** data CC-BY-SA 3.0 hai: *TAC data: Osmocom TAC database (c) Harald Welte and contributors*. Attribution TAC catalog screen par dikhaya jata hai; data ko aage public share karein to yahi licence/attribution rakhein.
+
+Optional env (`backend/.env`): `TAC_SYNC_URL` (mirror/alternate CSV), `TAC_SYNC_TIMEOUT_MS` (default 120000), `TAC_SYNC_MAX_MB` (default 25), `TAC_SYNC_MIN_ROWS` (default 100).
 
 ---
 ## 1) Backend chalana
@@ -27,8 +46,10 @@ IMEI ke pehle 8 digit (TAC) model batate hain. Database `tac_models` me:
 cd backend
 npm install
 cp .env.example .env        # DATABASE_URL, JWT_SECRET, super admin password badlein
-npm start                    # tables apne aap ban jayengi
+npm start                    # tables apne aap ban jayengi (migrations additive + idempotent)
+npm test                     # backend tests (SQLite temp DB)
 ```
+PostgreSQL par test: `TEST_DATABASE_URL=postgres://.../vktrix_test npm test` (DB naam me `test` hona zaroori).
 Local testing ke liye bina Postgres: `.env` me `DB_CLIENT=better-sqlite3` rakhein.
 
 **Default Super Admin:** `superadmin` / `Admin@123` (`.env` me badlein!)
@@ -69,6 +90,8 @@ flutter build apk --release
 | PUT/DELETE | /api/admin/shops/:id | Edit, band/chalu / delete |
 | POST | /api/admin/shops/:id/reset-password | Password reset |
 | POST | /api/admin/tac/import | TAC CSV import |
+| GET | /api/admin/tac/status | TAC catalog coverage, last sync runs, limitations |
+| POST | /api/admin/tac/sync | Free TAC catalog sync shuru (202; pehle se chal raha ho to 409) |
 | GET | /api/imei/:imei | IMEI se phone ki info |
 | POST | /api/buy | Phone kharido (stock me add) |
 | GET | /api/stock?search= | Stock list |

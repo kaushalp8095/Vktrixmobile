@@ -6,6 +6,7 @@ const db = require('../db');
 const { requireAuth, requireRole } = require('../auth');
 const { wrap } = require('../util');
 const V = require('../validation');
+const TAC = require('../tac');
 r.use(requireAuth, requireRole('superadmin'));
 
 r.get('/dashboard', wrap(async (req, res) => {
@@ -77,19 +78,25 @@ r.delete('/shops/:id', wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
-// TAC CSV import. Columns: tac,brand,model[,ram,storage]
+// TAC CSV import. Accepts `tac,brand,model[,ram,storage]` (admin data, may overwrite
+// those columns) or the raw Osmocom export (treated exactly like the sync:
+// additive, never overwrites learned/admin rows, brand+model only).
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 r.post('/tac/import', upload.single('file'), wrap(async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'CSV file bhejein' });
-  const lines = req.file.buffer.toString('utf8').split(/\r?\n/);
-  let n = 0;
-  for (const line of lines) {
-    const c = line.split(',').map(x => x.trim().replace(/^"|"$/g, ''));
-    if (!/^\d{8}$/.test(c[0])) continue;
-    const row = { tac: c[0], brand: c[1] || null, model: c[2] || null, ram: c[3] || null, storage: c[4] || null };
-    await db('tac_models').insert(row).onConflict('tac').merge();
-    n++;
-  }
-  res.json({ imported: n });
+  const parsed = TAC.parseTacCsv(req.file.buffer.toString('utf8'));
+  if (!parsed.rows.length) return res.status(400).json({ error: 'CSV me koi valid TAC row nahi mili', invalid: parsed.invalid });
+  const result = await db.transaction(trx => parsed.format === 'osmocom'
+    ? TAC.applyCommunityRows(parsed.rows, trx) : TAC.applyAdminRows(parsed.rows, trx));
+  res.json({ imported: parsed.rows.length, format: parsed.format, invalid: parsed.invalid, duplicates: parsed.duplicates, ...result });
+}));
+
+// Free community TAC catalog (Osmocom) sync. Runs in the background; poll status.
+r.get('/tac/status', wrap(async (req, res) => res.json(await TAC.status())));
+r.post('/tac/sync', wrap(async (req, res) => {
+  const { started, run } = await TAC.startSync({ userId: req.user.id });
+  res.status(started ? 202 : 409).json({
+    started, run, ...(started ? {} : { error: 'TAC sync pehle se chal raha hai' }),
+  });
 }));
 module.exports = r;
