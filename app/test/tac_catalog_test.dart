@@ -4,6 +4,7 @@ import 'package:mobile_shop/design/components/components.dart';
 import 'package:mobile_shop/design/design.dart';
 import 'package:mobile_shop/screens/buy_form.dart';
 import 'package:mobile_shop/screens/tac_catalog.dart';
+import 'showcase_golden_test.dart' show loadFonts;
 
 Map<String, dynamic> _status({Map<String, dynamic>? lastRun, Map<String, dynamic>? running, Map<String, dynamic>? lastSuccess}) => {
       'total': 12450,
@@ -34,6 +35,7 @@ Widget _app(Widget home) => MaterialApp(
     );
 
 Future<void> _pump(WidgetTester t, Widget w) async {
+  await loadFonts(); // same real fonts as the golden tests (default test font is much wider)
   t.view.physicalSize = const Size(1080, 2340);
   t.view.devicePixelRatio = 2.625;
   t.view.padding = const FakeViewPadding(top: 63, bottom: 63);
@@ -87,10 +89,10 @@ void main() {
   });
 
   testWidgets('buy form flags community catalog matches for verification', (t) async {
-    await _pump(t, Scaffold(body: BuyForm(onSaved: () {}, testLookup: (imei) async => {
+    await _pump(t, Scaffold(body: AuroraBackground(child: BuyForm(onSaved: () {}, testLookup: (imei) async => {
       'valid': true, 'found': true, 'history': const [],
       'info': {'brand': 'Xiaomi', 'model': 'Redmi 9A', 'ram': null, 'storage': null, 'source': 'osmocom'},
-    })));
+    }))));
     await t.enterText(find.byType(TextField).first, '867513060000001');
     for (var i = 0; i < 6; i++) { await t.pump(const Duration(milliseconds: 50)); }
     expect(_textContaining('community data, verify model & fill RAM/storage'), findsOneWidget);

@@ -40,11 +40,4 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: flutter analyze --no-pub
-      - name: flutter test (tmp diagnostics)
-        run: |
-          set -o pipefail
-          flutter test --no-pub --reporter expanded 2>&1 | tee /tmp/out.txt || {
-            msg=$(grep -m1 -A45 "EXCEPTION CAUGHT BY RENDERING" /tmp/out.txt | cut -c1-200 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
-            echo "::error title=flutter-test-diagnostics::$msg"
-            exit 1
-          }
+      - run: flutter test --no-pub
