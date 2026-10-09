@@ -94,10 +94,15 @@ PostgreSQL par test: `TEST_DATABASE_URL=postgres://.../vktrix_test npm test` (DB
 > `npm_config_nodedir=<node-install-dir> npm install` use karein.
 
 ### Flutter tests — golden files
-App ke UI screenshots `app/goldens/*.png` me hain. **Buy form jaise kisi bhi screen ka layout badalne
-ke baad** goldens ek baar regenerate karne padte hain (main yahan se nahi kar sakta, Flutter local
-me chahiye):
+App ke UI screenshots `app/goldens/*.png` me hain. **Kisi bhi screen ka layout badalne ke baad**
+(naya field, row hili, label badla) goldens regenerate karne padte hain.
 
+**Tarika 1 — GitHub Actions se (local me Flutter ki zaroorat nahi):**
+`.github/workflows/update-goldens.yml` automatically chal jata hai jab `app/lib/**`, `app/test/**`
+ya `app/pubspec.yaml` badle hain. Ye goldens regenerate karta hai, test suite dobara chalata hai,
+aur PNGs wapas branch par commit kar deta hai.
+
+**Tarika 2 — local me:**
 ```bash
 cd app
 flutter pub get
@@ -105,8 +110,18 @@ flutter test --update-goldens     # goldens/*.png overwrite ho jayenge
 flutter test                      # sab green
 ```
 
+⚠️ `flutter test --update-goldens` **saare** goldens dobara likhta hai, sirf badle hue nahi. Chhoti
+si rendering drift (Flutter/font version) ki wajah se aisi PNGs bhi badal sakti hain jo 5% tolerance
+ke andar pass ho rahi thin — commit se pehle diff me dekh lein ki koi anjaani screen to nahi badli.
+
 Comparison me 5% tolerance hai (`test/flutter_test_config.dart`), par naye fields/rows usse zyada
 badalte hain — isliye CI tab tak fail rahega jab tak nayi PNGs commit na ho jayein.
+
+> Note: Actions tab me workflow tab dikhta hai jab wo repository ke **default branch** (`main`) par ho.
+> Feature branch par rehne ke dauran use push trigger automatically chala deta hai.
+> Bot (`github-actions[bot]`) ke commit se bana CI run "action_required" (approval) ka wait karta hai —
+> aisi run ko PR page se manually approve karein, ya branch par apne credentials se koi commit push
+> kar dein (nayi run bina approval ke chal jayegi).
 Local testing ke liye bina Postgres: `.env` me `DB_CLIENT=better-sqlite3` rakhein.
 
 **Default Super Admin:** `superadmin` / `Admin@123` (`.env` me badlein!)
