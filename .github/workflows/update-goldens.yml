@@ -1,0 +1,51 @@
+name: Update goldens
+
+# Manual only. Run this after an INTENTIONAL UI change (new field, moved row,
+# changed label) when `flutter test` fails with golden mismatches.
+#
+# How to use: Actions tab → "Update goldens" → Run workflow → pick the branch
+# you are working on (default is main, so change it if needed). The job
+# regenerates app/goldens/*.png, re-runs the suite, and pushes a commit.
+#
+# Review the committed PNGs before trusting them: a golden only proves "the
+# layout changed", not "the layout is right".
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  goldens:
+    name: Regenerate Flutter goldens
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      - name: Regenerate goldens
+        run: flutter test --no-pub --update-goldens
+
+      - name: Verify the suite is green with the new goldens
+        run: flutter test --no-pub
+
+      - name: Commit and push if anything changed
+        run: |
+          if [ -z "$(git status --porcelain goldens)" ]; then
+            echo "Goldens already up to date - nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add goldens
+          git commit -m "chore: regenerate Flutter goldens"
+          git push

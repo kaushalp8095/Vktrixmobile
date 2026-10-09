@@ -288,9 +288,9 @@ class _BuyFormState extends State<BuyForm> {
               ]),
               const SizedBox(height: Space.x12),
               Row(children: [
-                Expanded(child: _OptionField(controller: ram, label: 'RAM', options: _ramOptions)),
+                Expanded(child: _OptionField(controller: ram, label: 'RAM (e.g. 8GB)', options: _ramOptions)),
                 const SizedBox(width: Space.x12),
-                Expanded(child: _OptionField(controller: storage, label: 'Storage', options: _storageOptions)),
+                Expanded(child: _OptionField(controller: storage, label: 'Storage (e.g. 128GB)', options: _storageOptions)),
               ]),
               const SizedBox(height: Space.x12),
               Row(children: [
