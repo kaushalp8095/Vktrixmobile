@@ -99,4 +99,29 @@ void main() {
     expect(_textContaining('details auto-filled'), findsNothing);
     await t.pumpWidget(const SizedBox());
   });
+
+  testWidgets('catalog miss: the shop\'s own earlier entry for that IMEI fills the form', (t) async {
+    String value(String label) => t.widget<GlassTextField>(
+        find.byWidgetPredicate((w) => w is GlassTextField && w.label == label)).controller.text;
+
+    await _pump(t, Scaffold(body: AuroraBackground(child: BuyForm(onSaved: () {}, testLookup: (imei) async => {
+      'valid': true, 'found': false, 'info': null, 'already_in_stock': false,
+      'history': const [
+        {'brand': 'Samsung', 'model': 'Galaxy S21', 'ram': '8GB', 'storage': '128GB',
+          'color': 'Phantom Grey', 'notes': 'bill missing'},
+      ],
+    }))));
+    await t.enterText(find.byType(TextField).first, '867513060000001');
+    for (var i = 0; i < 6; i++) { await t.pump(const Duration(milliseconds: 50)); }
+    expect(_textContaining('Samsung Galaxy S21 · filled from your earlier entry'), findsOneWidget);
+    expect(_textContaining('bought 1× before'), findsOneWidget);
+    expect(_textContaining('New model'), findsNothing);
+    expect(value('Brand'), 'Samsung');
+    expect(value('Model'), 'Galaxy S21');
+    expect(value('RAM (e.g. 8GB)'), '8GB');
+    expect(value('Storage (e.g. 128GB)'), '128GB');
+    expect(value('Color'), 'Phantom Grey');
+    expect(value('IMEI 2 (optional)'), '', reason: 'history fills device fields only');
+    await t.pumpWidget(const SizedBox());
+  });
 }

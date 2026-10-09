@@ -1,6 +1,8 @@
 // SHOP SHELL: aurora + page content + floating AnimatedTabBar (Home/Buy/Stock/Sales/Reports).
+// System back: any tab → Home tab, back again within 2s → exit (see _onBack).
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../api.dart';
 import '../design/components/components.dart';
 import '../design/design.dart';
@@ -23,6 +25,10 @@ class _ShopHomeState extends State<ShopHome> {
   final _keys = List.generate(5, (_) => GlobalKey());
   final _pager = PageController();
   Timer? _updateTimer;
+  Timer? _exitTimer;
+
+  /// How long a first back press stays "armed" for the exit.
+  static const _exitWindow = Duration(seconds: 2);
 
   String get _name => widget.adminShopName ?? (Api.user?['shop']?['name'] ?? 'My Shop');
 
@@ -40,18 +46,41 @@ class _ShopHomeState extends State<ShopHome> {
     _pager.animateToPage(i, duration: Motion.of(context).d(Durations2.enter), curve: Curves2.enter);
   }
 
+  /// System/gesture back on the shop shell. The tabs are pages, not routes, so back
+  /// has nothing to pop: step to Home first, and only exit once Home is already showing.
+  /// Second press inside [_exitWindow] closes the app; otherwise the arm expires quietly.
+  void _onBack() {
+    if (tab != 0) { go(0); return; }
+    if (_exitTimer?.isActive ?? false) {
+      _exitTimer?.cancel();
+      SystemNavigator.pop();
+      return;
+    }
+    Haptics.tick();
+    _exitTimer?.cancel();
+    _exitTimer = Timer(_exitWindow, () {});
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(const SnackBar(
+          content: Text('Press back again to exit'), duration: _exitWindow));
+  }
+
   @override
   void dispose() {
     _pager.dispose();
     _updateTimer?.cancel();
+    _exitTimer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.viewPaddingOf(context).bottom;
-    return PopScope(
+    // Admin view is a pushed route: back pops to the shop list as usual (canPop true).
+    // For a shop user canPop is false, so the press lands in _onBack instead of dying.
+    return PopScope<Object?>(
       canPop: widget.adminShopName != null,
+      onPopInvokedWithResult: (didPop, _) { if (!didPop) _onBack(); },
       child: Scaffold(
         resizeToAvoidBottomInset: false,
         body: AuroraBackground(child: Stack(children: [

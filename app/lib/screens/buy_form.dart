@@ -1,5 +1,6 @@
 // BUY FORM: IMEI 15 digits → auto-lookup fills brand/model/RAM/storage/color.
-// Status shown as live StatusChip; save adds to stock. Test hook: testLookup/testSave.
+// Catalog (tac_models) first; if it misses, this shop's own last entry for the same
+// IMEI fills it. Status shown as live StatusChip; save adds to stock. Test hook: testLookup/testSave.
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../api.dart';
@@ -17,7 +18,7 @@ class BuyForm extends StatefulWidget {
   State<BuyForm> createState() => _BuyFormState();
 }
 
-enum _ImeiState { none, looking, found, community, newModel, invalid, duplicate }
+enum _ImeiState { none, looking, found, community, fromHistory, newModel, invalid, duplicate }
 
 class _BuyFormState extends State<BuyForm> {
   final _form = GlobalKey<FormState>();
@@ -44,23 +45,56 @@ class _BuyFormState extends State<BuyForm> {
     try {
       final r = widget.testLookup != null ? await widget.testLookup!(v) : (await Api.get('/imei/$v')) as Map<String, dynamic>;
       if (!mounted) return;
-      _timesBought = (r['history'] as List?)?.length ?? 0;
+      final history = (r['history'] as List?) ?? const [];
+      _timesBought = history.length;
+      // Newest first: this shop's own last entry for the same IMEI/IMEI 2 — the most
+      // trustworthy source we have, because the shop typed it itself.
+      final Map<String, dynamic>? prev = history.isEmpty ? null : Map<String, dynamic>.from(history.first as Map);
       if (r['already_in_stock'] == true) { _imeiState = _ImeiState.duplicate; _imeiLabel = 'This phone is already in stock'; }
       else if (r['found'] == true) {
         final i = r['info'];
         brand.text = '${i['brand'] ?? ''}'; model.text = '${i['model'] ?? ''}';
         ram.text = '${i['ram'] ?? ''}'; storage.text = '${i['storage'] ?? ''}';
         if (i['color'] != null && color.text.isEmpty) color.text = '${i['color']}';
-        // Community catalog rows are unverified and have no RAM/storage: say so instead of "auto-filled".
+        // Community catalog rows are unverified and have no RAM/storage: plug those gaps
+        // from the shop's earlier entry and say so, instead of claiming "auto-filled".
         final community = i['source'] == 'osmocom';
+        final plugged = _fillFrom(prev, onlyEmpty: true);
+        final name = _deviceName(i);
         _imeiState = community ? _ImeiState.community : _ImeiState.found;
         _imeiLabel = community
-            ? '${i['brand']} ${i['model']} · community data, verify model & fill RAM/storage'
-            : '${i['brand']} ${i['model']} · details auto-filled';
-      } else { _imeiState = _ImeiState.newModel; _imeiLabel = 'New model — fill once, auto-fills next time'; }
+            ? (plugged > 0
+                ? '$name · community data, verify model — RAM/storage from your earlier entry'
+                : '$name · community data, verify model & fill RAM/storage')
+            : '$name · details auto-filled';
+      } else if (prev != null) {
+        _fillFrom(prev, onlyEmpty: true);
+        final name = _deviceName(prev);
+        _imeiState = _ImeiState.fromHistory;
+        _imeiLabel = name.isEmpty ? 'Filled from your earlier entry' : '$name · filled from your earlier entry';
+      } else { _imeiState = _ImeiState.newModel; _imeiLabel = 'New model — fill brand & model once, next time they auto-fill'; }
       Haptics.tick();
     } catch (e) { _imeiState = _ImeiState.invalid; _imeiLabel = 'Lookup failed — you can still enter details manually'; }
     if (mounted) setState(() {});
+  }
+
+  /// "Samsung Galaxy S21" from a catalog or history row; skips whatever is missing
+  /// instead of printing "null".
+  String _deviceName(Map src) =>
+      [src['brand'], src['model']].map((e) => '${e ?? ''}'.trim()).where((e) => e.isNotEmpty).join(' ');
+
+  /// Copies brand/model/RAM/storage/color off [src]. Never overwrites a value the shop
+  /// has already typed when [onlyEmpty] is set. Returns how many fields were filled.
+  int _fillFrom(Map<String, dynamic>? src, {required bool onlyEmpty}) {
+    if (src == null) return 0;
+    var filled = 0;
+    void into(TextEditingController c, String key) {
+      final v = '${src[key] ?? ''}'.trim();
+      if (v.isEmpty || (onlyEmpty && c.text.trim().isNotEmpty)) return;
+      c.text = v; filled++;
+    }
+    into(brand, 'brand'); into(model, 'model'); into(ram, 'ram'); into(storage, 'storage'); into(color, 'color');
+    return filled;
   }
 
   Future<void> _scan() async {
@@ -99,6 +133,7 @@ class _BuyFormState extends State<BuyForm> {
 
   (ChipTone, IconData, String) get _imeiChip => switch (_imeiState) {
         _ImeiState.found => (ChipTone.success, Icons.check_circle_outline, _imeiLabel),
+        _ImeiState.fromHistory => (ChipTone.success, Icons.history, _imeiLabel),
         _ImeiState.newModel => (ChipTone.warning, Icons.info_outline, _imeiLabel),
         _ImeiState.community => (ChipTone.warning, Icons.fact_check_outlined, _imeiLabel),
         _ImeiState.invalid || _ImeiState.duplicate => (ChipTone.error, Icons.cancel_outlined, _imeiLabel),

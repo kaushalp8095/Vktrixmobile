@@ -11,10 +11,11 @@
 ## Features
 - **Super Admin**: shops banana, har shop ko alag login dena, shop band/chalu karna, password reset, delete, har shop ka stock/sales/report dekhna, overall dashboard, TAC (IMEI model) CSV import + **free TAC catalog sync** (Osmocom community data)
 - **Shop Login**: sirf apni shop ka data dikhega (dusri shop ka nahi)
-- **Buy Form**: IMEI likhte hi/scan karte hi Brand, Model, RAM, Storage apne aap bhar jata hai, IMEI valid hai ya nahi (Luhn check), duplicate check, pehle kab aaya tha wo history, seller ki details + ID proof
+- **Buy Form**: IMEI likhte hi/scan karte hi Brand, Model, RAM, Storage apne aap bhar jata hai, IMEI valid hai ya nahi (Luhn check), duplicate check, pehle kab aaya tha wo history (catalog miss ho to wahi entry auto-fill karti hai), seller ki details + ID proof
 - **Save karte hi stock me add** → Stock list me "BECHO" button → Sell form (profit/loss live dikhega)
 - **Sales**: list, long-press karke sale cancel (phone wapas stock me)
 - **Reports**: Aaj / 7 din / Mahina / Saal / Custom: kharidi, bikri, profit, stock value, payment mode, top models, roz ki sales
+- **Back button (Android)**: Buy/Stock/Sales/Reports tab par back = pehle Home tab; Home par 2 second ke andar dobara back = app band. Super Admin jab kisi shop ka data dekh raha ho, tab back seedha shop list par wapas jata hai.
 
 ### IMEI auto-fill kaise kaam karta hai
 IMEI ke pehle 8 digit (TAC) model batate hain. Database `tac_models` me har row ka `source` save hota hai:
@@ -29,6 +30,7 @@ IMEI ke pehle 8 digit (TAC) model batate hain. Database `tac_models` me har row 
 1. Jab bhi koi phone kharida jata hai, uska model/RAM/storage save ho jata hai (`learned`), **agli baar same model par sab auto-fill** (sabhi shops ke liye).
 2. **Free TAC catalog sync (Super Admin):** app me Super Admin → top bar ka 🔍 *TAC catalog* button → **Sync free catalog now**. Server [Osmocom TAC database](http://tacdb.osmocom.org/) ka CSV download karke naye TAC add karta hai. Sync background me chalta hai (1-2 min); screen par coverage, last run (new / updated / kept / skipped) aur error dikhte hain.
 3. Super admin apna CSV bhi import kar sakta hai: `POST /api/admin/tac/import` (form field `file`). Format `tac,brand,model[,ram,storage]` (header optional). Khaali columns purani RAM/storage ko blank **nahi** karte. Raw Osmocom export upload karne par wahi non-destructive sync rules lagte hain.
+4. **Wahi IMEI dobara aaye to:** `GET /api/imei/:imei` us shop ki apni latest entry (`history[0]`) bhi bhejta hai. Catalog (TAC) miss ho jaye to Brand/Model/RAM/Storage/Color wahin se bhar jate hain aur chip "filled from your earlier entry" dikhata hai; community (`osmocom`) row me jo RAM/storage missing hote hain wo bhi isi entry se plug hote hain. Jo field aapne khud bhar diya hai use auto-fill **kabhi overwrite nahi** karta.
 
 #### ⚠️ Free TAC catalog ki limitations (zaroor padhein)
 - **Data adhoora hai:** community catalog me bahut se naye aur India-only models (Redmi/Realme/Vivo/Oppo ke naye variants) **nahi** hain. Aise phone pehli baar manually bharne padenge; uske baad app khud seekh lega.
