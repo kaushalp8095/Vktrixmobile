@@ -11,7 +11,7 @@
 ## Features
 - **Super Admin**: shops banana, har shop ko alag login dena, shop band/chalu karna, password reset, delete, har shop ka stock/sales/report dekhna, overall dashboard, TAC (IMEI model) CSV import + **free TAC catalog sync** (Osmocom community data)
 - **Shop Login**: sirf apni shop ka data dikhega (dusri shop ka nahi)
-- **Buy Form**: IMEI likhte hi/scan karte hi Brand, Model, RAM, Storage apne aap bhar jata hai, IMEI valid hai ya nahi (Luhn check), duplicate check, pehle kab aaya tha wo history (catalog miss ho to wahi entry auto-fill karti hai), seller ki details + ID proof
+- **Buy Form**: IMEI likhte hi/scan karte hi **Brand + Model free me apne aap** bhar jata hai (local TAC catalog, koi external API/paisa nahi), RAM/Storage/Color ke liye **dropdown** (app ke apne purane data se), IMEI valid hai ya nahi (Luhn check), duplicate check, pehle kab aaya tha wo history (**catalog miss ho to wahi entry sab fields auto-fill karti hai**), **Serial number (optional)**, Customer details + ID proof (**photo upload: camera ya gallery**)
 - **Save karte hi stock me add** → Stock list me "BECHO" button → Sell form (profit/loss live dikhega)
 - **Sales**: list, long-press karke sale cancel (phone wapas stock me)
 - **Reports**: Aaj / 7 din / Mahina / Saal / Custom: kharidi, bikri, profit, stock value, payment mode, top models, roz ki sales
@@ -32,11 +32,47 @@ IMEI ke pehle 8 digit (TAC) model batate hain. Database `tac_models` me har row 
 3. Super admin apna CSV bhi import kar sakta hai: `POST /api/admin/tac/import` (form field `file`). Format `tac,brand,model[,ram,storage]` (header optional). Khaali columns purani RAM/storage ko blank **nahi** karte. Raw Osmocom export upload karne par wahi non-destructive sync rules lagte hain.
 4. **Wahi IMEI dobara aaye to:** `GET /api/imei/:imei` us shop ki apni latest entry (`history[0]`) bhi bhejta hai. Catalog (TAC) miss ho jaye to Brand/Model/RAM/Storage/Color wahin se bhar jate hain aur chip "filled from your earlier entry" dikhata hai; community (`osmocom`) row me jo RAM/storage missing hote hain wo bhi isi entry se plug hote hain. Jo field aapne khud bhar diya hai use auto-fill **kabhi overwrite nahi** karta.
 
+### RAM / Storage / Color dropdown kaise banta hai
+
+**IMEI me RAM, storage aur colour encoded hi nahi hote** — ye GSMA standard ka hissa nahi hain, isliye
+koi bhi TAC database (free ho ya paid) IMEI se ye nahi bata sakta. Sirf iPhone ke liye Apple ka
+per-serial lookup asli storage/colour de sakta hai (GSX-type paid service se).
+
+Isliye app ye karta hai:
+
+1. IMEI daalte hi `GET /api/imei/:imei` **Brand + Model free me** local `tac_models` se bhar deta hai.
+2. Saath me `options` bhejta hai — `{ram: [...], storage: [...], color: [...]}` — jo **poore app ke
+   apne data** se bante hain:
+   1. is exact TAC ke liye pichli baar jo bharaa tha
+   2. usi model ke liye kisi aur TAC par jo bharaa tha
+   3. usi brand ke liye jo bharaa tha
+   4. ek chhoti static fallback list (taaki dropdown kabhi khaali na rahe)
+3. Flutter me RAM/Storage/Color ek **text field + dropdown arrow** hain: shop ya to list me se
+   tap kare, ya naya value type kare. Jo bhi save hoga wo agle phone ke liye dropdown me aa jayega.
+
+Koi external API call nahi hoti, koi IMEI server se bahar nahi jata, aur iska koi kharcha nahi hai.
+
+### Customer details + ID photo
+
+- Section ka naam **Customer details** hai (phone jis se kharida jata hai).
+  Backend/API me field names `seller_*` hi hain taaki purana data aur reports na tootein.
+- **ID proof**: Aadhaar, PAN, Voter ID, Driving Licence, **Visiting Card**.
+- **Upload ID**: tap karne par sheet khulti hai — **Gallery se choose karein** ya **Camera se photo
+  lein**. Photo device par hi compress hoti hai (max 1280px, quality 72 → lagbhag 200-350 KB) aur
+  base64 data URL ban kar `phones.customer_id_photo` me save hoti hai. Server cap: **3 MB**, sirf
+  JPEG/PNG/WebP.
+  - ⚠️ Photo DB me base64 me save hoti hai (Render ka disk ephemeral hai, isliye file system reliable
+    nahi). Render ka `basic-256mb` Postgres plan me lagbhag 800-1500 photos aayengi — zyada volume ke
+    liye DB plan badhayein ya photo ko S3/Cloudinary jaise object storage me shift karein.
+  - Stock/sales list responses me photo **nahi** bheji jati (har row me base64 bhejne se response
+    bahut bhaari ho jayega). Poori row ke liye `GET /api/phones/:id` use karein.
+
 #### ⚠️ Free TAC catalog ki limitations (zaroor padhein)
 - **Data adhoora hai:** community catalog me bahut se naye aur India-only models (Redmi/Realme/Vivo/Oppo ke naye variants) **nahi** hain. Aise phone pehli baar manually bharne padenge; uske baad app khud seekh lega.
-- **Sirf brand + model:** RAM, storage, colour catalog me nahi hote, shop ko khud bharne honge.
+- **Sirf brand + model:** RAM, storage, colour catalog me nahi hote — dropdown app ke apne data se
+  bharata hai, nahi to shop khud bhar sakta hai.
 - **Naam hamesha marketing name nahi hota:** kabhi model code aata hai (jaise `SM-A515F/DSN` = Galaxy A51), aur ek TAC kai variants cover kar sakta hai.
-- **Verified nahi hai:** data crowd-sourced hai, GSMA official nahi. Buy form me aisi entry par chip dikhega *"community data, verify model & fill RAM/storage"*. Kharidne se pehle phone (Settings → About / `*#06#`) se match karein.
+- **Verified nahi hai:** data crowd-sourced hai, GSMA official nahi. Buy form me aisi entry par chip dikhega *"community data, model verify karein"*. Kharidne se pehle phone (Settings → About / `*#06#`) se match karein.
 - **Upstream sirf `http://` deta hai (HTTPS nahi):** isliye sync safety ke liye: file size limit, minimum valid rows check, sab ek transaction me, **koi row delete nahi hoti**, aur shop/CSV data kabhi overwrite nahi hota. Kharab/adhoora download par kuch nahi badalta (run "Failed" dikhega).
 - **Licence:** data CC-BY-SA 3.0 hai: *TAC data: Osmocom TAC database (c) Harald Welte and contributors*. Attribution TAC catalog screen par dikhaya jata hai; data ko aage public share karein to yahi licence/attribution rakhein.
 
@@ -52,6 +88,25 @@ npm start                    # tables apne aap ban jayengi (migrations additive 
 npm test                     # backend tests (SQLite temp DB)
 ```
 PostgreSQL par test: `TEST_DATABASE_URL=postgres://.../vktrix_test npm test` (DB naam me `test` hona zaroori).
+
+> **Note (native build):** `better-sqlite3` ko compile karne ke liye node headers chahiye. Agar
+> `npm install` nodejs.org se headers download nahi kar paaye, to
+> `npm_config_nodedir=<node-install-dir> npm install` use karein.
+
+### Flutter tests — golden files
+App ke UI screenshots `app/goldens/*.png` me hain. **Buy form jaise kisi bhi screen ka layout badalne
+ke baad** goldens ek baar regenerate karne padte hain (main yahan se nahi kar sakta, Flutter local
+me chahiye):
+
+```bash
+cd app
+flutter pub get
+flutter test --update-goldens     # goldens/*.png overwrite ho jayenge
+flutter test                      # sab green
+```
+
+Comparison me 5% tolerance hai (`test/flutter_test_config.dart`), par naye fields/rows usse zyada
+badalte hain — isliye CI tab tak fail rahega jab tak nayi PNGs commit na ho jayein.
 Local testing ke liye bina Postgres: `.env` me `DB_CLIENT=better-sqlite3` rakhein.
 
 **Default Super Admin:** `superadmin` / `Admin@123` (`.env` me badlein!)
@@ -105,7 +160,7 @@ Note: download app ke process me chalta hai. App ko kuch der ke liye minimize ka
 | POST | /api/admin/tac/import | TAC CSV import |
 | GET | /api/admin/tac/status | TAC catalog coverage, last sync runs, limitations |
 | POST | /api/admin/tac/sync | Free TAC catalog sync shuru (202; pehle se chal raha ho to 409) |
-| GET | /api/imei/:imei | IMEI se phone ki info |
+| GET | /api/imei/:imei | IMEI se phone ki info + RAM/storage/color ke dropdown `options` |
 | POST | /api/buy | Phone kharido (stock me add) |
 | GET | /api/stock?search= | Stock list |
 | GET/PUT/DELETE | /api/phones/:id | Phone detail/edit/delete |

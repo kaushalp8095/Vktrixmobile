@@ -54,6 +54,7 @@ async function migrate() {
       t.integer('shop_id').notNullable().references('shops.id').onDelete('CASCADE');
       t.string('imei', 15).notNullable();
       t.string('imei2', 15);
+      t.string('serial_number', 64);                 // box/back pe likha hua serial (optional)
       t.string('brand'); t.string('model'); t.string('ram'); t.string('storage'); t.string('color');
       t.string('condition');                 // Excellent / Good / Fair / Faulty
       t.string('accessories');               // box, charger, bill
@@ -62,6 +63,7 @@ async function migrate() {
       t.string('seller_name'); t.string('seller_phone'); t.string('seller_id_type'); t.string('seller_id_no');
       t.string('seller_address');
       t.text('notes');
+      t.text('customer_id_photo');                   // base64 data URL of the ID proof photo
       t.string('status').notNullable().defaultTo('in_stock'); // in_stock | sold
       t.integer('created_by').references('users.id');
       t.timestamp('created_at').defaultTo(db.fn.now());
@@ -102,6 +104,18 @@ async function migrate() {
   if (!(await db.schema.hasColumn('sales', 'buy_price_at_sale'))) {
     await db.schema.alterTable('sales', t => t.decimal('buy_price_at_sale', 12, 2));
   }
+  // Serial number (printed on the box / under the battery) and the customer ID photo.
+  if (!(await db.schema.hasColumn('phones', 'serial_number'))) {
+    await db.schema.alterTable('phones', t => t.string('serial_number', 64));
+  }
+  if (!(await db.schema.hasColumn('phones', 'customer_id_photo'))) {
+    await db.schema.alterTable('phones', t => t.text('customer_id_photo'));
+  }
+  // The Buy form asks for RAM/storage/colour suggestions on every IMEI lookup,
+  // matched case-insensitively on model and brand. Without these the sync can
+  // leave ~250k TAC rows and each lookup would full-scan the catalog six times.
+  await db.raw('CREATE INDEX IF NOT EXISTS tac_models_model_lower_idx ON tac_models (LOWER(model))');
+  await db.raw('CREATE INDEX IF NOT EXISTS tac_models_brand_lower_idx ON tac_models (LOWER(brand))');
   // Old sale rows predate cost snapshots. Backfill the best available current
   // phone cost; historical edits already made cannot be reconstructed.
   await db.raw('UPDATE sales SET buy_price_at_sale = (SELECT phones.buy_price FROM phones WHERE phones.id = sales.phone_id) WHERE buy_price_at_sale IS NULL');

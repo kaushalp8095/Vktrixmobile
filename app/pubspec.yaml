@@ -10,6 +10,7 @@ dependencies:
   http: ^1.2.0
   shared_preferences: ^2.2.0
   mobile_scanner: ^5.0.0
+  image_picker: ^1.1.2   # ID proof photo: camera ya gallery
   dynamic_color: ^1.7.0
   intl: ^0.19.0
   package_info_plus: ^10.2.2

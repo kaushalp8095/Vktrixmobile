@@ -4,7 +4,15 @@ const db = require('../db');
 const { requireAuth } = require('../auth');
 const { validImei, today, wrap } = require('../util');
 const V = require('../validation');
+const suggestions = require('../suggestions');
 r.use(requireAuth);
+
+// Columns returned by list endpoints. `customer_id_photo` is deliberately left
+// out: it holds a base64 image and would bloat every stock/reports response.
+// The full row (photo included) is available from GET /phones/:id.
+const PHONE_LIST_COLUMNS = ['id', 'shop_id', 'imei', 'imei2', 'serial_number', 'brand', 'model', 'ram', 'storage',
+  'color', 'condition', 'accessories', 'buy_price', 'buy_date', 'seller_name', 'seller_phone', 'seller_id_type',
+  'seller_id_no', 'seller_address', 'notes', 'status', 'created_by', 'created_at'];
 
 // shop_id nikalna: shop user -> apni shop; superadmin -> ?shop_id
 function shopId(req) {
@@ -34,16 +42,23 @@ r.get('/imei/:imei', wrap(async (req, res) => {
   const sid = shopId(req);
   const inStock = sid ? await db('phones').where({ shop_id: sid, status: 'in_stock' })
     .andWhere(q => q.where({ imei }).orWhere({ imei2: imei })).first() : null;
-  const history = sid ? await db('phones').where({ shop_id: sid }).andWhere(q => q.where({ imei }).orWhere({ imei2: imei })).orderBy('id', 'desc') : [];
-  res.json({ imei, valid, tac, found: !!info, info: info || null, already_in_stock: !!inStock, history });
+  // Same column list as /stock: history rows must not carry the base64 ID photo.
+  const history = sid ? await db('phones').select(PHONE_LIST_COLUMNS).where({ shop_id: sid })
+    .andWhere(q => q.where({ imei }).orWhere({ imei2: imei })).orderBy('id', 'desc') : [];
+  // Brand + model come from the local TAC catalog (free, no external call).
+  // ram/storage/color cannot be derived from an IMEI, so we send the values this
+  // app has already recorded for that model/brand and let the shop pick one.
+  const options = await suggestions.options(info);
+  res.json({ imei, valid, tac, found: !!info, info: info || null, options, already_in_stock: !!inStock, history });
 }));
 
 // ---------- BUY (stock me add) ----------
 r.post('/buy', wrap(async (req, res) => {
   const sid = needShop(req, res); if (!sid) return;
   const b = V.body(req);
-  const buyFields = ['imei', 'imei2', 'brand', 'model', 'ram', 'storage', 'color', 'condition', 'accessories',
-    'buy_price', 'buy_date', 'seller_name', 'seller_phone', 'seller_id_type', 'seller_id_no', 'seller_address', 'notes'];
+  const buyFields = ['imei', 'imei2', 'serial_number', 'brand', 'model', 'ram', 'storage', 'color', 'condition', 'accessories',
+    'buy_price', 'buy_date', 'seller_name', 'seller_phone', 'seller_id_type', 'seller_id_no', 'seller_address', 'notes',
+    'customer_id_photo'];
   if (Object.keys(b).some(k => !buyFields.includes(k))) return res.status(400).json({ error: 'Unsupported purchase field' });
   const fields = V.phoneData(b);
   const id = await db.transaction(async trx => {
@@ -77,7 +92,7 @@ r.get('/stock', wrap(async (req, res) => {
     const s = `%${req.query.search}%`;
     q.andWhere(w => w.where('imei', 'like', s).orWhere('imei2', 'like', s).orWhere('model', 'like', s).orWhere('brand', 'like', s));
   }
-  res.json(await q.orderBy('id', 'desc'));
+  res.json(await q.select(PHONE_LIST_COLUMNS).orderBy('id', 'desc'));
 }));
 
 r.get('/phones/:id', wrap(async (req, res) => {
@@ -94,7 +109,8 @@ r.put('/phones/:id', wrap(async (req, res) => {
   const id = V.id(req.params.id, 'phone id');
   const b = V.body(req);
   const allowed = ['brand', 'model', 'ram', 'storage', 'color', 'condition', 'accessories', 'buy_price', 'buy_date',
-    'seller_name', 'seller_phone', 'seller_id_type', 'seller_id_no', 'seller_address', 'notes', 'imei2'];
+    'seller_name', 'seller_phone', 'seller_id_type', 'seller_id_no', 'seller_address', 'notes', 'imei2',
+    'serial_number', 'customer_id_photo'];
   if (Object.keys(b).some(k => !allowed.includes(k))) return res.status(400).json({ error: 'Unsupported phone field' });
   const upd = V.phoneData(b, true);
   if (Object.hasOwn(upd, 'imei2') && upd.imei2) {
