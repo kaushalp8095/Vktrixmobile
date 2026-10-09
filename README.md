@@ -80,6 +80,17 @@ flutter build apk --release
 # file: build/app/outputs/flutter-apk/app-release.apk  → shops ko de dein
 ```
 
+## App update (in-app, bina browser)
+`app/version.json` me nayi `versionCode` aate hi app me **Update available** popup khulta hai. **Update now** dabane par:
+1. APK app ke andar hi download hota hai. Popup me live % progress bar, MB, speed aur time-left dikhte hain. **Hide** dabane par download chalta rehta hai.
+2. Download ke baad file check hoti hai (poori size + valid APK). Phir Android ka **Install** popup apne aap khulta hai.
+3. Pehli baar Android *"Install unknown apps"* permission maangta hai. Settings me *Allow from this source* on karke wapas aate hi install apne aap aage badhta hai.
+4. Fail hone par **Retry** milta hai, aur fallback ke liye *Download in browser instead* bhi hai.
+
+⚠️ **Signing zaroori:** Android update tabhi install karta hai jab har release **same key** se sign ho. `auto-release.yml` ab GitHub secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_STORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` (wahi jo Firebase workflow use karta hai) se sign karta hai. Secrets na hon to release fail hoti hai. Jin phones me purani (random debug-key wali) APK hai, unhe **ek baar** purani app uninstall karke nayi APK install karni hogi. Uske baad har update app ke andar se ho jayega.
+
+Note: download app ke process me chalta hai. App ko kuch der ke liye minimize karna theek hai, lekin app poori tarah band (swipe-kill) karne par download ruk jata hai. Agli baar **Update now** dabane par download fir se shuru hoga.
+
 ## API list
 | Method | URL | Kaam |
 |---|---|---|
