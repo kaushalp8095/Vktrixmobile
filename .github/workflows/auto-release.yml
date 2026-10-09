@@ -46,10 +46,41 @@ jobs:
         working-directory: app
         run: flutter pub get
         
+      # In-app updates only install over the existing app when EVERY release is signed
+      # with the same key. Without these secrets the runner's random debug key is used
+      # and Android rejects the update ("App not installed"), so fail loudly instead.
+      - name: Prepare persistent Android signing key
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_STORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Missing GitHub Actions secret ${name}. Releases must use the persistent signing key or in-app updates cannot install."
+              exit 1
+            fi
+          done
+          mkdir -p keystore
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > keystore/release.jks
+          test -s keystore/release.jks
+          {
+            printf 'storeFile=%s\n' "$GITHUB_WORKSPACE/keystore/release.jks"
+            printf 'storePassword=%s\n' "$ANDROID_STORE_PASSWORD"
+            printf 'keyAlias=%s\n' "$ANDROID_KEY_ALIAS"
+            printf 'keyPassword=%s\n' "$ANDROID_KEY_PASSWORD"
+          } > keystore/key.properties
+
       - name: Build APK
         working-directory: app
         run: flutter build apk --release --build-name=${{ steps.version.outputs.version_name }} --build-number=${{ steps.version.outputs.build_number }}
         
+      - name: Show APK signing certificate
+        run: keytool -printcert -jarfile app/build/app/outputs/flutter-apk/app-release.apk | grep -E "Owner|SHA256" || true
+
       - name: Create version.json
         run: |
           cat > app/version.json << EOF
