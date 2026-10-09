@@ -78,6 +78,35 @@ Koi external API call nahi hoti, koi IMEI server se bahar nahi jata, aur iska ko
 
 Optional env (`backend/.env`): `TAC_SYNC_URL` (mirror/alternate CSV), `TAC_SYNC_TIMEOUT_MS` (default 120000), `TAC_SYNC_MAX_MB` (default 25), `TAC_SYNC_MIN_ROWS` (default 100).
 
+### "New model — fill brand & model once" kyon aata hai aur kya karein
+
+Iska matlab sirf itna hai: **ye TAC (IMEI ke pehle 8 digit) abhi tak catalog me nahi hai.** IMEI se
+sirf Brand + Model hi mil sakte hain (RAM/storage/colour nahi — upar dekhein), aur wo bhi tabhi jab
+TAC pahle se maujood ho. Coverage badhane ke 4 tarike, saste se mehenge ki taraf:
+
+1. **Free catalog sync (pehle ye try karein):** Super Admin → 🔍 *TAC catalog* → **Sync free catalog now**.
+   Osmocom ka free data hai, par isme naye aur India-only models (Redmi/Realme/Vivo/Oppo ke naye
+   variants) aksar **nahi** hote.
+2. **App khud seekh lega:** ek baar aapne brand/model bhar diya to wahi TAC dobara aane par
+   auto-fill ho jata hai — aur wo sabhi shops ke liye. Roz ke use me yahi sabse zyada kaam aata hai.
+3. **CSV import:** `POST /api/admin/tac/import`, format `tac,brand,model[,ram,storage]`.
+4. **TAC API (optional, sirf miss hone par):** `.env` me daalein —
+   ```ini
+   TAC_API_URL=https://imei.hicelltek.com/api/v1/tac/lookup   # misal
+   TAC_API_KEY=                 # provider ka key (agar chahiye)
+   TAC_API_METHOD=POST          # ya GET; URL me {tac} likha ho to wahan TAC lag jata hai
+   TAC_API_TIMEOUT_MS=4000
+   ```
+   Ye **sirf tab** call hota hai jab local catalog miss kare, aur jo mile wo `source='api'` ke saath
+   save ho jata hai — isliye **har TAC par zyada se zyada ek request, kabhi dobara nahi**
+   (HiCellTek ka free tier 100/month kaafi ho jata hai). Community sync in rows ko kabhi overwrite
+   nahi karta, aur jo shop ne khud bharaa hai wo hamesha bacha rehta hai.
+   Bina `TAC_API_URL` ke ye feature band hai aur koi request jaati hi nahi.
+
+> ⚠️ **Backend deploy hona zaroori hai.** App `lib/api.dart` ke `baseUrl` par jata hai
+> (abhi `https://vktrixmobile.onrender.com`). Backend me ye code tabhi kaam karega jab branch
+> merge ho kar Render par deploy ho jaye — tab tak purana server chal raha hota hai.
+
 ---
 ## 1) Backend chalana
 ```bash

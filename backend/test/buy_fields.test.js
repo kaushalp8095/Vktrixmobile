@@ -26,6 +26,7 @@ const migrate = require('../src/migrate');
 const V = require('../src/validation');
 const { validImei } = require('../src/util');
 const suggestions = require('../src/suggestions');
+const tacApi = require('../src/tacApi');
 
 // 1x1 transparent PNG, as the app would send it.
 const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==';
@@ -141,6 +142,62 @@ test('suggestion lists are built from this app\'s own data, exact match first', 
   assert.deepEqual(await suggestions.distinctBy('model', { brand: 'Apple' }), []);
   // distinctBy is raw (no case folding); '8gb' is only collapsed inside options().
   assert.deepEqual(await suggestions.distinctBy('ram'), ['4GB', '6GB', '8GB', '8gb']);
+});
+
+test('external TAC API is off by default and, when on, caches what it learns', async () => {
+  await migrate();
+
+  // Nothing configured => no request is ever made.
+  delete process.env.TAC_API_URL;
+  assert.equal(tacApi.enabled(), false);
+  assert.equal(await tacApi.lookup('35104463'), null);
+
+  let calls = 0;
+  const fake = async (url, init) => {
+    calls++;
+    assert.match(url, /imei\.example/);
+    assert.equal(init.method, 'POST');
+    assert.equal(init.headers['X-Api-Key'], 'secret-key');
+    assert.deepEqual(JSON.parse(init.body), { query: '35104463' });
+    return new Response(JSON.stringify({ found: true, brand: { name: 'Apple' }, model: 'iPhone 13' }));
+  };
+
+  process.env.TAC_API_URL = 'https://imei.example/api/v1/tac/lookup';
+  process.env.TAC_API_KEY = 'secret-key';
+  assert.equal(tacApi.enabled(), true);
+
+  const first = await tacApi.lookup('35104463', fake);
+  assert.equal(calls, 1);
+  assert.equal(first.brand, 'Apple');
+  assert.equal(first.model, 'iPhone 13');
+  assert.equal((await db('tac_models').where({ tac: '35104463' }).first()).source, 'api');
+
+  // Second lookup is served from the cache, not the network.
+  assert.equal((await tacApi.lookup('35104463', fake)).model, 'iPhone 13');
+  assert.equal(calls, 1, 'a known TAC must not be looked up again');
+
+  // A row the shop typed itself is never overwritten by the API.
+  await db('tac_models').insert({ tac: '35104464', brand: 'Samsung', model: 'My Own Entry',
+    source: 'learned' }).onConflict('tac').merge();
+  const kept = await tacApi.lookup('35104464', fake);
+  assert.equal(kept.model, 'My Own Entry');
+
+  // Provider failures are swallowed: buying must keep working.
+  assert.equal(await tacApi.lookup('35104465', async () => { throw new Error('offline'); }), null);
+  assert.equal(await tacApi.lookup('35104466', async () => new Response('nope', { status: 500 })), null);
+  assert.equal(await tacApi.lookup('35104467', async () => new Response('{"found":false}')), null);
+  assert.equal(await tacApi.lookup('nope', fake), null, 'invalid TAC is rejected before any request');
+
+  // Other response shapes are understood too.
+  assert.deepEqual(tacApi.parse({ manufacturer: 'Xiaomi', marketing_name: 'Redmi Note 12' }),
+    { brand: 'Xiaomi', model: 'Redmi Note 12' });
+  assert.deepEqual(tacApi.parse({ brand: 'Apple', model: null }), { brand: 'Apple', model: null });
+  assert.equal(tacApi.parse({ brand: null, model: null }), null);
+  assert.equal(tacApi.parse({ found: false, brand: 'Apple', model: 'iPhone' }), null);
+  assert.equal(tacApi.parse('not json'), null);
+
+  delete process.env.TAC_API_URL;
+  delete process.env.TAC_API_KEY;
 });
 
 test('buy flow: serial number, ID photo and Visiting Card are stored; photos stay out of lists', async t => {

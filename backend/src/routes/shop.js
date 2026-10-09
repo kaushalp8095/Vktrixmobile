@@ -5,6 +5,7 @@ const { requireAuth } = require('../auth');
 const { validImei, today, wrap } = require('../util');
 const V = require('../validation');
 const suggestions = require('../suggestions');
+const tacApi = require('../tacApi');
 r.use(requireAuth);
 
 // Columns returned by list endpoints. `customer_id_photo` is deliberately left
@@ -38,7 +39,10 @@ r.get('/imei/:imei', wrap(async (req, res) => {
   const imei = req.params.imei.trim();
   const valid = validImei(imei);
   const tac = imei.slice(0, 8);
-  const info = await db('tac_models').where({ tac }).first();
+  // Local catalog first (free, instant). Only on a miss, and only if the
+  // deployment configured one, ask an external TAC API and cache the answer.
+  let info = await db('tac_models').where({ tac }).first();
+  if (!info && valid && tacApi.enabled()) info = await tacApi.lookup(tac);
   const sid = shopId(req);
   const inStock = sid ? await db('phones').where({ shop_id: sid, status: 'in_stock' })
     .andWhere(q => q.where({ imei }).orWhere({ imei2: imei })).first() : null;
