@@ -1,19 +1,31 @@
 name: Update goldens
 
-# Manual only. Run this after an INTENTIONAL UI change (new field, moved row,
-# changed label) when `flutter test` fails with golden mismatches.
+# Regenerates app/goldens/*.png after an intentional UI change (new field,
+# moved row, changed label) and pushes them back to the branch.
 #
-# How to use: Actions tab → "Update goldens" → Run workflow → pick the branch
-# you are working on (default is main, so change it if needed). The job
-# regenerates app/goldens/*.png, re-runs the suite, and pushes a commit.
+# Runs when UI code changes on a branch. The bot's own commit only touches
+# app/goldens/**, which is not in the `paths` filter, so it cannot loop.
+#
+# Can also be started by hand from the Actions tab once this file is on the
+# repository's default branch.
 #
 # Review the committed PNGs before trusting them: a golden only proves "the
 # layout changed", not "the layout is right".
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - 'app/lib/**'
+      - 'app/test/**'
+      - 'app/pubspec.yaml'
+      - '.github/workflows/update-goldens.yml'
 
 permissions:
   contents: write
+
+concurrency:
+  group: update-goldens-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   goldens:
@@ -39,6 +51,8 @@ jobs:
         run: flutter test --no-pub
 
       - name: Commit and push if anything changed
+        env:
+          BRANCH: ${{ github.ref_name }}
         run: |
           if [ -z "$(git status --porcelain goldens)" ]; then
             echo "Goldens already up to date - nothing to commit."
@@ -48,4 +62,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add goldens
           git commit -m "chore: regenerate Flutter goldens"
-          git push
+          git push origin "HEAD:$BRANCH"
