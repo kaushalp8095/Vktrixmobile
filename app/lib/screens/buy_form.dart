@@ -27,6 +27,13 @@ class BuyForm extends StatefulWidget {
 
 enum _ImeiState { none, looking, found, community, fromHistory, newModel, invalid, duplicate }
 
+/// Shown when the server has nothing recorded yet (new model, or a backend that
+/// is not deployed with the `options` response). The dropdown stays usable
+/// instead of opening empty.
+const List<String> kDefaultRamOptions = ['2GB', '3GB', '4GB', '6GB', '8GB', '12GB', '16GB'];
+const List<String> kDefaultStorageOptions = ['16GB', '32GB', '64GB', '128GB', '256GB', '512GB', '1TB'];
+const List<String> kDefaultColorOptions = ['Black', 'White', 'Blue', 'Silver', 'Grey', 'Gold', 'Green', 'Purple', 'Red'];
+
 class _BuyFormState extends State<BuyForm> {
   final _form = GlobalKey<FormState>();
   final _scroll = ScrollController();
@@ -45,8 +52,12 @@ class _BuyFormState extends State<BuyForm> {
   String _imeiLabel = '';
   int _timesBought = 0;
 
-  // Dropdown values for RAM/storage/colour, filled from the app's own data.
-  final List<String> _ramOptions = [], _storageOptions = [], _colorOptions = [];
+  // Dropdown values for RAM/storage/colour. Start with the built-in defaults so
+  // the arrow works immediately; /imei/:imei replaces these with what this app
+  // has actually recorded for the model.
+  final List<String> _ramOptions = [...kDefaultRamOptions],
+      _storageOptions = [...kDefaultStorageOptions],
+      _colorOptions = [...kDefaultColorOptions];
 
   // ID proof photo (camera or gallery), kept as a data URL for the API.
   Uint8List? _idPhotoBytes;
@@ -64,18 +75,22 @@ class _BuyFormState extends State<BuyForm> {
   /// Remembers the dropdown options returned by /imei/:imei.
   void _setOptions(dynamic raw) {
     final Map<dynamic, dynamic> o = raw is Map ? raw : const <dynamic, dynamic>{};
-    List<String> asList(dynamic v) => (v as List? ?? const [])
-        .map((e) => '$e'.trim()).where((e) => e.isNotEmpty).toList(growable: false);
+    // An older/absent backend sends nothing: fall back to the built-in defaults.
+    List<String> asList(dynamic v, List<String> fallback) {
+      final list = (v as List? ?? const [])
+          .map((e) => '$e'.trim()).where((e) => e.isNotEmpty).toList(growable: false);
+      return list.isEmpty ? fallback : list;
+    }
     setState(() {
       _ramOptions
         ..clear()
-        ..addAll(asList(o['ram']));
+        ..addAll(asList(o['ram'], kDefaultRamOptions));
       _storageOptions
         ..clear()
-        ..addAll(asList(o['storage']));
+        ..addAll(asList(o['storage'], kDefaultStorageOptions));
       _colorOptions
         ..clear()
-        ..addAll(asList(o['color']));
+        ..addAll(asList(o['color'], kDefaultColorOptions));
     });
   }
 
@@ -396,14 +411,53 @@ class _BuyFormState extends State<BuyForm> {
   }
 }
 
-/// A normal text field whose dropdown is filled with values this app has
-/// already recorded for the same model/brand. Typing a new value still works,
-/// which is what stores it for next time.
+/// A normal text field with a dropdown of values this app has already recorded
+/// for the same model/brand. The list opens as a bottom sheet, which always
+/// lands in the same place no matter where the field sits in the scrolling
+/// form (a popup menu anchored to the field can be clipped or misplaced).
+/// Typing a new value still works — that is what teaches the app for next time.
 class _OptionField extends StatelessWidget {
   final TextEditingController controller;
   final String label;
   final List<String> options;
   const _OptionField({required this.controller, required this.label, required this.options});
+
+  Future<void> _openPicker(BuildContext context) async {
+    final c = context.colors, t = context.type;
+    final current = controller.text.trim().toLowerCase();
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheet) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(sheet).height * 0.6),
+          child: SingleChildScrollView(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(Space.x16, Space.x8, Space.x16, Space.x12),
+                child: Row(children: [
+                  Icon(Icons.format_list_bulleted, size: 20, color: c.textSecondary),
+                  const SizedBox(width: Space.x12),
+                  Text('$label choose karein', style: t.titleSmall?.copyWith(color: c.textPrimary)),
+                ]),
+              ),
+              const Divider(height: 1),
+              for (final option in options)
+                ListTile(
+                  title: Text(option, style: t.bodyLarge),
+                  trailing: option.toLowerCase() == current ? Icon(Icons.check, color: c.brandInk) : null,
+                  onTap: () => Navigator.pop(sheet, option),
+                ),
+              const SizedBox(height: Space.x8),
+            ]),
+          ),
+        ),
+      ),
+    );
+    if (picked == null) return;
+    Haptics.tick();
+    controller.text = picked;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -411,16 +465,11 @@ class _OptionField extends StatelessWidget {
       controller: controller,
       label: label,
       textInputAction: TextInputAction.next,
-      suffix: options.isEmpty
-          ? null
-          : PopupMenuButton<String>(
-              tooltip: '$label choose karein',
-              icon: Icon(Icons.arrow_drop_down, color: context.colors.textSecondary),
-              onSelected: (value) { Haptics.tick(); controller.text = value; },
-              itemBuilder: (_) => options
-                  .map((e) => PopupMenuItem<String>(value: e, child: Text(e)))
-                  .toList(growable: false),
-            ),
+      suffix: IconButton(
+        tooltip: '$label choose karein',
+        icon: Icon(Icons.arrow_drop_down, color: context.colors.textSecondary),
+        onPressed: () => _openPicker(context),
+      ),
     );
   }
 }
