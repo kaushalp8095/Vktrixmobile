@@ -20,7 +20,13 @@ void main() {
         home: Scaffold(body: AuroraBackground(child: BuyForm(
           onSaved: () {},
           testLookup: (imei) async => {'valid': true, 'found': true, 'history': const [{}],
-              'info': {'brand': 'Apple', 'model': 'iPhone 13', 'ram': '4GB', 'storage': '128GB', 'color': 'Black'}})))),
+              'info': {'brand': 'Apple', 'model': 'iPhone 13', 'ram': '4GB', 'storage': '128GB', 'color': 'Black'},
+              // Dropdown options, as /imei/:imei returns them.
+              'options': {
+                'ram': ['4GB', '6GB', '8GB'],
+                'storage': ['128GB', '256GB'],
+                'color': ['Black', 'Blue', 'Silver'],
+              }})))),
     'stock': (dark) => MaterialApp(debugShowCheckedModeBanner: false,
         theme: AppTheme.build(dark ? AppTheme.darkScheme : AppTheme.lightScheme),
         home: Scaffold(body: AuroraBackground(child: StockScreen(testItems: _stock, onBuy: () {})))),

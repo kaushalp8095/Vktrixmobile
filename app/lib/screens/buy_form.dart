@@ -1,7 +1,14 @@
-// BUY FORM: IMEI 15 digits → auto-lookup fills brand/model/RAM/storage/color.
+// BUY FORM: IMEI 15 digits → free TAC lookup fills brand + model.
 // Catalog (tac_models) first; if it misses, this shop's own last entry for the same
-// IMEI fills it. Status shown as live StatusChip; save adds to stock. Test hook: testLookup/testSave.
+// IMEI fills it. RAM / storage / colour cannot come from an IMEI, so the server
+// sends the values THIS app has already recorded for that model and the shop picks
+// one from a dropdown (or types its own). Status shown as a live StatusChip;
+// save adds to stock. Test hook: testLookup/testSave.
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../api.dart';
 import '../design/components/components.dart';
@@ -23,11 +30,14 @@ enum _ImeiState { none, looking, found, community, fromHistory, newModel, invali
 class _BuyFormState extends State<BuyForm> {
   final _form = GlobalKey<FormState>();
   final _scroll = ScrollController();
-  final imei = TextEditingController(), imei2 = TextEditingController(), brand = TextEditingController(),
-      model = TextEditingController(), ram = TextEditingController(), storage = TextEditingController(),
-      color = TextEditingController(), accessories = TextEditingController(), price = TextEditingController(),
-      sName = TextEditingController(), sPhone = TextEditingController(), sIdNo = TextEditingController(),
-      sAddr = TextEditingController(), notes = TextEditingController();
+  final imei = TextEditingController(), imei2 = TextEditingController(), serial = TextEditingController(),
+      brand = TextEditingController(), model = TextEditingController(), ram = TextEditingController(),
+      storage = TextEditingController(), color = TextEditingController(), accessories = TextEditingController(),
+      price = TextEditingController(),
+      // Server-side keys stay seller_* for compatibility; the shop calls this
+      // person the customer, so the UI says "Customer".
+      cName = TextEditingController(), cPhone = TextEditingController(),
+      cAddr = TextEditingController(), notes = TextEditingController();
   String condition = 'Good', idType = 'Aadhaar';
   DateTime date = DateTime.now();
   ButtonPhase _phase = ButtonPhase.idle;
@@ -35,8 +45,39 @@ class _BuyFormState extends State<BuyForm> {
   String _imeiLabel = '';
   int _timesBought = 0;
 
+  // Dropdown values for RAM/storage/colour, filled from the app's own data.
+  final List<String> _ramOptions = [], _storageOptions = [], _colorOptions = [];
+
+  // ID proof photo (camera or gallery), kept as a data URL for the API.
+  Uint8List? _idPhotoBytes;
+  String? _idPhoto;
+  static const int _maxIdPhotoBytes = 3 * 1024 * 1024; // keep in sync with the server
+
   @override
-  void dispose() { _scroll.dispose(); for (final c in [imei, imei2, brand, model, ram, storage, color, accessories, price, sName, sPhone, sIdNo, sAddr, notes]) { c.dispose(); } super.dispose(); }
+  void dispose() {
+    _scroll.dispose();
+    for (final c in [imei, imei2, serial, brand, model, ram, storage, color, accessories, price,
+          cName, cPhone, cAddr, notes]) { c.dispose(); }
+    super.dispose();
+  }
+
+  /// Remembers the dropdown options returned by /imei/:imei.
+  void _setOptions(dynamic raw) {
+    final Map<dynamic, dynamic> o = raw is Map ? raw : const <dynamic, dynamic>{};
+    List<String> asList(dynamic v) => (v as List? ?? const [])
+        .map((e) => '$e'.trim()).where((e) => e.isNotEmpty).toList(growable: false);
+    setState(() {
+      _ramOptions
+        ..clear()
+        ..addAll(asList(o['ram']));
+      _storageOptions
+        ..clear()
+        ..addAll(asList(o['storage']));
+      _colorOptions
+        ..clear()
+        ..addAll(asList(o['color']));
+    });
+  }
 
   Future<void> _lookup(String v) async {
     if (v.length != 15) { setState(() => _imeiState = _ImeiState.none); return; }
@@ -50,6 +91,7 @@ class _BuyFormState extends State<BuyForm> {
       // Newest first: this shop's own last entry for the same IMEI/IMEI 2 — the most
       // trustworthy source we have, because the shop typed it itself.
       final Map<String, dynamic>? prev = history.isEmpty ? null : Map<String, dynamic>.from(history.first as Map);
+      _setOptions(r['options']);
       if (r['already_in_stock'] == true) { _imeiState = _ImeiState.duplicate; _imeiLabel = 'This phone is already in stock'; }
       else if (r['found'] == true) {
         final i = r['info'];
@@ -94,6 +136,7 @@ class _BuyFormState extends State<BuyForm> {
       c.text = v; filled++;
     }
     into(brand, 'brand'); into(model, 'model'); into(ram, 'ram'); into(storage, 'storage'); into(color, 'color');
+    into(serial, 'serial_number');
     return filled;
   }
 
@@ -102,16 +145,74 @@ class _BuyFormState extends State<BuyForm> {
     if (v != null) { imei.text = v; _lookup(v); }
   }
 
+  // ---- ID proof photo ----
+
+  Future<void> _askIdPhotoSource() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheet) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(
+            leading: const Icon(Icons.photo_library_outlined),
+            title: const Text('Gallery se choose karein'),
+            onTap: () => Navigator.pop(sheet, ImageSource.gallery),
+          ),
+          ListTile(
+            leading: const Icon(Icons.photo_camera_outlined),
+            title: const Text('Camera se photo lein'),
+            onTap: () => Navigator.pop(sheet, ImageSource.camera),
+          ),
+          if (_idPhoto != null)
+            ListTile(
+              leading: const Icon(Icons.delete_outline),
+              title: const Text('Photo hata dein'),
+              onTap: () {
+                setState(() { _idPhoto = null; _idPhotoBytes = null; });
+                Navigator.pop(sheet);
+              },
+            ),
+          const SizedBox(height: 8),
+        ]),
+      ),
+    );
+    if (source == null || !mounted) return;
+    await _pickIdPhoto(source);
+  }
+
+  Future<void> _pickIdPhoto(ImageSource source) async {
+    try {
+      final picked = await ImagePicker().pickImage(
+        source: source, maxWidth: 1280, maxHeight: 1280, imageQuality: 72,
+      );
+      if (picked == null || !mounted) return;
+      final bytes = await picked.readAsBytes();
+      if (bytes.lengthInBytes > _maxIdPhotoBytes) {
+        toast(context, 'Photo bahut badi hai (max 3MB). Dobara try karein.', err: true);
+        return;
+      }
+      final mime = (picked.mimeType ?? '').toLowerCase();
+      final type = mime.contains('png') ? 'png' : mime.contains('webp') ? 'webp' : 'jpeg';
+      setState(() {
+        _idPhotoBytes = bytes;
+        _idPhoto = 'data:image/$type;base64,${base64Encode(bytes)}';
+      });
+      Haptics.success();
+    } catch (e) {
+      if (mounted) toast(context, 'Photo choose nahi ho payi: $e', err: true);
+    }
+  }
+
   Future<void> _save() async {
     FocusScope.of(context).unfocus();
     if (!_form.currentState!.validate()) return;
     setState(() => _phase = ButtonPhase.loading);
     final body = {
-      'imei': imei.text, 'imei2': imei2.text, 'brand': brand.text, 'model': model.text, 'ram': ram.text,
-      'storage': storage.text, 'color': color.text, 'condition': condition, 'accessories': accessories.text,
+      'imei': imei.text, 'imei2': imei2.text, 'serial_number': serial.text, 'brand': brand.text, 'model': model.text,
+      'ram': ram.text, 'storage': storage.text, 'color': color.text, 'condition': condition, 'accessories': accessories.text,
       'buy_price': price.text, 'buy_date': DateFormat('yyyy-MM-dd').format(date),
-      'seller_name': sName.text, 'seller_phone': sPhone.text, 'seller_id_type': idType, 'seller_id_no': sIdNo.text,
-      'seller_address': sAddr.text, 'notes': notes.text,
+      'seller_name': cName.text, 'seller_phone': cPhone.text, 'seller_id_type': idType,
+      'seller_address': cAddr.text, 'notes': notes.text, 'customer_id_photo': _idPhoto ?? '',
     };
     try {
       if (widget.testSave != null) { await widget.testSave!(body); } else { await Api.post('/buy', body); }
@@ -173,6 +274,9 @@ class _BuyFormState extends State<BuyForm> {
               const SizedBox(height: Space.x12),
               GlassTextField(controller: imei2, label: 'IMEI 2 (optional)', prefixIcon: Icons.dialpad,
                   keyboardType: TextInputType.number, maxLength: 15, textInputAction: TextInputAction.next),
+              const SizedBox(height: Space.x12),
+              GlassTextField(controller: serial, label: 'Serial number (optional)', prefixIcon: Icons.tag,
+                  maxLength: 64, textInputAction: TextInputAction.next),
             ])),
             const SizedBox(height: Space.x16),
             // ---- Device ----
@@ -184,13 +288,13 @@ class _BuyFormState extends State<BuyForm> {
               ]),
               const SizedBox(height: Space.x12),
               Row(children: [
-                Expanded(child: GlassTextField(controller: ram, label: 'RAM (e.g. 8GB)', textInputAction: TextInputAction.next)),
+                Expanded(child: _OptionField(controller: ram, label: 'RAM (e.g. 8GB)', options: _ramOptions)),
                 const SizedBox(width: Space.x12),
-                Expanded(child: GlassTextField(controller: storage, label: 'Storage (e.g. 128GB)', textInputAction: TextInputAction.next)),
+                Expanded(child: _OptionField(controller: storage, label: 'Storage (e.g. 128GB)', options: _storageOptions)),
               ]),
               const SizedBox(height: Space.x12),
               Row(children: [
-                Expanded(child: GlassTextField(controller: color, label: 'Color', textInputAction: TextInputAction.next)),
+                Expanded(child: _OptionField(controller: color, label: 'Color', options: _colorOptions)),
                 const SizedBox(width: Space.x12),
                 Expanded(child: _GlassDropdown(label: 'Condition', value: condition,
                     items: const ['Excellent', 'Good', 'Fair', 'Faulty'], onChanged: (v) => setState(() => condition = v!))),
@@ -227,24 +331,23 @@ class _BuyFormState extends State<BuyForm> {
                 )),
             ])),
             const SizedBox(height: Space.section),
-            // ---- Seller ----
-            SectionHeader(title: 'Seller details'),
+            // ---- Customer (the person the phone is bought from) ----
+            SectionHeader(title: 'Customer details'),
             const SizedBox(height: Space.x12),
             GlassCard(blur: false, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Row(children: [
-                Expanded(child: GlassTextField(controller: sName, label: 'Seller name', required: true, prefixIcon: Icons.person_outline, textInputAction: TextInputAction.next)),
+                Expanded(child: GlassTextField(controller: cName, label: 'Customer name', required: true, prefixIcon: Icons.person_outline, textInputAction: TextInputAction.next)),
                 const SizedBox(width: Space.x12),
-                Expanded(child: GlassTextField(controller: sPhone, label: 'Mobile', prefixIcon: Icons.phone_outlined, keyboardType: TextInputType.phone, maxLength: 10, textInputAction: TextInputAction.next)),
+                Expanded(child: GlassTextField(controller: cPhone, label: 'Mobile', prefixIcon: Icons.phone_outlined, keyboardType: TextInputType.phone, maxLength: 10, textInputAction: TextInputAction.next)),
               ]),
               const SizedBox(height: Space.x12),
-              Row(children: [
-                Expanded(child: _GlassDropdown(label: 'ID proof', value: idType,
-                    items: const ['Aadhaar', 'PAN', 'Voter ID', 'Driving Licence'], onChanged: (v) => setState(() => idType = v!))),
-                const SizedBox(width: Space.x12),
-                Expanded(child: GlassTextField(controller: sIdNo, label: 'ID number', textInputAction: TextInputAction.next)),
-              ]),
+              _GlassDropdown(label: 'ID proof', value: idType,
+                  items: const ['Aadhaar', 'PAN', 'Voter ID', 'Driving Licence', 'Visiting Card'],
+                  onChanged: (v) => setState(() => idType = v!)),
               const SizedBox(height: Space.x12),
-              GlassTextField(controller: sAddr, label: 'Address (optional)'),
+              _idUploadTile(c, t),
+              const SizedBox(height: Space.x12),
+              GlassTextField(controller: cAddr, label: 'Address (optional)'),
               const SizedBox(height: Space.x12),
               GlassTextField(controller: notes, label: 'Notes (optional)'),
             ])),
@@ -255,6 +358,70 @@ class _BuyFormState extends State<BuyForm> {
       ),
       Positioned(top: 0, left: 0, right: 0, child: GlassTopBar(title: 'Buy phone', scroll: _scroll, leading: const SizedBox(width: Space.x12))),
     ]);
+  }
+
+  /// "Upload ID" row: tap to take a photo or pick one from the gallery.
+  Widget _idUploadTile(AppColors c, TextTheme t) {
+    final picked = _idPhotoBytes != null;
+    return Semantics(
+      button: true,
+      label: picked ? 'Uploaded ID photo. Double tap to change it.' : 'Upload ID photo',
+      child: InkWell(
+        borderRadius: Shapes.md,
+        onTap: _askIdPhotoSource,
+        child: Container(
+          height: 56, padding: const EdgeInsets.symmetric(horizontal: Space.x16),
+          decoration: BoxDecoration(borderRadius: Shapes.md, color: c.textPrimary.withValues(alpha: .05),
+              border: Border.all(color: c.textPrimary.withValues(alpha: .10))),
+          child: Row(children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: picked
+                  ? Image.memory(_idPhotoBytes!, width: 34, height: 34, fit: BoxFit.cover)
+                  : Icon(Icons.badge_outlined, size: 24, color: c.textSecondary),
+            ),
+            const SizedBox(width: Space.x12),
+            Expanded(
+              child: Text(
+                picked ? 'ID photo lag gayi — badalne ke liye tap karein' : 'Upload ID',
+                maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: t.bodyLarge?.copyWith(color: picked ? c.textPrimary : c.textSecondary),
+              ),
+            ),
+            Icon(Icons.upload_outlined, size: 20, color: c.brandInk),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+/// A normal text field whose dropdown is filled with values this app has
+/// already recorded for the same model/brand. Typing a new value still works,
+/// which is what stores it for next time.
+class _OptionField extends StatelessWidget {
+  final TextEditingController controller;
+  final String label;
+  final List<String> options;
+  const _OptionField({required this.controller, required this.label, required this.options});
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassTextField(
+      controller: controller,
+      label: label,
+      textInputAction: TextInputAction.next,
+      suffix: options.isEmpty
+          ? null
+          : PopupMenuButton<String>(
+              tooltip: '$label choose karein',
+              icon: Icon(Icons.arrow_drop_down, color: context.colors.textSecondary),
+              onSelected: (value) { Haptics.tick(); controller.text = value; },
+              itemBuilder: (_) => options
+                  .map((e) => PopupMenuItem<String>(value: e, child: Text(e)))
+                  .toList(growable: false),
+            ),
+    );
   }
 }
 

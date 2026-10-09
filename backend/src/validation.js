@@ -55,8 +55,29 @@ function password(value, field = 'password') {
     fail(`${field} must be at least 6 characters and at most 72 UTF-8 bytes`);
   return value;
 }
+
+// Accepted proofs of identity for the person the phone is bought from.
+const ID_TYPES = ['Aadhaar', 'PAN', 'Voter ID', 'Driving Licence', 'Visiting Card'];
+
+// ID photos are sent as base64 data URLs. Keep the cap well below the 8 MB JSON
+// limit; the app compresses to roughly 200-350 KB before sending.
+const ID_PHOTO_MAX_BYTES = 3 * 1024 * 1024;
+
+// Accepts a `data:image/...;base64,...` URL, or null/empty to clear it.
+function idPhoto(value, field = 'customer_id_photo') {
+  if (value == null || value === '') return null;
+  if (typeof value !== 'string') fail(`${field} must be a data URL`);
+  // Check the length before running the regex on what could be a huge string.
+  const maxChars = Math.ceil((ID_PHOTO_MAX_BYTES * 4) / 3) + 64;
+  if (value.length > maxChars) fail(`${field} is too large (max ${Math.round(ID_PHOTO_MAX_BYTES / (1024 * 1024))}MB)`);
+  if (!/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(value))
+    fail(`${field} must be a JPEG, PNG or WebP data URL`);
+  return value;
+}
+
 const phoneFields = ['brand', 'model', 'ram', 'storage', 'color', 'condition', 'accessories', 'buy_price', 'buy_date',
-  'seller_name', 'seller_phone', 'seller_id_type', 'seller_id_no', 'seller_address', 'notes', 'imei2'];
+  'seller_name', 'seller_phone', 'seller_id_type', 'seller_id_no', 'seller_address', 'notes', 'imei2',
+  'serial_number', 'customer_id_photo'];
 function phoneData(b, partial = false) {
   const out = {};
   for (const k of phoneFields) {
@@ -65,8 +86,10 @@ function phoneData(b, partial = false) {
     else if (k === 'buy_date') out[k] = date(b[k] || today(), k);
     else if (k === 'imei2') out[k] = imei(b[k], k, false);
     else if (k === 'condition') out[k] = choice(b[k], k, ['Excellent', 'Good', 'Fair', 'Faulty']);
-    else if (k === 'seller_id_type') out[k] = choice(b[k], k, ['Aadhaar', 'PAN', 'Voter ID', 'Driving Licence']);
+    else if (k === 'seller_id_type') out[k] = choice(b[k], k, ID_TYPES);
     else if (k === 'seller_phone') out[k] = mobile(b[k], k);
+    else if (k === 'serial_number') out[k] = text(b[k], k, { max: 64 });
+    else if (k === 'customer_id_photo') out[k] = idPhoto(b[k], k);
     else out[k] = text(b[k], k, { required: k === 'model', max: k === 'notes' ? 5000 : 255 });
   }
   if (!partial) {
@@ -103,4 +126,5 @@ function shopData(b, partial = false) {
   if (partial && !Object.keys(out).length) fail('No editable fields supplied');
   return out;
 }
-module.exports = { fail, body, text, id, money, date, imei, password, phoneData, saleData, range, shopData, choice };
+module.exports = { fail, body, text, id, money, date, imei, password, idPhoto, ID_TYPES, ID_PHOTO_MAX_BYTES,
+  phoneData, saleData, range, shopData, choice };

@@ -143,12 +143,13 @@ class _PhoneDetailSheet extends StatelessWidget {
     final rows = <(String, String)>[
       ('IMEI', '${p['imei']}'),
       if (p['imei2'] != null && '${p['imei2']}'.isNotEmpty) ('IMEI 2', '${p['imei2']}'),
+      if ((p['serial_number'] ?? '').toString().isNotEmpty) ('Serial', '${p['serial_number']}'),
       ('RAM / Storage', '${p['ram'] ?? '—'} / ${p['storage'] ?? '—'}'),
       if ((p['color'] ?? '').toString().isNotEmpty) ('Color', '${p['color']}'),
       if ((p['condition'] ?? '').toString().isNotEmpty) ('Condition', '${p['condition']}'),
       if ((p['accessories'] ?? '').toString().isNotEmpty) ('Accessories', '${p['accessories']}'),
       ('Buy price', rs(p['buy_price'])), ('Buy date', '${p['buy_date']}'),
-      if ((p['seller_name'] ?? '').toString().isNotEmpty) ('Seller', '${p['seller_name']}${p['seller_phone'] != null ? ' · ${p['seller_phone']}' : ''}'),
+      if ((p['seller_name'] ?? '').toString().isNotEmpty) ('Customer', '${p['seller_name']}${p['seller_phone'] != null ? ' · ${p['seller_phone']}' : ''}'),
       if ((p['seller_id_type'] ?? '').toString().isNotEmpty) ('ID', '${p['seller_id_type']} ${p['seller_id_no'] ?? ''}'),
       if ((p['notes'] ?? '').toString().isNotEmpty) ('Notes', '${p['notes']}'),
     ];
