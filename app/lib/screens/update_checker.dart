@@ -247,7 +247,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
               duration: motion.d(const Duration(milliseconds: 280)),
               switchInCurve: Curves.easeOutCubic,
               switchOutCurve: Curves.easeInCubic,
-              transitionBuilder: (child, a) => FadeTransition(opacity: a, child: SizeTransition(sizeFactor: a, axisAlignment: -1, child: child)),
+              transitionBuilder: (child, a) => FadeTransition(opacity: a, child: SizeTransition(sizeFactor: a, alignment: Alignment.topCenter, child: child)),
               child: body,
             ),
             if (_browserMessage != null) ...[
