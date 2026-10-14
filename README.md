@@ -53,8 +53,9 @@ Isliye app ye karta hai:
    2. usi model ke liye kisi aur TAC par jo bharaa tha
    3. usi brand ke liye jo bharaa tha
    4. ek chhoti static fallback list (taaki dropdown kabhi khaali na rahe)
-3. Flutter me RAM/Storage/Color ek **text field + dropdown arrow** hain: shop ya to list me se
-   tap kare, ya naya value type kare. Jo bhi save hoga wo agle phone ke liye dropdown me aa jayega.
+3. Flutter me RAM/Storage/Color ek **text field + dropdown arrow** hain: Indigo/Mint theme wali
+   rounded selection sheet (light/dark) me current value highlighted rehti hai. Shop list se
+   tap kare ya naya value type kare. Jo bhi save hoga wo agle phone ke liye dropdown me aa jayega.
 
 Koi external API call nahi hoti, koi IMEI server se bahar nahi jata, aur iska koi kharcha nahi hai.
 
@@ -63,15 +64,21 @@ Koi external API call nahi hoti, koi IMEI server se bahar nahi jata, aur iska ko
 - Section ka naam **Customer details** hai (phone jis se kharida jata hai).
   Backend/API me field names `seller_*` hi hain taaki purana data aur reports na tootein.
 - **ID proof**: Aadhaar, PAN, Voter ID, Driving Licence, **Visiting Card**.
-- **Upload ID**: tap karne par sheet khulti hai — **Gallery se choose karein** ya **Camera se photo
-  lein**. Photo device par hi compress hoti hai (max 1280px, quality 72 → lagbhag 200-350 KB) aur
-  base64 data URL ban kar `phones.customer_id_photo` me save hoti hai. Server cap: **3 MB**, sirf
-  JPEG/PNG/WebP.
-  - ⚠️ Photo DB me base64 me save hoti hai (Render ka disk ephemeral hai, isliye file system reliable
-    nahi). Render ka `basic-256mb` Postgres plan me lagbhag 800-1500 photos aayengi — zyada volume ke
-    liye DB plan badhayein ya photo ko S3/Cloudinary jaise object storage me shift karein.
-  - Stock/sales list responses me photo **nahi** bheji jati (har row me base64 bhejne se response
-    bahut bhaari ho jayega). Poori row ke liye `GET /api/phones/:id` use karein.
+- **Document photos**: Front aur Back ke alag cards — **Gallery se choose karein** ya **Camera se
+  photo lein**. Sirf ek side ya dono sides save kar sakte hain; replace/remove alag-alag hota hai.
+  - Photo device par background isolate me compress hoti hai: **target 100 KB/photo**, JPEG quality
+    94–80, long edge 1800–1280px (chhoti photo upscale nahi hoti). Text clarity ke liye noisy/detailed
+    photos target se badi ho sakti hain. **Actual size + zoom preview** se save se pehle text check karein.
+    Lossless quality ki guarantee nahi hai; camera orientation apply hoti hai aur EXIF/GPS strip hota hai.
+  - Front/legacy single photo `phones.customer_id_photo` aur optional back photo
+    `phones.customer_id_photo_back` me base64 JPEG ke roop me save hoti hai. Purane clients ke liye
+    server JPEG/PNG/WebP aur **3 MiB/side** accept karta hai; combined JSON body limit **9 MiB** hai.
+  - ⚠️ Base64 se size ~33% badhta hai aur dono photos DB storage leti hain. Zyada volume ke liye DB
+    plan badhayein ya S3/Cloudinary jaise object storage me shift karein.
+  - Stock/history list responses me photos **nahi** bheji jati. Shop-scoped complete row ke liye
+    `GET /api/phones/:id` use karein.
+  - **Rollout:** updated app se pehle backend deploy karein; startup migration optional back-photo
+    column add karti hai aur purane front photos preserve rehte hain. [Details/tests](docs/buy-documents.md).
 
 #### ⚠️ Free TAC catalog ki limitations (zaroor padhein)
 - **Data adhoora hai:** Osmocom me bahut se naye aur India-only models (Redmi/Realme/Poco/Vivo ke naye variants) **nahi** hain. Isliye extended catalog bhi hai; phir bhi bilkul naya model pehli baar manually bhar na pade — uske baad app khud seekh lega.

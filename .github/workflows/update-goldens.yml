@@ -44,13 +44,28 @@ jobs:
 
       - run: flutter pub get
 
-      - run: flutter analyze --no-pub
+      - name: Analyze Flutter
+        shell: bash
+        run: flutter analyze --no-pub 2>&1 | tee flutter-analyze.log
 
       - name: Regenerate goldens
-        run: flutter test --no-pub --update-goldens
+        shell: bash
+        run: flutter test --no-pub --reporter expanded --update-goldens 2>&1 | tee flutter-goldens.log
 
       - name: Verify the suite is green with the new goldens
-        run: flutter test --no-pub
+        shell: bash
+        run: flutter test --no-pub --reporter expanded 2>&1 | tee flutter-tests.log
+
+      - name: Report Flutter failure details
+        if: failure()
+        run: |
+          python3 - <<'PYTHON'
+          from pathlib import Path
+          for path in Path('.').glob('flutter-*.log'):
+              text = path.read_text()[-18000:]
+              text = text.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+              print(f'::error title={path.name}::{text}')
+          PYTHON
 
       - name: Commit and push if anything changed
         env:
