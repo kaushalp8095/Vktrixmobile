@@ -86,17 +86,26 @@ r.post('/tac/import', upload.single('file'), wrap(async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'CSV file bhejein' });
   const parsed = TAC.parseTacCsv(req.file.buffer.toString('utf8'));
   if (!parsed.rows.length) return res.status(400).json({ error: 'CSV me koi valid TAC row nahi mili', invalid: parsed.invalid });
-  const result = await db.transaction(trx => parsed.format === 'osmocom'
-    ? TAC.applyCommunityRows(parsed.rows, trx) : TAC.applyAdminRows(parsed.rows, trx));
+  const result = await db.transaction(trx => parsed.format === 'osmocom' ? TAC.applyCommunityRows(parsed.rows, trx)
+    : parsed.format === 'tacdb' ? TAC.applyCommunityRows(parsed.rows, trx, TAC.SOURCE.TACDB)
+      : TAC.applyAdminRows(parsed.rows, trx));
   res.json({ imported: parsed.rows.length, format: parsed.format, invalid: parsed.invalid, duplicates: parsed.duplicates, ...result });
 }));
 
-// Free community TAC catalog (Osmocom) sync. Runs in the background; poll status.
+// Free TAC catalogs (Osmocom community + extended India-models list) sync.
+// Runs in the background; poll /tac/status. `/tac/sync` keeps syncing the default
+// Osmocom catalog so older app builds keep working; `/tac/sync/:source` picks one.
 r.get('/tac/status', wrap(async (req, res) => res.json(await TAC.status())));
-r.post('/tac/sync', wrap(async (req, res) => {
-  const { started, run } = await TAC.startSync({ userId: req.user.id });
+async function startTacSync(req, res) {
+  const source = req.params.source || TAC.SOURCE.OSMOCOM;
+  if (!TAC.catalog(source))
+    return res.status(404).json({ error: `Unknown TAC catalog '${source}'`, catalogs: TAC.CATALOG_KEYS });
+  const { started, run } = await TAC.startSync({ userId: req.user.id, source });
   res.status(started ? 202 : 409).json({
-    started, run, ...(started ? {} : { error: 'TAC sync pehle se chal raha hai' }),
+    started, run,
+    ...(started ? {} : { error: `TAC sync pehle se chal raha hai (${run?.source || source})` }),
   });
-}));
+}
+r.post('/tac/sync', wrap(startTacSync));
+r.post('/tac/sync/:source', wrap(startTacSync));
 module.exports = r;
