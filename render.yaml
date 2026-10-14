@@ -24,6 +24,11 @@ services:
         value: superadmin
       - key: SUPERADMIN_PASSWORD
         sync: false          # Render dashboard me khud daalein
+      # Free TAC catalogs sab default URLs se chalte hain — koi key zaroori nahi.
+      # Zaroorat ho to Render dashboard me ye optional vars daal sakte hain:
+      #   TAC_SYNC_TACDB_URL / TAC_SYNC_TACDB_TIMEOUT_MS / TAC_SYNC_TACDB_MAX_MB /
+      #   TAC_SYNC_TACDB_MIN_ROWS / TAC_SYNC_TACDB_REFRESH_OSMOCOM (docs dekhein)
+      #   TAC_API_URL + TAC_API_KEY  (optional paid/free TAC API, sirf catalog miss par)
 databases:
   - name: vktrix-db
     region: singapore

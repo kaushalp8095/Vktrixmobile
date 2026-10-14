@@ -29,14 +29,14 @@ async function migrate() {
       t.string('tac', 8).primary();          // IMEI ke pehle 8 digit
       t.string('brand'); t.string('model');
       t.string('ram'); t.string('storage'); t.string('color');
-      t.string('source', 16);                // osmocom | learned | csv | seed | legacy
+      t.string('source', 16);                // osmocom | tacdb | learned | csv | api | seed | legacy
       t.timestamp('updated_at').defaultTo(db.fn.now());
     });
   }
   if (!(await db.schema.hasTable('tac_sync_runs'))) {
     await db.schema.createTable('tac_sync_runs', t => {
       t.increments('id');
-      t.string('source', 16).notNullable();  // osmocom
+      t.string('source', 16).notNullable();  // osmocom | tacdb
       t.string('url', 500);
       t.string('status', 16).notNullable();  // running | success | failed
       t.timestamp('started_at').notNullable();
