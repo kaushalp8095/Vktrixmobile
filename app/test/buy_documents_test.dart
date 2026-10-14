@@ -32,6 +32,8 @@ Finder _field(String label) => find.byWidgetPredicate((w) => w is GlassTextField
 
 Future<void> _scrollTo(WidgetTester t, Finder finder) async {
   await t.scrollUntilVisible(finder, 200, scrollable: find.byType(Scrollable).first);
+  // The Buy form has an overlaid top bar; align targets below it, not at y=0.
+  await Scrollable.ensureVisible(t.element(finder), alignment: .4);
   await t.pumpAndSettle();
 }
 
@@ -46,7 +48,8 @@ Future<void> _fillRequired(WidgetTester t) async {
 Future<void> _chooseSource(WidgetTester t, int side, {bool camera = false}) async {
   await _scrollTo(t, find.byKey(ValueKey('id-photo-$side')));
   await t.tap(find.byKey(ValueKey('id-photo-$side')));
-  await t.pump(const Duration(milliseconds: 300));
+  await t.pump();
+  await t.pump(const Duration(milliseconds: 400));
   await t.tap(find.text(camera ? 'Camera se photo lein' : 'Gallery se choose karein'));
   await t.pump(const Duration(milliseconds: 300));
 }
@@ -151,7 +154,8 @@ void main() {
     await _scrollTo(t, find.byKey(const ValueKey('id-photo-0')));
     expect(find.text('2/2'), findsOneWidget);
     await t.tap(find.byKey(const ValueKey('id-photo-0')));
-    await t.pump(const Duration(milliseconds: 300));
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 400));
     await t.tap(find.text('Photo hata dein'));
     await t.pumpAndSettle();
     expect(find.text('1/2'), findsOneWidget);

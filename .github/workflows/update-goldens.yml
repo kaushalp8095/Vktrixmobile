@@ -62,9 +62,25 @@ jobs:
           python3 - <<'PYTHON'
           from pathlib import Path
           for path in Path('.').glob('flutter-*.log'):
-              text = path.read_text()[-18000:]
-              text = text.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
-              print(f'::error title={path.name}::{text}')
+              text = path.read_text()
+              if 'No issues found!' in text or 'All tests passed!' in text:
+                  continue
+              # An annotation has a small message limit. Keep failure summaries
+              # rather than flooding it with passing tests and framework stacks.
+              blocks = text.split('EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK')
+              summaries = []
+              for block in blocks[1:]:
+                  start = block.find('The following')
+                  end = block.find('When the exception was thrown')
+                  summary = block[max(0, start):end if end > start else start + 1800]
+                  description = block.find('The test description was:')
+                  if description >= 0:
+                      summary += '\n' + block[description:description + 250]
+                  summaries.append(summary)
+              report = '\n\n'.join(summaries) if summaries else text
+              for i in range(0, min(len(report), 24000), 3000):
+                  part = report[i:i + 3000].replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+                  print(f'::error title={path.name} part {i // 3000 + 1}::{part}')
           PYTHON
 
       - name: Commit and push if anything changed
