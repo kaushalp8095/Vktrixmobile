@@ -206,7 +206,7 @@ test('buy flow: serial number, ID photo and Visiting Card are stored; photos sta
   await db('users').whereNot({ username: 'superadmin' }).del(); await db('shops').del();
 
   const app = express();
-  app.use(express.json({ limit: '8mb' }));
+  app.use(express.json({ limit: '9mb' }));
   app.use('/api/auth', require('../src/routes/auth'));
   app.use('/api/admin', require('../src/routes/admin'));
   app.use('/api', require('../src/routes/shop'));
@@ -255,7 +255,18 @@ test('buy flow: serial number, ID photo and Visiting Card are stored; photos sta
   const row = await db('phones').where({ id: buy.body.id }).first();
   assert.equal(row.serial_number, 'C02XK1ZJQ6NV');
   assert.equal(row.customer_id_photo, PNG);
+  assert.equal(row.customer_id_photo_back, null, 'legacy single-photo purchases still work');
   assert.equal(row.seller_id_type, 'Visiting Card');
+
+  // Upgrade an existing database without replacing or losing the front photo.
+  await db.schema.alterTable('phones', table => table.dropColumn('customer_id_photo_back'));
+  await migrate();
+  await migrate(); // repeatable on every server start
+  const migrated = await db('phones').where({ id: buy.body.id }).first();
+  assert.equal(migrated.customer_id_photo, PNG);
+  assert.equal(migrated.customer_id_photo_back, null);
+  const addBack = await request('PUT', `/phones/${buy.body.id}`, owner, { customer_id_photo_back: PNG });
+  assert.equal(addBack.status, 200, JSON.stringify(addBack.body));
 
   // The photo must not ride along in list responses (base64 would bloat every
   // stock call) but the detail endpoint returns it.
@@ -264,9 +275,11 @@ test('buy flow: serial number, ID photo and Visiting Card are stored; photos sta
   assert.equal(stock.body.length, 1);
   assert.equal(stock.body[0].serial_number, 'C02XK1ZJQ6NV');
   assert.ok(!('customer_id_photo' in stock.body[0]));
+  assert.ok(!('customer_id_photo_back' in stock.body[0]));
 
   const detail = await request('GET', `/phones/${buy.body.id}`, owner);
   assert.equal(detail.body.customer_id_photo, PNG);
+  assert.equal(detail.body.customer_id_photo_back, PNG);
 
   // The IMEI lookup returns this phone in `history` (the app re-fills from it),
   // but those rows must not carry the base64 photo back over the wire.
@@ -276,10 +289,29 @@ test('buy flow: serial number, ID photo and Visiting Card are stored; photos sta
   assert.equal(again.body.history[0].serial_number, 'C02XK1ZJQ6NV');
   assert.ok(!('customer_id_photo' in again.body.history[0]), 'history must not include the base64 photo');
 
+  assert.ok(!('customer_id_photo_back' in again.body.history[0]));
+
   // Editing keeps the new fields writable.
   const edited = await request('PUT', `/phones/${buy.body.id}`, owner, { serial_number: 'NEW-SERIAL' });
   assert.equal(edited.status, 200, JSON.stringify(edited.body));
   assert.equal((await db('phones').where({ id: buy.body.id }).first()).serial_number, 'NEW-SERIAL');
+
+  const afterEdit = await request('GET', `/phones/${buy.body.id}`, owner);
+  assert.equal(afterEdit.body.customer_id_photo_back, PNG, 'unrelated edits preserve the reverse side');
+  const clearBack = await request('PUT', `/phones/${buy.body.id}`, owner, { customer_id_photo_back: '' });
+  assert.equal(clearBack.status, 200);
+  const cleared = await request('GET', `/phones/${buy.body.id}`, owner);
+  assert.equal(cleared.body.customer_id_photo_back, null);
+  assert.equal(cleared.body.customer_id_photo, PNG, 'removing one side preserves the other');
+
+  const badBack = await request('POST', '/buy', owner, { imei: IMEI_B, model: 'X', buy_price: '10',
+    customer_id_photo_back: 'javascript:alert(1)' });
+  assert.equal(badBack.status, 400);
+  assert.match(badBack.body.error, /customer_id_photo_back/);
+  const oversizedBack = await request('PUT', `/phones/${buy.body.id}`, owner, {
+    customer_id_photo_back: 'data:image/jpeg;base64,' + Buffer.alloc(V.ID_PHOTO_MAX_BYTES + 1).toString('base64') });
+  assert.equal(oversizedBack.status, 400);
+  assert.match(oversizedBack.body.error, /customer_id_photo_back.*too large/);
 
   // Bad payloads are rejected at the API boundary.
   const bad = await request('POST', '/buy', owner, { imei: IMEI_B, model: 'X', buy_price: '10',
@@ -296,4 +328,17 @@ test('buy flow: serial number, ID photo and Visiting Card are stored; photos sta
     seller_id_type: 'Ration Card' });
   assert.equal(badIdType.status, 400);
   assert.match(badIdType.body.error, /seller_id_type/);
+  const both = await request('POST', '/buy', owner, { imei: IMEI_B, model: 'X', buy_price: '10',
+    customer_id_photo: PNG, customer_id_photo_back: PNG });
+  assert.equal(both.status, 200, JSON.stringify(both.body));
+  const bothDetail = await request('GET', `/phones/${both.body.id}`, owner);
+  assert.equal(bothDetail.body.customer_id_photo, PNG);
+  assert.equal(bothDetail.body.customer_id_photo_back, PNG);
+  const backOnly = await request('PUT', `/phones/${both.body.id}`, owner, { customer_id_photo: null });
+  assert.equal(backOnly.status, 200);
+  const backOnlyDetail = await request('GET', `/phones/${both.body.id}`, owner);
+  assert.equal(backOnlyDetail.body.customer_id_photo, null);
+  assert.equal(backOnlyDetail.body.customer_id_photo_back, PNG);
+  assert.equal((await request('GET', `/phones/${both.body.id}`, null)).status, 401);
+
 });

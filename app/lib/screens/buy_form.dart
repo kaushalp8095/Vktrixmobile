@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../api.dart';
+import '../documents/document_photo.dart';
 import '../design/components/components.dart';
 import '../design/design.dart';
 import 'common.dart';
@@ -20,7 +21,10 @@ class BuyForm extends StatefulWidget {
   final VoidCallback onSaved;
   final Future<Map<String, dynamic>> Function(String imei)? testLookup;
   final Future<void> Function(Map<String, dynamic> body)? testSave;
-  const BuyForm({super.key, required this.onSaved, this.testLookup, this.testSave});
+  final Future<Uint8List?> Function(ImageSource source)? testPickPhoto;
+  final Future<Uint8List> Function(Uint8List bytes)? testPreparePhoto;
+  const BuyForm({super.key, required this.onSaved, this.testLookup, this.testSave,
+    this.testPickPhoto, this.testPreparePhoto});
   @override
   State<BuyForm> createState() => _BuyFormState();
 }
@@ -59,10 +63,10 @@ class _BuyFormState extends State<BuyForm> {
       _storageOptions = [...kDefaultStorageOptions],
       _colorOptions = [...kDefaultColorOptions];
 
-  // ID proof photo (camera or gallery), kept as a data URL for the API.
-  Uint8List? _idPhotoBytes;
-  String? _idPhoto;
-  static const int _maxIdPhotoBytes = 3 * 1024 * 1024; // keep in sync with the server
+  // Front uses the existing API column; the reverse side is optional.
+  final List<Uint8List?> _idPhotos = [null, null];
+  int? _pickingSide;
+  bool get _saving => _phase == ButtonPhase.loading || _phase == ButtonPhase.success;
 
   @override
   void dispose() {
@@ -161,65 +165,94 @@ class _BuyFormState extends State<BuyForm> {
     if (v != null) { imei.text = v; _lookup(v); }
   }
 
-  // ---- ID proof photo ----
+  // ---- ID proof photos ----
 
-  Future<void> _askIdPhotoSource() async {
-    final source = await showModalBottomSheet<ImageSource>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheet) => SafeArea(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          ListTile(
-            leading: const Icon(Icons.photo_library_outlined),
-            title: const Text('Gallery se choose karein'),
-            onTap: () => Navigator.pop(sheet, ImageSource.gallery),
-          ),
-          ListTile(
-            leading: const Icon(Icons.photo_camera_outlined),
-            title: const Text('Camera se photo lein'),
-            onTap: () => Navigator.pop(sheet, ImageSource.camera),
-          ),
-          if (_idPhoto != null)
-            ListTile(
-              leading: const Icon(Icons.delete_outline),
-              title: const Text('Photo hata dein'),
-              onTap: () {
-                setState(() { _idPhoto = null; _idPhotoBytes = null; });
-                Navigator.pop(sheet);
-              },
-            ),
-          const SizedBox(height: 8),
-        ]),
-      ),
-    );
-    if (source == null || !mounted) return;
-    await _pickIdPhoto(source);
-  }
-
-  Future<void> _pickIdPhoto(ImageSource source) async {
+  Future<void> _askIdPhotoSource(int side) async {
+    if (_pickingSide != null || _saving) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _pickingSide = side);
     try {
-      final picked = await ImagePicker().pickImage(
-        source: source, maxWidth: 1280, maxHeight: 1280, imageQuality: 72,
+      final source = await showModalBottomSheet<ImageSource>(
+        context: context,
+        showDragHandle: true,
+        builder: (sheet) => SafeArea(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text('${side == 0 ? 'Front' : 'Back'} photo', style: context.type.titleMedium),
+            ListTile(
+              leading: Icon(Icons.photo_library_outlined, color: context.colors.brandInk),
+              title: const Text('Gallery se choose karein'),
+              onTap: () => Navigator.pop(sheet, ImageSource.gallery),
+            ),
+            ListTile(
+              leading: Icon(Icons.photo_camera_outlined, color: context.colors.brandInk),
+              title: const Text('Camera se photo lein'),
+              onTap: () => Navigator.pop(sheet, ImageSource.camera),
+            ),
+            if (_idPhotos[side] != null)
+              ListTile(
+                leading: Icon(Icons.delete_outline, color: context.colors.errorInk),
+                title: const Text('Photo hata dein'),
+                onTap: () {
+                  setState(() => _idPhotos[side] = null);
+                  Navigator.pop(sheet);
+                },
+              ),
+            const SizedBox(height: Space.x8),
+          ]),
+        ),
       );
-      if (picked == null || !mounted) return;
-      final bytes = await picked.readAsBytes();
-      if (bytes.lengthInBytes > _maxIdPhotoBytes) {
-        toast(context, 'Photo bahut badi hai (max 3MB). Dobara try karein.', err: true);
-        return;
+      if (source == null || !mounted) return;
+      Uint8List? bytes;
+      if (widget.testPickPhoto != null) {
+        bytes = await widget.testPickPhoto!(source);
+      } else {
+        // Bound decode memory and normalize camera orientation on the platform.
+        // Final size/quality is chosen by our compressor, not a fixed picker quality.
+        final picked = await ImagePicker().pickImage(
+          source: source, maxWidth: 2000, maxHeight: 2000, imageQuality: 100,
+          requestFullMetadata: false,
+        );
+        if (picked == null || !mounted) return;
+        if (await picked.length() > documentPhotoMaxInputBytes) {
+          throw const FormatException('Choose a photo smaller than 20 MB.');
+        }
+        bytes = await picked.readAsBytes();
       }
-      final mime = (picked.mimeType ?? '').toLowerCase();
-      final type = mime.contains('png') ? 'png' : mime.contains('webp') ? 'webp' : 'jpeg';
-      setState(() {
-        _idPhotoBytes = bytes;
-        _idPhoto = 'data:image/$type;base64,${base64Encode(bytes)}';
-      });
+      if (bytes == null || !mounted) return;
+      final compressed = await (widget.testPreparePhoto ?? prepareDocumentPhoto)(bytes);
+      if (!mounted) return;
+      setState(() => _idPhotos[side] = compressed);
       Haptics.success();
-    } catch (e) {
-      if (mounted) toast(context, 'Photo choose nahi ho payi: $e', err: true);
+    } catch (_) {
+      if (mounted) toast(context, 'Photo process nahi ho payi. JPEG/PNG ya camera se dobara try karein.', err: true);
+    } finally {
+      if (mounted) setState(() => _pickingSide = null);
     }
   }
 
+  Future<void> _previewIdPhoto(int side) async {
+    final bytes = _idPhotos[side];
+    if (bytes == null) return;
+    await showDialog<void>(context: context, builder: (dialog) => Dialog(
+      child: Padding(
+        padding: const EdgeInsets.all(Space.x16),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Row(children: [
+            Expanded(child: Text('${side == 0 ? 'Front' : 'Back'} · ${(bytes.length / 1024).ceil()} KB',
+              style: context.type.titleMedium)),
+            IconButton(tooltip: 'Close preview', onPressed: () => Navigator.pop(dialog), icon: const Icon(Icons.close)),
+          ]),
+          Flexible(child: InteractiveViewer(minScale: 1, maxScale: 5,
+            child: Image.memory(bytes, fit: BoxFit.contain))),
+          const SizedBox(height: Space.x8),
+          const Text('Zoom karke document ka text check karein.'),
+        ]),
+      ),
+    ));
+  }
+
   Future<void> _save() async {
+    if (_pickingSide != null || _saving) return;
     FocusScope.of(context).unfocus();
     if (!_form.currentState!.validate()) return;
     setState(() => _phase = ButtonPhase.loading);
@@ -228,7 +261,8 @@ class _BuyFormState extends State<BuyForm> {
       'ram': ram.text, 'storage': storage.text, 'color': color.text, 'condition': condition, 'accessories': accessories.text,
       'buy_price': price.text, 'buy_date': DateFormat('yyyy-MM-dd').format(date),
       'seller_name': cName.text, 'seller_phone': cPhone.text, 'seller_id_type': idType,
-      'seller_address': cAddr.text, 'notes': notes.text, 'customer_id_photo': _idPhoto ?? '',
+      'seller_address': cAddr.text, 'notes': notes.text, 'customer_id_photo': _photoDataUrl(0),
+      'customer_id_photo_back': _photoDataUrl(1),
     };
     try {
       if (widget.testSave != null) { await widget.testSave!(body); } else { await Api.post('/buy', body); }
@@ -247,6 +281,9 @@ class _BuyFormState extends State<BuyForm> {
       if (mounted && _phase == ButtonPhase.error) setState(() => _phase = ButtonPhase.idle);
     }
   }
+
+  String _photoDataUrl(int side) => _idPhotos[side] == null
+      ? '' : 'data:image/jpeg;base64,${base64Encode(_idPhotos[side]!)}';
 
   (ChipTone, IconData, String) get _imeiChip => switch (_imeiState) {
         _ImeiState.found => (ChipTone.success, Icons.check_circle_outline, _imeiLabel),
@@ -304,13 +341,13 @@ class _BuyFormState extends State<BuyForm> {
               ]),
               const SizedBox(height: Space.x12),
               Row(children: [
-                Expanded(child: _OptionField(controller: ram, label: 'RAM (e.g. 8GB)', options: _ramOptions)),
+                Expanded(child: _OptionField(controller: ram, label: 'RAM (e.g. 8GB)', title: 'RAM', icon: Icons.memory_outlined, options: _ramOptions)),
                 const SizedBox(width: Space.x12),
-                Expanded(child: _OptionField(controller: storage, label: 'Storage (e.g. 128GB)', options: _storageOptions)),
+                Expanded(child: _OptionField(controller: storage, label: 'Storage (e.g. 128GB)', title: 'Storage', icon: Icons.storage_rounded, options: _storageOptions)),
               ]),
               const SizedBox(height: Space.x12),
               Row(children: [
-                Expanded(child: _OptionField(controller: color, label: 'Color', options: _colorOptions)),
+                Expanded(child: _OptionField(controller: color, label: 'Color', title: 'Color', icon: Icons.palette_outlined, options: _colorOptions)),
                 const SizedBox(width: Space.x12),
                 Expanded(child: _GlassDropdown(label: 'Condition', value: condition,
                     items: const ['Excellent', 'Good', 'Fair', 'Faulty'], onChanged: (v) => setState(() => condition = v!))),
@@ -333,14 +370,15 @@ class _BuyFormState extends State<BuyForm> {
                     if (d != null) setState(() => date = d);
                   },
                   child: Container(
-                    height: 56, padding: const EdgeInsets.symmetric(horizontal: Space.x16),
+                    constraints: const BoxConstraints(minHeight: 56),
+                    padding: const EdgeInsets.symmetric(horizontal: Space.x16, vertical: Space.x12),
                     decoration: BoxDecoration(borderRadius: Shapes.md, color: c.textPrimary.withValues(alpha: .05),
                         border: Border.all(color: c.textPrimary.withValues(alpha: .10))),
                     child: Row(children: [
                       Icon(Icons.calendar_month_outlined, size: 20, color: c.textSecondary),
                       const SizedBox(width: Space.x12),
-                      Text(DateFormat('d MMMM yyyy').format(date), style: t.bodyLarge),
-                      const Spacer(),
+                      Expanded(child: Text(DateFormat('d MMMM yyyy').format(date), style: t.bodyLarge)),
+                      const SizedBox(width: Space.x8),
                       Text('Change', style: t.labelLarge?.copyWith(color: c.brandInk)),
                     ]),
                   ),
@@ -361,14 +399,14 @@ class _BuyFormState extends State<BuyForm> {
                   items: const ['Aadhaar', 'PAN', 'Voter ID', 'Driving Licence', 'Visiting Card'],
                   onChanged: (v) => setState(() => idType = v!)),
               const SizedBox(height: Space.x12),
-              _idUploadTile(c, t),
+              _idUploadSection(c, t),
               const SizedBox(height: Space.x12),
               GlassTextField(controller: cAddr, label: 'Address (optional)'),
               const SizedBox(height: Space.x12),
               GlassTextField(controller: notes, label: 'Notes (optional)'),
             ])),
             const SizedBox(height: Space.section),
-            PrimaryButton(label: 'Save & add to stock', icon: Icons.add, phase: _phase, onPressed: _save),
+            PrimaryButton(label: 'Save & add to stock', icon: Icons.add, phase: _phase, onPressed: _pickingSide == null ? _save : null),
           ],
         ),
       ),
@@ -376,38 +414,68 @@ class _BuyFormState extends State<BuyForm> {
     ]);
   }
 
-  /// "Upload ID" row: tap to take a photo or pick one from the gallery.
-  Widget _idUploadTile(AppColors c, TextTheme t) {
-    final picked = _idPhotoBytes != null;
-    return Semantics(
-      button: true,
-      label: picked ? 'Uploaded ID photo. Double tap to change it.' : 'Upload ID photo',
-      child: InkWell(
-        borderRadius: Shapes.md,
-        onTap: _askIdPhotoSource,
-        child: Container(
-          height: 56, padding: const EdgeInsets.symmetric(horizontal: Space.x16),
-          decoration: BoxDecoration(borderRadius: Shapes.md, color: c.textPrimary.withValues(alpha: .05),
-              border: Border.all(color: c.textPrimary.withValues(alpha: .10))),
-          child: Row(children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: picked
-                  ? Image.memory(_idPhotoBytes!, width: 34, height: 34, fit: BoxFit.cover)
-                  : Icon(Icons.badge_outlined, size: 24, color: c.textSecondary),
-            ),
+  Widget _idUploadSection(AppColors c, TextTheme t) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Icon(Icons.verified_user_outlined, size: 20, color: c.brandInk),
+        const SizedBox(width: Space.x8),
+        Expanded(child: Text('Document photos', style: t.titleSmall)),
+        Text('${_idPhotos.whereType<Uint8List>().length}/2', style: t.labelLarge?.copyWith(color: c.brandInk)),
+      ]),
+      const SizedBox(height: Space.x8),
+      Text('Front aur back upload karein. Sirf 1 photo bhi chalegi.',
+        style: t.bodySmall?.copyWith(color: c.textSecondary)),
+      const SizedBox(height: Space.x12),
+      LayoutBuilder(builder: (context, box) => box.maxWidth < 280
+        ? Column(children: [_idUploadTile(0, c, t), const SizedBox(height: Space.x12), _idUploadTile(1, c, t)])
+        : Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(child: _idUploadTile(0, c, t)),
             const SizedBox(width: Space.x12),
-            Expanded(
-              child: Text(
-                picked ? 'ID photo lag gayi — badalne ke liye tap karein' : 'Upload ID',
-                maxLines: 1, overflow: TextOverflow.ellipsis,
-                style: t.bodyLarge?.copyWith(color: picked ? c.textPrimary : c.textSecondary),
-              ),
+            Expanded(child: _idUploadTile(1, c, t)),
+          ])),
+      const SizedBox(height: Space.x8),
+      Text('Auto-compress · Target 100 KB/photo. Text clarity ke liye size zyada ho sakta hai.',
+        style: t.bodySmall?.copyWith(color: c.textSecondary)),
+    ]);
+  }
+
+  Widget _idUploadTile(int side, AppColors c, TextTheme t) {
+    final bytes = _idPhotos[side];
+    final busy = _pickingSide == side;
+    final enabled = _pickingSide == null && !_saving;
+    final name = side == 0 ? 'Front' : 'Back';
+    return Material(
+      color: context.scheme.primary.withValues(alpha: .06),
+      shape: RoundedRectangleBorder(borderRadius: Shapes.md,
+        side: BorderSide(color: context.scheme.primary.withValues(alpha: bytes == null ? .20 : .5))),
+      clipBehavior: Clip.antiAlias,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        InkWell(
+          key: ValueKey('id-photo-$side'),
+          onTap: enabled ? () => _askIdPhotoSource(side) : null,
+          child: Semantics(button: true, label: 'Upload $name document photo',
+            child: Padding(
+              padding: const EdgeInsets.all(Space.x12),
+              child: Column(children: [
+                SizedBox(height: 72, width: double.infinity,
+                  child: busy
+                    ? const Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)))
+                    : bytes != null
+                      ? ClipRRect(borderRadius: Shapes.xs, child: Image.memory(bytes, fit: BoxFit.contain))
+                      : Icon(side == 0 ? Icons.badge_outlined : Icons.flip_to_back_rounded, size: 32, color: c.brandInk)),
+                const SizedBox(height: Space.x8),
+                Text('$name photo', style: t.labelLarge),
+                const SizedBox(height: Space.x4),
+                Text(busy ? 'Processing…' : bytes == null ? 'Tap to upload' : '${(bytes.length / 1024).ceil()} KB · Change',
+                  textAlign: TextAlign.center, style: t.bodySmall?.copyWith(color: c.brandInk)),
+              ]),
             ),
-            Icon(Icons.upload_outlined, size: 20, color: c.brandInk),
-          ]),
+          ),
         ),
-      ),
+        if (bytes != null)
+          TextButton.icon(onPressed: () => _previewIdPhoto(side),
+            icon: const Icon(Icons.zoom_in, size: 18), label: const Text('Preview')),
+      ]),
     );
   }
 }
@@ -419,45 +487,106 @@ class _BuyFormState extends State<BuyForm> {
 /// Typing a new value still works — that is what teaches the app for next time.
 class _OptionField extends StatelessWidget {
   final TextEditingController controller;
-  final String label;
+  final String label, title;
+  final IconData icon;
   final List<String> options;
-  const _OptionField({required this.controller, required this.label, required this.options});
+  const _OptionField({required this.controller, required this.label, required this.title,
+    required this.icon, required this.options});
 
   Future<void> _openPicker(BuildContext context) async {
-    final c = context.colors, t = context.type;
-    final current = controller.text.trim().toLowerCase();
+    FocusScope.of(context).unfocus();
+    final c = context.colors, t = context.type, scheme = context.scheme;
+    final current = controller.text.trim();
+    final values = <String>[];
+    for (final value in [if (current.isNotEmpty) current, ...options]) {
+      if (value.trim().isNotEmpty && !values.any((v) => v.toLowerCase() == value.trim().toLowerCase())) {
+        values.add(value.trim());
+      }
+    }
     final picked = await showModalBottomSheet<String>(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
       showDragHandle: true,
-      builder: (sheet) => SafeArea(
+      backgroundColor: scheme.surfaceContainer,
+      barrierColor: scheme.scrim.withValues(alpha: .5),
+      shape: RoundedRectangleBorder(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(Radii.xl)),
+        side: BorderSide(color: scheme.primary.withValues(alpha: .18))),
+      builder: (sheet) => SafeArea(top: false,
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(sheet).height * 0.6),
+          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(sheet).height * .72),
           child: SingleChildScrollView(
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(Space.x16, Space.x8, Space.x16, Space.x12),
-                child: Row(children: [
-                  Icon(Icons.format_list_bulleted, size: 20, color: c.textSecondary),
-                  const SizedBox(width: Space.x12),
-                  Text('$label choose karein', style: t.titleSmall?.copyWith(color: c.textPrimary)),
+            padding: const EdgeInsets.fromLTRB(Space.x20, 0, Space.x20, Space.x24),
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Container(width: 48, height: 48,
+                  decoration: BoxDecoration(color: scheme.primary.withValues(alpha: .12), borderRadius: Shapes.md),
+                  child: Icon(icon, color: c.brandInk)),
+                const SizedBox(width: Space.x12),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Choose $title', style: t.titleLarge?.copyWith(color: c.textPrimary)),
+                  Text('Apne phone ka variant select karein', style: t.bodySmall?.copyWith(color: c.textSecondary)),
+                ])),
+                IconButton(tooltip: 'Close $title options', onPressed: () => Navigator.pop(sheet),
+                  icon: Icon(Icons.close_rounded, color: c.textSecondary)),
+              ]),
+              const SizedBox(height: Space.x24),
+              LayoutBuilder(builder: (context, box) {
+                final columns = box.maxWidth < 300 || MediaQuery.textScalerOf(context).scale(14) > 20 ? 1 : 2;
+                final width = (box.maxWidth - (columns - 1) * Space.x12) / columns;
+                return Wrap(spacing: Space.x12, runSpacing: Space.x12, children: [
+                  for (final option in values)
+                    SizedBox(width: width, child: _optionTile(sheet, option,
+                      selected: option.toLowerCase() == current.toLowerCase())),
+                ]);
+              }),
+              const SizedBox(height: Space.x20),
+              Container(
+                padding: const EdgeInsets.all(Space.x12),
+                decoration: BoxDecoration(color: c.accent.withValues(alpha: .08), borderRadius: Shapes.sm),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Icon(Icons.edit_outlined, size: 18, color: c.brandInk),
+                  const SizedBox(width: Space.x8),
+                  Expanded(child: Text('Option nahi mila? Sheet band karke field mein apna value type karein.',
+                    style: t.bodySmall?.copyWith(color: c.textSecondary))),
                 ]),
               ),
-              const Divider(height: 1),
-              for (final option in options)
-                ListTile(
-                  title: Text(option, style: t.bodyLarge),
-                  trailing: option.toLowerCase() == current ? Icon(Icons.check, color: c.brandInk) : null,
-                  onTap: () => Navigator.pop(sheet, option),
-                ),
-              const SizedBox(height: Space.x8),
             ]),
           ),
         ),
       ),
     );
-    if (picked == null) return;
+    if (picked == null || !context.mounted) return;
     Haptics.tick();
     controller.text = picked;
+  }
+
+  Widget _optionTile(BuildContext context, String option, {required bool selected}) {
+    final c = context.colors, scheme = context.scheme;
+    return Semantics(selected: selected, button: true,
+      child: Material(
+        color: selected ? scheme.primary.withValues(alpha: .14) : scheme.surfaceContainerHigh.withValues(alpha: .55),
+        shape: RoundedRectangleBorder(borderRadius: Shapes.md,
+          side: BorderSide(color: selected ? scheme.primary : scheme.outline.withValues(alpha: .35), width: selected ? 1.5 : 1)),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(onTap: () => Navigator.pop(context, option),
+          child: ConstrainedBox(constraints: const BoxConstraints(minHeight: 60),
+            child: Padding(padding: const EdgeInsets.all(Space.x12),
+              child: Row(children: [
+                Icon(icon, size: 20, color: selected ? c.brandInk : c.textSecondary),
+                const SizedBox(width: Space.x8),
+                Expanded(child: Text(option, style: context.type.titleSmall?.copyWith(
+                  color: selected ? c.brandInk : c.textPrimary))),
+                const SizedBox(width: Space.x4),
+                Icon(selected ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
+                  size: 20, color: selected ? c.brandInk : scheme.outline),
+              ]),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -468,7 +597,8 @@ class _OptionField extends StatelessWidget {
       textInputAction: TextInputAction.next,
       suffix: IconButton(
         tooltip: '$label choose karein',
-        icon: Icon(Icons.arrow_drop_down, color: context.colors.textSecondary),
+        icon: Icon(Icons.expand_more_rounded, color: context.colors.brandInk),
+        style: IconButton.styleFrom(backgroundColor: context.scheme.primary.withValues(alpha: .08)),
         onPressed: () => _openPicker(context),
       ),
     );

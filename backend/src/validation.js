@@ -59,8 +59,9 @@ function password(value, field = 'password') {
 // Accepted proofs of identity for the person the phone is bought from.
 const ID_TYPES = ['Aadhaar', 'PAN', 'Voter ID', 'Driving Licence', 'Visiting Card'];
 
-// ID photos are sent as base64 data URLs. Keep the cap well below the 8 MB JSON
-// limit; the app compresses to roughly 200-350 KB before sending.
+// ID photos are sent as base64 data URLs. Keep the cap below the 9 MB JSON
+// limit per side for older clients; new clients target 100 KB per photo.
+// Two maximum-size photos including base64 must fit the JSON request limit.
 const ID_PHOTO_MAX_BYTES = 3 * 1024 * 1024;
 
 // Accepts a `data:image/...;base64,...` URL, or null/empty to clear it.
@@ -72,12 +73,15 @@ function idPhoto(value, field = 'customer_id_photo') {
   if (value.length > maxChars) fail(`${field} is too large (max ${Math.round(ID_PHOTO_MAX_BYTES / (1024 * 1024))}MB)`);
   if (!/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(value))
     fail(`${field} must be a JPEG, PNG or WebP data URL`);
+  const encoded = value.slice(value.indexOf(',') + 1);
+  if (Buffer.from(encoded, 'base64').length > ID_PHOTO_MAX_BYTES)
+    fail(`${field} is too large (max 3MB)`);
   return value;
 }
 
 const phoneFields = ['brand', 'model', 'ram', 'storage', 'color', 'condition', 'accessories', 'buy_price', 'buy_date',
   'seller_name', 'seller_phone', 'seller_id_type', 'seller_id_no', 'seller_address', 'notes', 'imei2',
-  'serial_number', 'customer_id_photo'];
+  'serial_number', 'customer_id_photo', 'customer_id_photo_back'];
 function phoneData(b, partial = false) {
   const out = {};
   for (const k of phoneFields) {
@@ -89,7 +93,7 @@ function phoneData(b, partial = false) {
     else if (k === 'seller_id_type') out[k] = choice(b[k], k, ID_TYPES);
     else if (k === 'seller_phone') out[k] = mobile(b[k], k);
     else if (k === 'serial_number') out[k] = text(b[k], k, { max: 64 });
-    else if (k === 'customer_id_photo') out[k] = idPhoto(b[k], k);
+    else if (k === 'customer_id_photo' || k === 'customer_id_photo_back') out[k] = idPhoto(b[k], k);
     else out[k] = text(b[k], k, { required: k === 'model', max: k === 'notes' ? 5000 : 255 });
   }
   if (!partial) {

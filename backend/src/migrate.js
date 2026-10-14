@@ -63,7 +63,8 @@ async function migrate() {
       t.string('seller_name'); t.string('seller_phone'); t.string('seller_id_type'); t.string('seller_id_no');
       t.string('seller_address');
       t.text('notes');
-      t.text('customer_id_photo');                   // base64 data URL of the ID proof photo
+      t.text('customer_id_photo');                   // front / legacy single ID photo
+      t.text('customer_id_photo_back');              // optional reverse side
       t.string('status').notNullable().defaultTo('in_stock'); // in_stock | sold
       t.integer('created_by').references('users.id');
       t.timestamp('created_at').defaultTo(db.fn.now());
@@ -110,6 +111,9 @@ async function migrate() {
   }
   if (!(await db.schema.hasColumn('phones', 'customer_id_photo'))) {
     await db.schema.alterTable('phones', t => t.text('customer_id_photo'));
+  }
+  if (!(await db.schema.hasColumn('phones', 'customer_id_photo_back'))) {
+    await db.schema.alterTable('phones', t => t.text('customer_id_photo_back'));
   }
   // The Buy form asks for RAM/storage/colour suggestions on every IMEI lookup,
   // matched case-insensitively on model and brand. Without these the sync can

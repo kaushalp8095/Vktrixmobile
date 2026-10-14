@@ -4,7 +4,7 @@ name: Update goldens
 # moved row, changed label) and pushes them back to the branch.
 #
 # Runs when UI code changes on a branch. The bot's own commit only touches
-# app/goldens/**, which is not in the `paths` filter, so it cannot loop.
+# app/goldens/** and app/pubspec.lock, neither is in the paths filter, so it cannot loop.
 #
 # Can also be started by hand from the Actions tab once this file is on the
 # repository's default branch.
@@ -44,22 +44,56 @@ jobs:
 
       - run: flutter pub get
 
+      - name: Analyze Flutter
+        shell: bash
+        run: flutter analyze --no-pub 2>&1 | tee flutter-analyze.log
+
       - name: Regenerate goldens
-        run: flutter test --no-pub --update-goldens
+        shell: bash
+        run: flutter test --no-pub --reporter expanded --update-goldens 2>&1 | tee flutter-goldens.log
 
       - name: Verify the suite is green with the new goldens
-        run: flutter test --no-pub
+        shell: bash
+        run: flutter test --no-pub --reporter expanded 2>&1 | tee flutter-tests.log
+
+      - name: Report Flutter failure details
+        if: failure()
+        run: |
+          python3 - <<'PYTHON'
+          from pathlib import Path
+          import re
+          for path in Path('.').glob('flutter-*.log'):
+              text = path.read_text()
+              if 'No issues found!' in text or 'All tests passed!' in text:
+                  continue
+              # An annotation has a small message limit. Keep failure summaries
+              # rather than flooding it with passing tests and framework stacks.
+              blocks = re.split(r'EXCEPTION CAUGHT BY [^\n]+', text)
+              summaries = []
+              for block in blocks[1:]:
+                  start = block.find('The following')
+                  end = block.find('When the exception was thrown')
+                  summary = block[max(0, start):end if end > start else start + 1800]
+                  description = block.find('The test description was:')
+                  if description >= 0:
+                      summary += '\n' + block[description:description + 250]
+                  summaries.append(summary)
+              report = '\n\n'.join(summaries) if summaries else text
+              for i in range(0, min(len(report), 24000), 3000):
+                  part = report[i:i + 3000].replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+                  print(f'::error title={path.name} part {i // 3000 + 1}::{part}')
+          PYTHON
 
       - name: Commit and push if anything changed
         env:
           BRANCH: ${{ github.ref_name }}
         run: |
-          if [ -z "$(git status --porcelain goldens)" ]; then
-            echo "Goldens already up to date - nothing to commit."
+          if [ -z "$(git status --porcelain goldens pubspec.lock)" ]; then
+            echo "Goldens and dependency lock already up to date - nothing to commit."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add goldens
-          git commit -m "chore: regenerate Flutter goldens"
+          git add goldens pubspec.lock
+          git commit -m "chore: refresh Flutter goldens and dependency lock"
           git push origin "HEAD:$BRANCH"
