@@ -9,7 +9,7 @@
 | Login security | JWT token + bcrypt password hashing | |
 
 ## Features
-- **Super Admin**: shops banana, har shop ko alag login dena, shop band/chalu karna, password reset, delete, har shop ka stock/sales/report dekhna, overall dashboard, TAC (IMEI model) CSV import + **free TAC catalog sync** (Osmocom community data)
+- **Super Admin**: shops banana, har shop ko alag login dena, shop band/chalu karna, password reset, delete, har shop ka stock/sales/report dekhna, overall dashboard, TAC (IMEI model) CSV import + **do free TAC catalog sync**: Osmocom community list aur **extended India-models list** (Redmi/Realme/Poco/Vivo ke naye variants + internal model code, koi API key/paisa nahi)
 - **Shop Login**: sirf apni shop ka data dikhega (dusri shop ka nahi)
 - **Buy Form**: IMEI likhte hi/scan karte hi **Brand + Model free me apne aap** bhar jata hai (local TAC catalog, koi external API/paisa nahi), RAM/Storage/Color ke liye **dropdown** (app ke apne purane data se), IMEI valid hai ya nahi (Luhn check), duplicate check, pehle kab aaya tha wo history (**catalog miss ho to wahi entry sab fields auto-fill karti hai**), **Serial number (optional)**, Customer details + ID proof (**photo upload: camera ya gallery**)
 - **Save karte hi stock me add** → Stock list me "BECHO" button → Sell form (profit/loss live dikhega)
@@ -25,12 +25,18 @@ IMEI ke pehle 8 digit (TAC) model batate hain. Database `tac_models` me har row 
 | `learned` | Kisi shop ne ye phone kharida (brand/model/RAM/storage) | **Kabhi nahi** |
 | `csv` | Super admin ka apna CSV import | **Kabhi nahi** |
 | `legacy` / `seed` | Is update se pehle ki rows / sample rows | **Kabhi nahi** |
-| `osmocom` | Free community TAC catalog sync | Haan, sirf agle sync me (brand/model) |
+| `api` | Optional external TAC API (jab `TAC_API_URL` set ho) | **Kabhi nahi** |
+| `osmocom` | Free community TAC catalog sync (Osmocom) | Haan, sirf agle Osmocom sync me (brand/model) |
+| `tacdb` | Free extended TAC catalog sync (India models, MIT) | Haan, sirf agle extended sync me (brand/model) |
 
 1. Jab bhi koi phone kharida jata hai, uska model/RAM/storage save ho jata hai (`learned`), **agli baar same model par sab auto-fill** (sabhi shops ke liye).
-2. **Free TAC catalog sync (Super Admin):** app me Super Admin → top bar ka 🔍 *TAC catalog* button → **Sync free catalog now**. Server [Osmocom TAC database](http://tacdb.osmocom.org/) ka CSV download karke naye TAC add karta hai. Sync background me chalta hai (1-2 min); screen par coverage, last run (new / updated / kept / skipped) aur error dikhte hain.
+2. **Free TAC catalog sync (Super Admin):** app me Super Admin → top bar ka 🔍 *TAC catalog* button → har catalog ke saath **Sync** button:
+   - **Community catalog (Osmocom)** — [tacdb.osmocom.org](http://tacdb.osmocom.org/) ka CSV (brand + model only). 1–2 min.
+   - **Extended catalog (India models)** — [MoazEb/tac-database](https://github.com/MoazEb/tac-database) (MIT licence) ka `tac_full.csv` (~2.5 lakh TAC, India/global variants + internal model code jaise `13 5G (2406ERN9CI)`). Pehli baar **3–5 min** lagte hain (bade DB par), uske baad sirf naye/badle rows likhte hain.
+   Dono sync background me chalte hain; ek time par ek hi sync chalta hai. Screen par coverage, per-catalog last run (new / updated / kept / skipped), licence/attribution aur error dikhte hain. Sync **kabhi kuch delete nahi karta** aur `learned`/`csv`/`legacy` rows ko **kabhi overwrite nahi karta** (default: ek catalog doosre catalog ki rows bhi nahi chhedta).
+   Server me GitHub block ho to mirror bhi hai (`jsDelivr`), aur `TAC_SYNC_TACDB_URL` se apna URL de sakte hain.
 3. Super admin apna CSV bhi import kar sakta hai: `POST /api/admin/tac/import` (form field `file`). Format `tac,brand,model[,ram,storage]` (header optional). Khaali columns purani RAM/storage ko blank **nahi** karte. Raw Osmocom export upload karne par wahi non-destructive sync rules lagte hain.
-4. **Wahi IMEI dobara aaye to:** `GET /api/imei/:imei` us shop ki apni latest entry (`history[0]`) bhi bhejta hai. Catalog (TAC) miss ho jaye to Brand/Model/RAM/Storage/Color wahin se bhar jate hain aur chip "filled from your earlier entry" dikhata hai; community (`osmocom`) row me jo RAM/storage missing hote hain wo bhi isi entry se plug hote hain. Jo field aapne khud bhar diya hai use auto-fill **kabhi overwrite nahi** karta.
+4. **Wahi IMEI dobara aaye to:** `GET /api/imei/:imei` us shop ki apni latest entry (`history[0]`) bhi bhejta hai. Catalog (TAC) miss ho jaye to Brand/Model/RAM/Storage/Color wahin se bhar jate hain aur chip "filled from your earlier entry" dikhata hai; community catalog (`osmocom` / `tacdb` / optional `api`) row me jo RAM/storage missing hote hain wo bhi isi entry se plug hote hain. Jo field aapne khud bhar diya hai use auto-fill **kabhi overwrite nahi** karta.
 
 ### RAM / Storage / Color dropdown kaise banta hai
 
@@ -68,15 +74,23 @@ Koi external API call nahi hoti, koi IMEI server se bahar nahi jata, aur iska ko
     bahut bhaari ho jayega). Poori row ke liye `GET /api/phones/:id` use karein.
 
 #### ⚠️ Free TAC catalog ki limitations (zaroor padhein)
-- **Data adhoora hai:** community catalog me bahut se naye aur India-only models (Redmi/Realme/Vivo/Oppo ke naye variants) **nahi** hain. Aise phone pehli baar manually bharne padenge; uske baad app khud seekh lega.
+- **Data adhoora hai:** Osmocom me bahut se naye aur India-only models (Redmi/Realme/Poco/Vivo ke naye variants) **nahi** hain. Isliye extended catalog bhi hai; phir bhi bilkul naya model pehli baar manually bhar na pade — uske baad app khud seekh lega.
 - **Sirf brand + model:** RAM, storage, colour catalog me nahi hote — dropdown app ke apne data se
   bharata hai, nahi to shop khud bhar sakta hai.
 - **Naam hamesha marketing name nahi hota:** kabhi model code aata hai (jaise `SM-A515F/DSN` = Galaxy A51), aur ek TAC kai variants cover kar sakta hai.
 - **Verified nahi hai:** data crowd-sourced hai, GSMA official nahi. Buy form me aisi entry par chip dikhega *"community data, model verify karein"*. Kharidne se pehle phone (Settings → About / `*#06#`) se match karein.
-- **Upstream sirf `http://` deta hai (HTTPS nahi):** isliye sync safety ke liye: file size limit, minimum valid rows check, sab ek transaction me, **koi row delete nahi hoti**, aur shop/CSV data kabhi overwrite nahi hota. Kharab/adhoora download par kuch nahi badalta (run "Failed" dikhega).
-- **Licence:** data CC-BY-SA 3.0 hai: *TAC data: Osmocom TAC database (c) Harald Welte and contributors*. Attribution TAC catalog screen par dikhaya jata hai; data ko aage public share karein to yahi licence/attribution rakhein.
+- **Osmocom upstream sirf `http://` deta hai (HTTPS nahi):** isliye sync safety ke liye: file size limit, minimum valid rows check, sab ek transaction me, **koi row delete nahi hoti**, aur shop/CSV data kabhi overwrite nahi hota. Kharab/adhoora download par kuch nahi badalta (run "Failed" dikhega).
+- **Extended catalog ka nature:** ye MoazEb/tac-database (MIT) hai — 2.5 lakh rows 2000–2025 tak, jisme purane/overseas variants bhi hain, aur model code brackets me hota hai (`13 5G (2406ERN9CI)`, `SM-A556B`). Kabhi galti bhi ho sakti hai (jaise `9A` vs `9A Sport`), isliye buy form me community chip *"verify model"* dikhata hai. Chipset/bands/release year is app me **sync nahi** hote (sirf brand + model chahiye).
+- **Pehla extended sync bhaari hai:** ~2.5 lakh rows ek transaction me jaate hain (chhote chunks me, batch lookups ke saath). Render ke chhote plan par 3–5 min lag sakte hain aur DB kuch MB bada hoga; baad ke syncs bahut tez hote hain (sirf badle rows).
+- **Licence:** Osmocom data CC-BY-SA 3.0 hai: *TAC data: Osmocom TAC database (c) Harald Welte and contributors*; extended data MIT: *TAC data: MoazEb/tac-database (MIT)*. Dono ki attribution TAC catalog screen par dikhayi jati hai — aage share karte waqt yahi licence/attribution rakhein.
 
-Optional env (`backend/.env`): `TAC_SYNC_URL` (mirror/alternate CSV), `TAC_SYNC_TIMEOUT_MS` (default 120000), `TAC_SYNC_MAX_MB` (default 25), `TAC_SYNC_MIN_ROWS` (default 100).
+Optional env (`backend/.env`):
+- Osmocom: `TAC_SYNC_URL` (mirror/alternate CSV), `TAC_SYNC_TIMEOUT_MS` (default 120000), `TAC_SYNC_MAX_MB` (default 25), `TAC_SYNC_MIN_ROWS` (default 100).
+- Extended: `TAC_SYNC_TACDB_URL` (comma se alag kai mirrors — pehla fail hone par agla try hota hai), `TAC_SYNC_TACDB_TIMEOUT_MS` (default 300000), `TAC_SYNC_TACDB_MAX_MB` (default 30), `TAC_SYNC_TACDB_MIN_ROWS` (default 150000 — isse kam rows aayein to sync "failed" hota hai aur kuch nahi badalta).
+- `TAC_SYNC_TACDB_REFRESH_OSMOCOM=true` — extended list ko purani Osmocom rows bhi update karne dena (default off).
+- `TAC_API_URL` + `TAC_API_KEY` — optional paid/free TAC API, sirf tab jab local catalog miss ho (per TAC max 1 request). Khaali chhodne par koi request nahi jati.
+
+Kaun-kaunsi free/paid IMEI API hai aur kya-kya free me mil sakta hai: **[docs/FREE_IMEI_APIS.md](docs/FREE_IMEI_APIS.md)**.
 
 ### "New model — fill brand & model once" kyon aata hai aur kya karein
 

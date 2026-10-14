@@ -113,9 +113,10 @@ class _BuyFormState extends State<BuyForm> {
         brand.text = '${i['brand'] ?? ''}'; model.text = '${i['model'] ?? ''}';
         ram.text = '${i['ram'] ?? ''}'; storage.text = '${i['storage'] ?? ''}';
         if (i['color'] != null && color.text.isEmpty) color.text = '${i['color']}';
-        // Community catalog rows are unverified and have no RAM/storage: plug those gaps
-        // from the shop's earlier entry and say so, instead of claiming "auto-filled".
-        final community = i['source'] == 'osmocom';
+        // Community catalog rows (Osmocom, the extended India-models list, or an
+        // optional external TAC API) are unverified and have no RAM/storage: plug those
+        // gaps from the shop's earlier entry and say so, instead of claiming "auto-filled".
+        final community = const {'osmocom', 'tacdb', 'api'}.contains(i['source']);
         final plugged = _fillFrom(prev, onlyEmpty: true);
         final name = _deviceName(i);
         _imeiState = community ? _ImeiState.community : _ImeiState.found;

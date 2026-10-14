@@ -1,7 +1,8 @@
 // TAC catalog: CSV parsing, safe merge rules and the free catalog syncs.
 //
 // Two free upstream catalogs can be synced by the super admin:
-//   1. osmocom - Osmocom TAC database (CC-BY-SA 3.0), ~30k rows, brand + model.
+//   1. osmocom - Osmocom TAC database (CC-BY-SA 3.0), tens of thousands of rows,
+//                brand + model only.
 //   2. tacdb   - MoazEb/tac-database (MIT), ~250k rows, includes recent India-only
 //                Redmi/Realme/Poco/Vivo variants and internal model codes.
 //
@@ -27,7 +28,7 @@ const CATALOGS = Object.freeze({
     source: SOURCE.OSMOCOM,
     label: 'Community catalog (Osmocom)',
     short: 'Osmocom',
-    note: 'Free community list of ~30k TACs. Brand + model only — weakest for recent India-only phones.',
+    note: 'Free community list (brand + model only). Weakest for recent India-only phones.',
     homepage: 'http://tacdb.osmocom.org/',
     license: 'CC-BY-SA 3.0 Unported',
     attribution: 'TAC data: Osmocom TAC database (c) Harald Welte and contributors, CC-BY-SA 3.0',
