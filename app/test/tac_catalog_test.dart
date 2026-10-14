@@ -103,10 +103,13 @@ void main() {
     expect(_text('Never synced'), findsOneWidget, reason: 'only the extended catalog has no run yet');
     expect(_text('Success'), findsOneWidget);
     expect(_textContaining('11900 new · 12 updated'), findsOneWidget);
-    expect(_textContaining('Osmocom TAC database'), findsOneWidget, reason: 'attribution for the community data');
-    expect(_textContaining('MoazEb/tac-database'), findsOneWidget, reason: 'attribution for the extended data');
     expect(_buttons(t).length, 2, reason: 'one sync action per free catalog');
     expect(_buttons(t).every((b) => b.onPressed != null), isTrue);
+    // Both licences must be visible somewhere on the screen (bottom of a lazy list).
+    await t.drag(find.byType(ListView, skipOffstage: false), const Offset(0, -1500));
+    await _settle(t);
+    expect(_textContaining('Osmocom TAC database'), findsOneWidget, reason: 'attribution for the community data');
+    expect(_textContaining('MoazEb/tac-database'), findsOneWidget, reason: 'attribution for the extended data');
     await t.pumpWidget(const SizedBox());
   });
 
