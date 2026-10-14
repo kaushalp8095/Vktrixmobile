@@ -4,7 +4,7 @@ name: Update goldens
 # moved row, changed label) and pushes them back to the branch.
 #
 # Runs when UI code changes on a branch. The bot's own commit only touches
-# app/goldens/**, which is not in the `paths` filter, so it cannot loop.
+# app/goldens/** and app/pubspec.lock, neither is in the paths filter, so it cannot loop.
 #
 # Can also be started by hand from the Actions tab once this file is on the
 # repository's default branch.
@@ -44,6 +44,8 @@ jobs:
 
       - run: flutter pub get
 
+      - run: flutter analyze --no-pub
+
       - name: Regenerate goldens
         run: flutter test --no-pub --update-goldens
 
@@ -54,12 +56,12 @@ jobs:
         env:
           BRANCH: ${{ github.ref_name }}
         run: |
-          if [ -z "$(git status --porcelain goldens)" ]; then
-            echo "Goldens already up to date - nothing to commit."
+          if [ -z "$(git status --porcelain goldens pubspec.lock)" ]; then
+            echo "Goldens and dependency lock already up to date - nothing to commit."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add goldens
-          git commit -m "chore: regenerate Flutter goldens"
+          git add goldens pubspec.lock
+          git commit -m "chore: refresh Flutter goldens and dependency lock"
           git push origin "HEAD:$BRANCH"

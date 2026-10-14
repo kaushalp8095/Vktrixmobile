@@ -8,8 +8,8 @@ const suggestions = require('../suggestions');
 const tacApi = require('../tacApi');
 r.use(requireAuth);
 
-// Columns returned by list endpoints. `customer_id_photo` is deliberately left
-// out: it holds a base64 image and would bloat every stock/reports response.
+// Columns returned by list endpoints. Both customer ID photos are deliberately
+// left out: base64 images would bloat every stock/reports response.
 // The full row (photo included) is available from GET /phones/:id.
 const PHONE_LIST_COLUMNS = ['id', 'shop_id', 'imei', 'imei2', 'serial_number', 'brand', 'model', 'ram', 'storage',
   'color', 'condition', 'accessories', 'buy_price', 'buy_date', 'seller_name', 'seller_phone', 'seller_id_type',
@@ -62,7 +62,7 @@ r.post('/buy', wrap(async (req, res) => {
   const b = V.body(req);
   const buyFields = ['imei', 'imei2', 'serial_number', 'brand', 'model', 'ram', 'storage', 'color', 'condition', 'accessories',
     'buy_price', 'buy_date', 'seller_name', 'seller_phone', 'seller_id_type', 'seller_id_no', 'seller_address', 'notes',
-    'customer_id_photo'];
+    'customer_id_photo', 'customer_id_photo_back'];
   if (Object.keys(b).some(k => !buyFields.includes(k))) return res.status(400).json({ error: 'Unsupported purchase field' });
   const fields = V.phoneData(b);
   const id = await db.transaction(async trx => {
@@ -114,7 +114,7 @@ r.put('/phones/:id', wrap(async (req, res) => {
   const b = V.body(req);
   const allowed = ['brand', 'model', 'ram', 'storage', 'color', 'condition', 'accessories', 'buy_price', 'buy_date',
     'seller_name', 'seller_phone', 'seller_id_type', 'seller_id_no', 'seller_address', 'notes', 'imei2',
-    'serial_number', 'customer_id_photo'];
+    'serial_number', 'customer_id_photo', 'customer_id_photo_back'];
   if (Object.keys(b).some(k => !allowed.includes(k))) return res.status(400).json({ error: 'Unsupported phone field' });
   const upd = V.phoneData(b, true);
   if (Object.hasOwn(upd, 'imei2') && upd.imei2) {
