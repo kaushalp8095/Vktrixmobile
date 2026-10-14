@@ -227,7 +227,7 @@ test('extended catalog sync: status, merge rules, re-sync, failures and access c
   });
 
   await t.test('a real purchase wins: learned stays learned over later extended syncs', async () => {
-    const buy = await request('POST', '/buy', owner, { imei: '861665070000009', brand: 'Redmi', model: '13 5G',
+    const buy = await request('POST', '/buy', owner, { imei: '861665070000094', brand: 'Redmi', model: '13 5G',
       ram: '6GB', storage: '128GB', condition: 'Good', buy_price: '8000', buy_date: '2025-01-01' });
     assert.equal(buy.status, 200, JSON.stringify(buy.body));
     assert.equal((await tacRow('86166507')).source, 'learned');
@@ -283,8 +283,8 @@ test('extended catalog sync: status, merge rules, re-sync, failures and access c
     try {
       upstream = { status: 200, body: UPSTREAM_V1, hold: null };
       const s = await syncNow(admin, 'tacdb');
-      assert.equal(s.last_run.updated, 1);
-      assert.equal(s.last_run.protected, 1);
+      assert.equal(s.last_run.updated, 2, 'the Osmocom row plus the extended row V1 renamed back');
+      assert.equal(s.last_run.protected, 1, 'the learned row is still never touched');
       const row = await tacRow('35332811');
       assert.deepEqual([row.brand, row.model, row.source], ['SAMSUNG', 'GALAXY A55 5G (SM-A556B)', 'tacdb']);
       assert.equal((await tacRow('86900001')).source, 'csv', 'admin CSV data is never touched');
