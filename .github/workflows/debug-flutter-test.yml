@@ -1,0 +1,22 @@
+name: Debug flutter test
+on:
+  push:
+    branches: [arena/20cedaa2-vktrixmobile]
+permissions:
+  contents: read
+jobs:
+  cat:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter test --no-pub --reporter github
+      - run: echo "::error::flutter test exited 0"
+        if: failure()
