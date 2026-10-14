@@ -370,14 +370,15 @@ class _BuyFormState extends State<BuyForm> {
                     if (d != null) setState(() => date = d);
                   },
                   child: Container(
-                    height: 56, padding: const EdgeInsets.symmetric(horizontal: Space.x16),
+                    constraints: const BoxConstraints(minHeight: 56),
+                    padding: const EdgeInsets.symmetric(horizontal: Space.x16, vertical: Space.x12),
                     decoration: BoxDecoration(borderRadius: Shapes.md, color: c.textPrimary.withValues(alpha: .05),
                         border: Border.all(color: c.textPrimary.withValues(alpha: .10))),
                     child: Row(children: [
                       Icon(Icons.calendar_month_outlined, size: 20, color: c.textSecondary),
                       const SizedBox(width: Space.x12),
-                      Text(DateFormat('d MMMM yyyy').format(date), style: t.bodyLarge),
-                      const Spacer(),
+                      Expanded(child: Text(DateFormat('d MMMM yyyy').format(date), style: t.bodyLarge)),
+                      const SizedBox(width: Space.x8),
                       Text('Change', style: t.labelLarge?.copyWith(color: c.brandInk)),
                     ]),
                   ),

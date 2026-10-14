@@ -61,13 +61,14 @@ jobs:
         run: |
           python3 - <<'PYTHON'
           from pathlib import Path
+          import re
           for path in Path('.').glob('flutter-*.log'):
               text = path.read_text()
               if 'No issues found!' in text or 'All tests passed!' in text:
                   continue
               # An annotation has a small message limit. Keep failure summaries
               # rather than flooding it with passing tests and framework stacks.
-              blocks = text.split('EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK')
+              blocks = re.split(r'EXCEPTION CAUGHT BY [^\n]+', text)
               summaries = []
               for block in blocks[1:]:
                   start = block.find('The following')
