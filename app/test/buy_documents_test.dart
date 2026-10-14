@@ -120,7 +120,7 @@ void main() {
       testPickPhoto: (_) async => cancel ? null : _jpeg,
       testPreparePhoto: (bytes) async {
         if (fail) throw const FormatException('invalid photo');
-        return processing == null ? bytes : await processing!.future;
+        return processing == null ? bytes : await processing.future;
       }));
     await _chooseSource(t, 0);
     await t.pumpAndSettle();
