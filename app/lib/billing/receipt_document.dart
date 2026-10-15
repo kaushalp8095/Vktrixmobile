@@ -255,7 +255,12 @@ class ReceiptDocument {
       final raw = _text(dataUrl);
       final comma = raw.indexOf(',');
       if (comma < 0 || !raw.startsWith('data:image/')) return null;
-      return pw.MemoryImage(base64Decode(raw.substring(comma + 1)));
+      final bytes = base64Decode(raw.substring(comma + 1));
+      // MemoryImage decodes lazily while painting the page. Validate here so a
+      // corrupt/legacy logo falls back to the shop initial instead of breaking
+      // the entire receipt generation.
+      if (image.decodeImage(bytes) == null) return null;
+      return pw.MemoryImage(bytes);
     } catch (_) {
       return null;
     }
