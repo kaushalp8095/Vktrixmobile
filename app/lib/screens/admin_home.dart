@@ -75,7 +75,7 @@ class _AdminHomeState extends State<AdminHome> {
     if (logoData.isEmpty) logoData = null;
     Uint8List? logoBytes;
     try {
-      if (logoData != null) logoBytes = base64Decode(logoData!.substring(logoData!.indexOf(',') + 1));
+      if (logoData != null) logoBytes = base64Decode(logoData.substring(logoData.indexOf(',') + 1));
     } catch (_) { logoData = null; }
     final key = GlobalKey<FormState>();
     final ok = await showDialog<bool>(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, setDialogState) => AlertDialog(
