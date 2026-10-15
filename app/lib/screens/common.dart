@@ -1,5 +1,22 @@
 import 'package:flutter/material.dart';
 
+/// Keeps API timestamps compact in business screens without shifting a UTC
+/// calendar date into the previous/next local day.
+String dateOnly(dynamic value) {
+  if (value == null) return '—';
+  final raw = value.toString().trim();
+  if (raw.isEmpty || raw == 'null') return '—';
+
+  final isoPrefix = RegExp(r'^(\d{4}-\d{2}-\d{2})(?:$|[Tt ].*)').firstMatch(raw);
+  if (isoPrefix != null) return isoPrefix.group(1)!;
+
+  final parsed = DateTime.tryParse(raw);
+  if (parsed == null) return raw;
+  return '${parsed.year.toString().padLeft(4, '0')}-'
+      '${parsed.month.toString().padLeft(2, '0')}-'
+      '${parsed.day.toString().padLeft(2, '0')}';
+}
+
 void toast(BuildContext c, String m, {bool err = false}) => ScaffoldMessenger.of(c)
     .showSnackBar(SnackBar(content: Text(m.replaceFirst('Exception: ', '')), backgroundColor: err ? Colors.red : null));
 
