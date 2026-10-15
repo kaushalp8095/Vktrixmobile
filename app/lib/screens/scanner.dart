@@ -11,6 +11,15 @@ import '../api.dart';
 /// MobileScanner also auto-starts causes two overlapping CameraX start calls and
 /// surfaces as `genericError` on Android. One owner now controls start/stop, and
 /// the newer CameraX selector handles devices with unusual rear-camera layouts.
+/// Kept as a small public factory so a regression test can guarantee that the
+/// widget and this screen never both auto-start the same camera again.
+MobileScannerController createImeiScannerController() => MobileScannerController(
+  autoStart: false,
+  detectionSpeed: DetectionSpeed.noDuplicates,
+  facing: CameraFacing.back,
+  useNewCameraSelector: true,
+);
+
 class ImeiScanner extends StatefulWidget {
   const ImeiScanner({super.key});
 
@@ -19,12 +28,7 @@ class ImeiScanner extends StatefulWidget {
 }
 
 class _ImeiScannerState extends State<ImeiScanner> with WidgetsBindingObserver {
-  final MobileScannerController _camera = MobileScannerController(
-    autoStart: false,
-    detectionSpeed: DetectionSpeed.noDuplicates,
-    facing: CameraFacing.back,
-    useNewCameraSelector: true,
-  );
+  final MobileScannerController _camera = createImeiScannerController();
   StreamSubscription<BarcodeCapture>? _subscription;
   bool _done = false;
   bool _starting = false;
