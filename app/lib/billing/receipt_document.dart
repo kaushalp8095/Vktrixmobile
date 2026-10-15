@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
+import 'package:image/image.dart' as image;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
