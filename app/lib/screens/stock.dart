@@ -4,6 +4,7 @@ import '../api.dart';
 import '../design/components/components.dart';
 import '../design/design.dart';
 import 'common.dart';
+import 'receipt.dart';
 import 'sell_form.dart';
 
 class StockScreen extends StatefulWidget {
@@ -41,9 +42,13 @@ class _StockScreenState extends State<StockScreen> {
     Haptics.tap();
     final action = await showModalBottomSheet<String>(
       context: context, isScrollControlled: true, backgroundColor: Colors.transparent,
-      builder: (c) => _PhoneDetailSheet(phone: p, onSell: () => Navigator.pop(c, 'sell'), onDelete: () => Navigator.pop(c, 'delete')),
+      builder: (c) => _PhoneDetailSheet(phone: p,
+        onReceipt: () => Navigator.pop(c, 'receipt'),
+        onSell: () => Navigator.pop(c, 'sell'), onDelete: () => Navigator.pop(c, 'delete')),
     );
-    if (action == 'delete') {
+    if (action == 'receipt' && mounted) {
+      await SharedAxisRoute.push(context, (_) => ReceiptScreen(type: 'purchase', id: int.parse('${p['id']}')));
+    } else if (action == 'delete') {
       try { await Api.delete('/phones/${p['id']}'); _load(); } catch (e) { if (mounted) toast(context, '$e', err: true); }
     } else if (action == 'sell' && mounted) {
       final ok = await SharedAxisRoute.push<bool>(context, (_) => SellForm(phone: Map<String, dynamic>.from(p)));
@@ -134,8 +139,8 @@ class _StockRow extends StatelessWidget {
 }
 
 class _PhoneDetailSheet extends StatelessWidget {
-  final Map phone; final VoidCallback onSell, onDelete;
-  const _PhoneDetailSheet({required this.phone, required this.onSell, required this.onDelete});
+  final Map phone; final VoidCallback onReceipt, onSell, onDelete;
+  const _PhoneDetailSheet({required this.phone, required this.onReceipt, required this.onSell, required this.onDelete});
   @override
   Widget build(BuildContext context) {
     final c = context.colors, t = context.type;
@@ -175,9 +180,14 @@ class _PhoneDetailSheet extends StatelessWidget {
                 Expanded(child: SelectableText(r.$2, style: t.bodyMedium)),
               ])),
             const SizedBox(height: Space.x20),
-            Row(children: [
-              Expanded(child: PrimaryButton(label: 'Sell this phone', icon: Icons.sell_outlined, onPressed: onSell)),
-            ]),
+            OutlinedButton.icon(
+              onPressed: onReceipt,
+              icon: const Icon(Icons.picture_as_pdf_outlined),
+              label: const Text('Purchase PDF & WhatsApp'),
+              style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+            ),
+            const SizedBox(height: Space.x8),
+            PrimaryButton(label: 'Sell this phone', icon: Icons.sell_outlined, onPressed: onSell),
             const SizedBox(height: Space.x12),
             Center(child: TextButton(
               onPressed: () async {

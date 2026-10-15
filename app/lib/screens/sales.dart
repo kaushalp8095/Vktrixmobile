@@ -4,6 +4,8 @@ import '../api.dart';
 import '../design/components/components.dart';
 import '../design/design.dart';
 import 'common.dart';
+import 'ledger.dart';
+import 'receipt.dart';
 
 class SalesScreen extends StatefulWidget {
   final List<dynamic>? testItems; // test hook
@@ -38,14 +40,29 @@ class _SalesScreenState extends State<SalesScreen> {
 
   Future<void> _details(Map s) async {
     Haptics.tap();
-    final cancel = await showModalBottomSheet<bool>(
+    final action = await showModalBottomSheet<String>(
       context: context, isScrollControlled: true, backgroundColor: Colors.transparent,
-      builder: (c) => _SaleDetailSheet(sale: s, profit: _profit(s), onCancel: () => Navigator.pop(c, true)),
+      builder: (c) => _SaleDetailSheet(
+        sale: s, profit: _profit(s),
+        onReceipt: () => Navigator.pop(c, 'receipt'),
+        onLedger: () => Navigator.pop(c, 'ledger'),
+        onCancel: () => Navigator.pop(c, 'cancel'),
+      ),
     );
-    if (cancel != true || !mounted) return;
+    if (!mounted || action == null) return;
+    final saleId = int.parse('${s['id']}');
+    if (action == 'receipt') {
+      await SharedAxisRoute.push(context, (_) => ReceiptScreen(type: 'sale', id: saleId));
+      return;
+    }
+    if (action == 'ledger') {
+      await SharedAxisRoute.push(context, (_) => LedgerDetailScreen(saleId: saleId));
+      if (mounted && widget.testItems == null) _load();
+      return;
+    }
     final ok = await showDialog<bool>(context: context, builder: (d) => AlertDialog(
       title: const Text('Cancel this sale?'),
-      content: Text('${s['brand']} ${s['model']} will go back into stock.'),
+      content: Text('${s['brand']} ${s['model']} will go back into stock. Payment history will also be removed.'),
       actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Keep sale')),
         FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Cancel sale'))],
     ));
@@ -86,7 +103,14 @@ class _SalesScreenState extends State<SalesScreen> {
       ),
       Positioned(top: 0, left: 0, right: 0, child: GlassTopBar(title: 'Sales', scroll: _scroll,
           leading: const SizedBox(width: Space.x12),
-          actions: [GlassIconButton(icon: Icons.refresh, semanticLabel: 'Refresh sales', onPressed: _load)])),
+          actions: [
+            GlassIconButton(icon: Icons.account_balance_wallet_outlined, semanticLabel: 'Open udhaar ledger',
+              onPressed: () async {
+                await SharedAxisRoute.push(context, (_) => const LedgerScreen());
+                if (mounted && widget.testItems == null) _load();
+              }),
+            GlassIconButton(icon: Icons.refresh, semanticLabel: 'Refresh sales', onPressed: _load),
+          ])),
     ]);
   }
 }
@@ -98,6 +122,7 @@ class _SaleRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors, t = context.type;
     final pay = '${s['payment_mode'] ?? 'cash'}'.toUpperCase();
+    final due = num.tryParse('${s['balance_due'] ?? 0}') ?? 0;
     return Semantics(
       button: true, label: '${s['brand']} ${s['model']}, sold for ${rs(s['sell_price'])}, profit ${rs(profit)}',
       child: InkWell(
@@ -112,14 +137,15 @@ class _SaleRow extends StatelessWidget {
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('${s['brand']} ${s['model']}', style: t.titleSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
               const SizedBox(height: 2),
-              Text([if ((s['customer_name'] ?? '').toString().isNotEmpty) s['customer_name'], '${s['sell_date']}', pay]
-                  .join(' · '), style: t.bodySmall?.copyWith(color: c.textSecondary), maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text([if ((s['customer_name'] ?? '').toString().isNotEmpty) s['customer_name'], '${s['sell_date']}',
+                    due > 0 ? '${rs(due)} due' : pay]
+                  .join(' · '), style: t.bodySmall?.copyWith(color: due > 0 ? c.warningInk : c.textSecondary), maxLines: 1, overflow: TextOverflow.ellipsis),
             ])),
             const SizedBox(width: Space.x12),
             Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
               Text(rs(s['sell_price']), style: t.titleSmall),
-              Text(profit >= 0 ? '+${rs(profit)}' : '−${rs(-profit)}',
-                  style: t.labelSmall?.copyWith(color: profit >= 0 ? c.successInk : c.errorInk)),
+              Text(due > 0 ? '${rs(due)} due' : (profit >= 0 ? '+${rs(profit)}' : '−${rs(-profit)}'),
+                  style: t.labelSmall?.copyWith(color: due > 0 ? c.warningInk : profit >= 0 ? c.successInk : c.errorInk)),
             ]),
           ]),
         ),
@@ -129,8 +155,10 @@ class _SaleRow extends StatelessWidget {
 }
 
 class _SaleDetailSheet extends StatelessWidget {
-  final Map sale; final num profit; final VoidCallback onCancel;
-  const _SaleDetailSheet({required this.sale, required this.profit, required this.onCancel});
+  final Map sale; final num profit;
+  final VoidCallback onReceipt, onLedger, onCancel;
+  const _SaleDetailSheet({required this.sale, required this.profit,
+    required this.onReceipt, required this.onLedger, required this.onCancel});
   @override
   Widget build(BuildContext context) {
     final c = context.colors, t = context.type;
@@ -140,6 +168,8 @@ class _SaleDetailSheet extends StatelessWidget {
       ('RAM / Storage', '${s['ram'] ?? '—'} / ${s['storage'] ?? '—'}'),
       ('Bought at', rs(s['buy_price'])), ('Sold at', rs(s['sell_price'])),
       ('Sell date', '${s['sell_date']}'), ('Payment', '${s['payment_mode'] ?? 'cash'}'.toUpperCase()),
+      ('Received', rs(s['paid_amount'] ?? s['sell_price'])),
+      ('Balance due', rs(s['balance_due'] ?? 0)),
       if ((s['customer_name'] ?? '').toString().isNotEmpty) ('Customer', '${s['customer_name']}${s['customer_phone'] != null ? ' · ${s['customer_phone']}' : ''}'),
       if ((s['customer_address'] ?? '').toString().isNotEmpty) ('Address', '${s['customer_address']}'),
       if ((s['warranty'] ?? '').toString().isNotEmpty) ('Warranty', '${s['warranty']}'),
@@ -163,6 +193,15 @@ class _SaleDetailSheet extends StatelessWidget {
               Expanded(child: SelectableText(r.$2, style: t.bodyMedium)),
             ])),
           const SizedBox(height: Space.x20),
+          PrimaryButton(label: 'PDF bill & WhatsApp', icon: Icons.picture_as_pdf_outlined, onPressed: onReceipt),
+          const SizedBox(height: Space.x8),
+          OutlinedButton.icon(
+            onPressed: onLedger,
+            icon: const Icon(Icons.account_balance_wallet_outlined),
+            label: Text((num.tryParse('${s['balance_due'] ?? 0}') ?? 0) > 0 ? 'Payment ledger · ${rs(s['balance_due'])} due' : 'View payment history'),
+            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+          ),
+          const SizedBox(height: Space.x12),
           Center(child: TextButton(
             onPressed: onCancel,
             child: Text('Cancel sale (returns to stock)', style: t.labelLarge?.copyWith(color: c.errorInk)),

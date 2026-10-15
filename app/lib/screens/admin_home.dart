@@ -1,10 +1,14 @@
 // SUPER ADMIN: overview stats + shops list (open as shop, edit, reset pass, toggle, delete)
 // + TAC catalog screen (free community IMEI model sync).
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../api.dart';
 import '../design/components/components.dart';
 import '../design/design.dart';
+import '../documents/document_photo.dart';
 import 'common.dart';
 import 'login.dart';
 import 'shop_home.dart';
@@ -67,8 +71,14 @@ class _AdminHomeState extends State<AdminHome> {
     final name = TextEditingController(text: shop?['name']), owner = TextEditingController(text: shop?['owner_name']),
         phone = TextEditingController(text: shop?['phone']), addr = TextEditingController(text: shop?['address']),
         gst = TextEditingController(text: shop?['gst_no']), user = TextEditingController(), pass = TextEditingController();
+    String? logoData = '${shop?['logo_data'] ?? ''}'.trim();
+    if (logoData.isEmpty) logoData = null;
+    Uint8List? logoBytes;
+    try {
+      if (logoData != null) logoBytes = base64Decode(logoData!.substring(logoData!.indexOf(',') + 1));
+    } catch (_) { logoData = null; }
     final key = GlobalKey<FormState>();
-    final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+    final ok = await showDialog<bool>(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, setDialogState) => AlertDialog(
       title: Text(shop == null ? 'New shop' : 'Edit shop'),
       content: Form(key: key, child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
         TextFormField(controller: name, decoration: const InputDecoration(labelText: 'Shop name *'), validator: (v) => (v ?? '').trim().isEmpty ? 'Required' : null),
@@ -80,6 +90,47 @@ class _AdminHomeState extends State<AdminHome> {
         TextFormField(controller: addr, decoration: const InputDecoration(labelText: 'Address')),
         const SizedBox(height: 8),
         TextFormField(controller: gst, decoration: const InputDecoration(labelText: 'GST no (optional)')),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(Space.x12),
+          decoration: BoxDecoration(color: context.colors.textPrimary.withValues(alpha: .04),
+            borderRadius: Shapes.md, border: Border.all(color: context.colors.textPrimary.withValues(alpha: .10))),
+          child: Row(children: [
+            Container(width: 54, height: 54,
+              decoration: BoxDecoration(color: context.scheme.primary.withValues(alpha: .10), borderRadius: Shapes.md),
+              clipBehavior: Clip.antiAlias,
+              child: logoBytes == null
+                ? Icon(Icons.storefront_outlined, color: context.colors.brandInk)
+                : Image.memory(logoBytes!, fit: BoxFit.contain)),
+            const SizedBox(width: Space.x12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Bill logo', style: context.type.titleSmall),
+              Text('PDF bill par shop logo', style: context.type.bodySmall?.copyWith(color: context.colors.textSecondary)),
+            ])),
+            TextButton(
+              onPressed: () async {
+                try {
+                  final picked = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1200,
+                    maxHeight: 1200, imageQuality: 100, requestFullMetadata: false);
+                  if (picked == null) return;
+                  final prepared = await prepareDocumentPhoto(await picked.readAsBytes());
+                  if (!ctx.mounted) return;
+                  setDialogState(() {
+                    logoBytes = prepared;
+                    logoData = 'data:image/jpeg;base64,${base64Encode(prepared)}';
+                  });
+                } catch (_) {
+                  if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Logo process nahi hua. Dobara try karein.')));
+                }
+              },
+              child: Text(logoBytes == null ? 'Add' : 'Change'),
+            ),
+            if (logoBytes != null)
+              IconButton(tooltip: 'Remove logo', icon: const Icon(Icons.close), onPressed: () => setDialogState(() {
+                logoBytes = null; logoData = null;
+              })),
+          ]),
+        ),
         if (shop == null) ...[
           const SizedBox(height: 16),
           Align(alignment: Alignment.centerLeft, child: Text('Shop login', style: Theme.of(ctx).textTheme.titleSmall)),
@@ -96,10 +147,11 @@ class _AdminHomeState extends State<AdminHome> {
         FilledButton(onPressed: () { if (key.currentState!.validate()) Navigator.pop(ctx, true); },
             child: Text(shop == null ? 'Create shop' : 'Save')),
       ],
-    ));
+    )));
     if (ok != true) return;
     try {
-      final body = {'name': name.text, 'owner_name': owner.text, 'phone': phone.text, 'address': addr.text, 'gst_no': gst.text};
+      final body = {'name': name.text, 'owner_name': owner.text, 'phone': phone.text, 'address': addr.text,
+        'gst_no': gst.text, 'logo_data': logoData ?? ''};
       if (shop == null) {
         await Api.post('/admin/shops', {...body, 'username': user.text.trim(), 'password': pass.text});
         if (mounted) toast(context, '${name.text} created — login: ${user.text.trim()}');

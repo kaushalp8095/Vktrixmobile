@@ -104,6 +104,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
               Wrap(spacing: Space.x8, runSpacing: Space.x8, children: [
                 StatusChip(label: '${d!['sales']['count']} sold · ${rs(d!['sales']['amount'])}', tone: ChipTone.brand, icon: Icons.sell_outlined),
                 StatusChip(label: '${d!['purchases']['count']} bought · ${rs(d!['purchases']['amount'])}', tone: ChipTone.neutral, icon: Icons.call_received),
+                if (d!['receivables'] != null && (num.tryParse('${d!['receivables']['outstanding']}') ?? 0) > 0)
+                  StatusChip(label: '${rs(d!['receivables']['outstanding'])} payment baki',
+                    tone: ChipTone.warning, icon: Icons.account_balance_wallet_outlined),
               ]),
             ])),
             const SizedBox(height: Space.x16),

@@ -7,10 +7,10 @@ import '../api.dart';
 
 /// Phone box / *#06# screen ka barcode scan karke IMEI laata hai.
 ///
-/// `MobileScanner(onDetect: ...)` was **removed in mobile_scanner 5.0.0**, which
-/// is why the old version of this screen never fired. The supported API on 5.x,
-/// 6.x and 7.x alike is a [MobileScannerController] plus its `barcodes` stream,
-/// so that is what this screen uses.
+/// The controller is deliberately `autoStart: false`: starting it manually while
+/// MobileScanner also auto-starts causes two overlapping CameraX start calls and
+/// surfaces as `genericError` on Android. One owner now controls start/stop, and
+/// the newer CameraX selector handles devices with unusual rear-camera layouts.
 class ImeiScanner extends StatefulWidget {
   const ImeiScanner({super.key});
 
@@ -20,10 +20,14 @@ class ImeiScanner extends StatefulWidget {
 
 class _ImeiScannerState extends State<ImeiScanner> with WidgetsBindingObserver {
   final MobileScannerController _camera = MobileScannerController(
+    autoStart: false,
     detectionSpeed: DetectionSpeed.noDuplicates,
+    facing: CameraFacing.back,
+    useNewCameraSelector: true,
   );
   StreamSubscription<BarcodeCapture>? _subscription;
   bool _done = false;
+  bool _starting = false;
   String? _hint;
 
   @override
@@ -35,16 +39,27 @@ class _ImeiScannerState extends State<ImeiScanner> with WidgetsBindingObserver {
   }
 
   void _subscribe() {
+    if (_subscription != null) return;
     _subscription = _camera.barcodes.listen(_onBarcodes);
   }
 
   Future<void> _start() async {
+    if (_done || _starting || _camera.value.isRunning) return;
+    _starting = true;
     try {
       await _camera.start();
     } catch (_) {
-      // Failures (camera busy, permission denied, unsupported device) are
-      // published on MobileScannerState.error and rendered below.
+      // The controller publishes camera failures in MobileScannerState.error.
+    } finally {
+      _starting = false;
     }
+  }
+
+  Future<void> _restart() async {
+    if (_starting) return;
+    await _camera.stop();
+    _subscribe();
+    await _start();
   }
 
   void _onBarcodes(BarcodeCapture capture) {
@@ -98,7 +113,7 @@ class _ImeiScannerState extends State<ImeiScanner> with WidgetsBindingObserver {
             valueListenable: _camera,
             builder: (context, state, _) {
               final error = state.error;
-              if (error != null) return _CameraProblem(error: error, onRetry: _start);
+              if (error != null) return _CameraProblem(error: error, onRetry: _restart);
               if (!state.isInitialized) {
                 return const ColoredBox(
                   color: Colors.black,

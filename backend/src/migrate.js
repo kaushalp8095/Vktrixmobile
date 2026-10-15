@@ -7,6 +7,8 @@ async function migrate() {
       t.increments('id');
       t.string('name').notNullable();
       t.string('owner_name'); t.string('phone'); t.string('address'); t.string('gst_no');
+      // Small JPEG/PNG/WebP data URL used on customer-facing PDF receipts.
+      t.text('logo_data');
       t.boolean('active').defaultTo(true);
       t.timestamp('created_at').defaultTo(db.fn.now());
     });
@@ -80,12 +82,33 @@ async function migrate() {
       t.decimal('buy_price_at_sale', 12, 2);
       t.date('sell_date').notNullable();
       t.string('customer_name'); t.string('customer_phone'); t.string('customer_address');
-      t.string('payment_mode').defaultTo('cash'); // cash | upi | card | credit
+      t.string('payment_mode').defaultTo('cash'); // cash | upi | card | bank | credit | emi
       t.string('warranty');
       t.text('notes');
       t.integer('created_by').references('users.id');
       t.timestamp('created_at').defaultTo(db.fn.now());
       t.index(['shop_id', 'sell_date']);
+    });
+  }
+
+  // Every receipt can have zero or more collections. Keeping payments in their
+  // own immutable rows gives an auditable partial-payment history instead of a
+  // single balance that can silently be overwritten.
+  let createdSalePayments = false;
+  if (!(await db.schema.hasTable('sale_payments'))) {
+    createdSalePayments = true;
+    await db.schema.createTable('sale_payments', t => {
+      t.increments('id');
+      t.integer('shop_id').notNullable().references('shops.id').onDelete('CASCADE');
+      t.integer('sale_id').notNullable().references('sales.id').onDelete('CASCADE');
+      t.decimal('amount', 12, 2).notNullable();
+      t.date('payment_date').notNullable();
+      t.string('payment_mode', 24).notNullable(); // cash | upi | card | bank | other
+      t.string('note', 500);
+      t.integer('created_by').references('users.id').onDelete('SET NULL');
+      t.timestamp('created_at').defaultTo(db.fn.now());
+      t.index(['shop_id', 'sale_id']);
+      t.index(['shop_id', 'payment_date']);
     });
   }
 
@@ -104,6 +127,24 @@ async function migrate() {
     .update({ status: 'failed', finished_at: new Date().toISOString(), error: 'Interrupted by server restart' });
   if (!(await db.schema.hasColumn('sales', 'buy_price_at_sale'))) {
     await db.schema.alterTable('sales', t => t.decimal('buy_price_at_sale', 12, 2));
+  }
+  if (!(await db.schema.hasColumn('shops', 'logo_data'))) {
+    await db.schema.alterTable('shops', t => t.text('logo_data'));
+  }
+  // On the one deployment where the ledger table is first introduced, preserve
+  // old behaviour by marking non-credit historical sales as fully collected.
+  // This runs only when the table was created, so a new unpaid sale can never be
+  // mistaken for a legacy row on a later restart.
+  if (createdSalePayments) {
+    const oldPaidSales = await db('sales').whereNot({ payment_mode: 'credit' })
+      .select('id', 'shop_id', 'sell_price', 'sell_date', 'payment_mode', 'created_by', 'created_at');
+    if (oldPaidSales.length) {
+      await db('sale_payments').insert(oldPaidSales.map(s => ({
+        shop_id: s.shop_id, sale_id: s.id, amount: s.sell_price,
+        payment_date: s.sell_date, payment_mode: ['cash', 'upi', 'card', 'bank'].includes(s.payment_mode) ? s.payment_mode : 'other',
+        note: 'Opening balance migrated from existing sale', created_by: s.created_by, created_at: s.created_at,
+      })));
+    }
   }
   // Serial number (printed on the box / under the battery) and the customer ID photo.
   if (!(await db.schema.hasColumn('phones', 'serial_number'))) {
