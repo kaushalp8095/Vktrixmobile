@@ -11,6 +11,7 @@ import 'buy_form.dart';
 import 'stock.dart';
 import 'sales.dart';
 import 'reports.dart';
+import 'ledger.dart';
 import 'update_checker.dart';
 
 class ShopHome extends StatefulWidget {
@@ -91,7 +92,8 @@ class _ShopHomeState extends State<ShopHome> {
               physics: const NeverScrollableScrollPhysics(),
               onPageChanged: (i) => setState(() => tab = i),
               children: [
-                Dashboard(key: _keys[0], onGo: go, shopName: _name, isAdminView: widget.adminShopName != null),
+                Dashboard(key: _keys[0], onGo: go, shopName: _name, isAdminView: widget.adminShopName != null,
+                  onOpenLedger: () => SharedAxisRoute.push(context, (_) => const LedgerScreen())),
                 KeyedSubtree(key: _keys[1], child: BuyForm(onSaved: () { go(2); })),
                 KeyedSubtree(key: _keys[2], child: StockScreen(onBuy: () => go(1))),
                 KeyedSubtree(key: _keys[3], child: const SalesScreen()),

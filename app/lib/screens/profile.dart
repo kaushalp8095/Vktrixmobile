@@ -1,4 +1,6 @@
 // PROFILE & SETTINGS: shop card → theme → account (change password, logout) → app info.
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../api.dart';
 import '../design/components/components.dart';
@@ -73,6 +75,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Uint8List? _shopLogo(dynamic value) {
+    try {
+      final raw = '${value ?? ''}';
+      final comma = raw.indexOf(',');
+      return comma < 0 ? null : base64Decode(raw.substring(comma + 1));
+    } catch (_) { return null; }
+  }
+
   Future<void> _logout() async {
     final ok = await showDialog<bool>(context: context, builder: (d) => AlertDialog(
       title: const Text('Log out?'),
@@ -90,6 +100,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final c = context.colors, t = context.type;
     final u = Api.user ?? const {};
     final shop = (u['shop'] as Map?) ?? const {};
+    final logo = _shopLogo(shop['logo_data']);
     final top = MediaQuery.viewPaddingOf(context).top;
     return Scaffold(
       body: AuroraBackground(child: Stack(children: [
@@ -100,9 +111,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             // ---- Shop card ----
             GlassCard(child: Row(children: [
               SizedBox.square(dimension: 56, child: GlassSurface(radius: Radii.full, blur: false,
-                  child: Center(child: Text(
-                      ('${shop['name'] ?? u['name'] ?? 'S'}').trim().characters.first.toUpperCase(),
-                      style: t.headlineSmall?.copyWith(color: c.brandInk)))),
+                  child: logo == null
+                    ? Center(child: Text(
+                        ('${shop['name'] ?? u['name'] ?? 'S'}').trim().characters.first.toUpperCase(),
+                        style: t.headlineSmall?.copyWith(color: c.brandInk)))
+                    : Padding(padding: const EdgeInsets.all(6), child: ClipOval(child: Image.memory(logo, fit: BoxFit.contain)))),
               ),
               const SizedBox(width: Space.x12),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

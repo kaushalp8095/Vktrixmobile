@@ -15,6 +15,7 @@ import '../documents/document_photo.dart';
 import '../design/components/components.dart';
 import '../design/design.dart';
 import 'common.dart';
+import 'receipt.dart';
 import 'scanner.dart';
 
 class BuyForm extends StatefulWidget {
@@ -265,12 +266,22 @@ class _BuyFormState extends State<BuyForm> {
       'customer_id_photo_back': _photoDataUrl(1),
     };
     try {
-      if (widget.testSave != null) { await widget.testSave!(body); } else { await Api.post('/buy', body); }
+      int? receiptId;
+      if (widget.testSave != null) {
+        await widget.testSave!(body);
+      } else {
+        final saved = await Api.post('/buy', body);
+        receiptId = saved is Map ? int.tryParse('${saved['id']}') : null;
+      }
       if (!mounted) return;
       setState(() => _phase = ButtonPhase.success);
       Haptics.success();
       await Future<void>.delayed(Motion.of(context).d(const Duration(milliseconds: 500)));
       if (!mounted) return;
+      if (receiptId != null) {
+        await SharedAxisRoute.push(context, (_) => ReceiptScreen(type: 'purchase', id: receiptId!));
+        if (!mounted) return;
+      }
       widget.onSaved();
     } catch (e) {
       if (!mounted) return;

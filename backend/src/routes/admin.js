@@ -70,6 +70,7 @@ r.delete('/shops/:id', wrap(async (req, res) => {
   const exists = await db('shops').where({ id: shopId }).first();
   if (!exists) return res.status(404).json({ error: 'Shop nahi mila' });
   await db.transaction(async trx => {
+    await trx('sale_payments').where({ shop_id: shopId }).del();
     await trx('sales').where({ shop_id: shopId }).del();
     await trx('phones').where({ shop_id: shopId }).del();
     await trx('users').where({ shop_id: shopId }).del();

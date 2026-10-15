@@ -17,6 +17,7 @@ class ActivityItem {
 
 class Dashboard extends StatefulWidget {
   final void Function(int) onGo;
+  final VoidCallback? onOpenLedger;
   final String shopName;
   final bool isAdminView;
 
@@ -24,7 +25,7 @@ class Dashboard extends StatefulWidget {
   final Map<String, dynamic>? testSummary;
   final List<ActivityItem>? testRecent;
   final String? greeting;
-  const Dashboard({super.key, required this.onGo, required this.shopName,
+  const Dashboard({super.key, required this.onGo, required this.shopName, this.onOpenLedger,
       this.isAdminView = false, this.testSummary, this.greeting, this.testRecent});
   @override
   State<Dashboard> createState() => _DashboardState();
@@ -128,6 +129,14 @@ class _DashboardState extends State<Dashboard> {
                 const SizedBox(width: Space.x12),
                 Expanded(child: _SecondaryAction(label: 'Sell phone', icon: Icons.sell_outlined, onTap: () => widget.onGo(2))),
               ]),
+              if (widget.onOpenLedger != null) ...[
+                const SizedBox(height: Space.x12),
+                _LedgerAction(
+                  outstanding: _s!['receivables']?['outstanding'] ?? 0,
+                  count: int.tryParse('${_s!['receivables']?['pending_count'] ?? 0}') ?? 0,
+                  onTap: widget.onOpenLedger!,
+                ),
+              ],
               const SizedBox(height: Space.section),
               // ---- Today ----
               SectionHeader(title: 'Today'),
@@ -168,6 +177,40 @@ class _DashboardState extends State<Dashboard> {
         ],
       )),
     ]);
+  }
+}
+
+class _LedgerAction extends StatelessWidget {
+  final dynamic outstanding;
+  final int count;
+  final VoidCallback onTap;
+  const _LedgerAction({required this.outstanding, required this.count, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors, t = context.type;
+    return GlassCard(
+      blur: false,
+      padding: EdgeInsets.zero,
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.all(Space.x12),
+        child: Row(children: [
+          Container(width: 42, height: 42,
+            decoration: BoxDecoration(color: c.warning.withValues(alpha: .12), borderRadius: Shapes.md),
+            child: Icon(Icons.account_balance_wallet_outlined, color: c.warningInk, size: 21)),
+          const SizedBox(width: Space.x12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Udhaar / pending payments', style: t.titleSmall),
+            Text(count > 0 ? '$count customers · ${rs(outstanding)} baki' : 'Sab payments clear',
+              style: t.bodySmall?.copyWith(color: c.textSecondary)),
+          ])),
+          StatusChip(label: count > 0 ? 'OPEN' : 'CLEAR', tone: count > 0 ? ChipTone.warning : ChipTone.success),
+          const SizedBox(width: Space.x4),
+          Icon(Icons.chevron_right, color: c.textSecondary, size: 20),
+        ]),
+      ),
+    );
   }
 }
 

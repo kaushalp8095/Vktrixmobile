@@ -5,6 +5,7 @@ import '../api.dart';
 import '../design/components/components.dart';
 import '../design/design.dart';
 import 'common.dart';
+import 'receipt.dart';
 
 class SellForm extends StatefulWidget {
   final Map<String, dynamic> phone;
@@ -17,40 +18,62 @@ class SellForm extends StatefulWidget {
 class _SellFormState extends State<SellForm> {
   final _form = GlobalKey<FormState>();
   final _scroll = ScrollController();
-  final price = TextEditingController(), name = TextEditingController(), mob = TextEditingController(),
-      addr = TextEditingController(), warranty = TextEditingController(), notes = TextEditingController();
+  final price = TextEditingController(), received = TextEditingController(), name = TextEditingController(),
+      mob = TextEditingController(), addr = TextEditingController(), warranty = TextEditingController(), notes = TextEditingController();
   String pay = 'Cash';
   DateTime date = DateTime.now();
   ButtonPhase _phase = ButtonPhase.idle;
+  bool _receivedEdited = false;
 
-  num get _profit => (num.tryParse(price.text) ?? 0) -
-      (num.tryParse('${widget.phone['buy_price']}') ?? 0);
+  num get _saleAmount => num.tryParse(price.text) ?? 0;
+  num get _receivedAmount => num.tryParse(received.text) ?? 0;
+  num get _balance => (_saleAmount - _receivedAmount).clamp(0, double.infinity);
+  num get _profit => _saleAmount - (num.tryParse('${widget.phone['buy_price']}') ?? 0);
 
   @override
   void initState() {
     super.initState();
-    price.addListener(() => setState(() {}));
+    price.addListener(() {
+      if (!_receivedEdited) received.text = price.text;
+      if (mounted) setState(() {});
+    });
+    received.addListener(() { if (mounted) setState(() {}); });
   }
 
   @override
-  void dispose() { for (final c in [price, name, mob, addr, warranty, notes]) { c.dispose(); } _scroll.dispose(); super.dispose(); }
+  void dispose() { for (final c in [price, received, name, mob, addr, warranty, notes]) { c.dispose(); } _scroll.dispose(); super.dispose(); }
 
   Future<void> _save() async {
     FocusScope.of(context).unfocus();
     if (!_form.currentState!.validate()) return;
     setState(() => _phase = ButtonPhase.loading);
+    final paymentCode = switch (pay) {
+      'UPI' => 'upi', 'Card' => 'card', 'Bank' => 'bank', 'Udhaar' => 'credit', _ => 'cash',
+    };
     final body = {
       'phone_id': widget.phone['id'], 'sell_price': price.text, 'sell_date': DateFormat('yyyy-MM-dd').format(date),
       'customer_name': name.text, 'customer_phone': mob.text, 'customer_address': addr.text,
-      'payment_mode': pay.toLowerCase(), 'warranty': warranty.text, 'notes': notes.text,
+      'payment_mode': paymentCode, 'amount_received': received.text.isEmpty ? '0' : received.text,
+      'warranty': warranty.text, 'notes': notes.text,
     };
     try {
-      if (widget.testSave != null) { await widget.testSave!(body); } else { await Api.post('/sell', body); }
+      int? saleId;
+      if (widget.testSave != null) {
+        await widget.testSave!(body);
+      } else {
+        final saved = await Api.post('/sell', body);
+        saleId = saved is Map ? int.tryParse('${saved['id']}') : null;
+      }
       if (!mounted) return;
       setState(() => _phase = ButtonPhase.success);
       Haptics.success();
       await Future<void>.delayed(Motion.of(context).d(const Duration(milliseconds: 500)));
-      if (mounted) Navigator.pop(context, true);
+      if (!mounted) return;
+      if (saleId != null) {
+        await SharedAxisRoute.push(context, (_) => ReceiptScreen(type: 'sale', id: saleId!));
+        if (!mounted) return;
+      }
+      Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
       setState(() => _phase = ButtonPhase.error);
@@ -130,8 +153,35 @@ class _SellFormState extends State<SellForm> {
                 Row(children: [
                   Expanded(child: GlassTextField(controller: mob, label: 'Mobile', prefixIcon: Icons.phone_outlined, keyboardType: TextInputType.phone, maxLength: 10, textInputAction: TextInputAction.next)),
                   const SizedBox(width: Space.x12),
-                  Expanded(child: _PayDropdown(value: pay, onChanged: (v) => setState(() => pay = v!))),
+                  Expanded(child: _PayDropdown(value: pay, onChanged: (v) {
+                    if (v == null) return;
+                    setState(() {
+                      pay = v;
+                      if (v == 'Udhaar') {
+                        _receivedEdited = true;
+                        received.text = '0';
+                      }
+                    });
+                  })),
                 ]),
+                const SizedBox(height: Space.x12),
+                GlassTextField(
+                  controller: received,
+                  label: 'Amount received now (₹)',
+                  prefixIcon: Icons.payments_outlined,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  textInputAction: TextInputAction.next,
+                  onChanged: (_) => _receivedEdited = true,
+                  helper: 'Full, partial ya 0 — baki amount Udhaar ledger mein rahega.',
+                  validator: (v) {
+                    final amount = num.tryParse(v ?? '');
+                    if (amount == null || amount < 0) return 'Enter 0 or a valid received amount';
+                    if (amount > _saleAmount) return 'Received amount cannot exceed sell price';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: Space.x12),
+                _PaymentSummary(total: _saleAmount, received: _receivedAmount, balance: _balance),
                 const SizedBox(height: Space.x12),
                 GlassTextField(controller: addr, label: 'Address (optional)'),
                 const SizedBox(height: Space.x12),
@@ -152,6 +202,59 @@ class _SellFormState extends State<SellForm> {
   }
 }
 
+class _PaymentSummary extends StatelessWidget {
+  final num total, received, balance;
+  const _PaymentSummary({required this.total, required this.received, required this.balance});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors, t = context.type;
+    final paid = total > 0 && balance <= 0;
+    final partial = received > 0 && balance > 0;
+    return AnimatedContainer(
+      duration: Motion.of(context).d(Durations2.enter),
+      padding: const EdgeInsets.all(Space.x12),
+      decoration: BoxDecoration(
+        color: (paid ? c.success : balance > 0 ? c.warning : c.brandInk).withValues(alpha: .09),
+        borderRadius: Shapes.md,
+        border: Border.all(color: (paid ? c.success : balance > 0 ? c.warning : c.brandInk).withValues(alpha: .24)),
+      ),
+      child: Column(children: [
+        Row(children: [
+          Icon(paid ? Icons.check_circle_outline : Icons.account_balance_wallet_outlined,
+            size: 20, color: paid ? c.successInk : balance > 0 ? c.warningInk : c.brandInk),
+          const SizedBox(width: Space.x8),
+          Expanded(child: Text(paid ? 'Payment complete' : partial ? 'Partial payment' : 'Udhaar / payment pending',
+            style: t.titleSmall)),
+          StatusChip(label: paid ? 'PAID' : '${rs(balance)} DUE', tone: paid ? ChipTone.success : ChipTone.warning),
+        ]),
+        const SizedBox(height: Space.x12),
+        Row(children: [
+          Expanded(child: _MoneyStat(label: 'Bill', value: total)),
+          Expanded(child: _MoneyStat(label: 'Received', value: received)),
+          Expanded(child: _MoneyStat(label: 'Balance', value: balance, strong: true)),
+        ]),
+      ]),
+    );
+  }
+}
+
+class _MoneyStat extends StatelessWidget {
+  final String label;
+  final num value;
+  final bool strong;
+  const _MoneyStat({required this.label, required this.value, this.strong = false});
+
+  @override
+  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Text(label, style: context.type.labelSmall?.copyWith(color: context.colors.textSecondary)),
+    const SizedBox(height: 2),
+    FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft,
+      child: Text(rs(value), style: (strong ? context.type.titleSmall : context.type.bodyMedium)?.copyWith(
+        color: strong ? context.colors.brandInk : context.colors.textPrimary))),
+  ]);
+}
+
 class _PayDropdown extends StatelessWidget {
   final String value; final ValueChanged<String?> onChanged;
   const _PayDropdown({required this.value, required this.onChanged});
@@ -164,7 +267,7 @@ class _PayDropdown extends StatelessWidget {
       child: DropdownButtonHideUnderline(child: DropdownButton<String>(
         value: value, isExpanded: true, dropdownColor: context.scheme.surface,
         style: context.type.bodyLarge?.copyWith(color: c.textPrimary),
-        items: const ['Cash', 'UPI', 'Card', 'EMI'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+        items: const ['Cash', 'UPI', 'Card', 'Bank', 'Udhaar'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
         onChanged: (v) { Haptics.tick(); onChanged(v); },
       )),
     );

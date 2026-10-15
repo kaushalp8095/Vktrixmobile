@@ -13,8 +13,10 @@
 - **Shop Login**: sirf apni shop ka data dikhega (dusri shop ka nahi)
 - **Buy Form**: IMEI likhte hi/scan karte hi **Brand + Model free me apne aap** bhar jata hai (local TAC catalog, koi external API/paisa nahi), RAM/Storage/Color ke liye **dropdown** (app ke apne purane data se), IMEI valid hai ya nahi (Luhn check), duplicate check, pehle kab aaya tha wo history (**catalog miss ho to wahi entry sab fields auto-fill karti hai**), **Serial number (optional)**, Customer details + ID proof (**photo upload: camera ya gallery**)
 - **Save karte hi stock me add** → Stock list me "BECHO" button → Sell form (profit/loss live dikhega)
-- **Sales**: list, long-press karke sale cancel (phone wapas stock me)
-- **Reports**: Aaj / 7 din / Mahina / Saal / Custom: kharidi, bikri, profit, stock value, payment mode, top models, roz ki sales
+- **PDF bill + attachment sharing**: Buy/Sell save ke baad branded PDF screen; purane purchase ke liye Stock detail aur purane sale ke liye Sales detail se dobara khol sakte hain. View, Android document picker se Save, WhatsApp par actual PDF attachment, aur other-app share available hai. Bill me shop logo/details, customer, IMEI, amount, date aur sale warranty aati hai; **profit, purchase cost, internal notes, ID number/photos kabhi customer PDF me nahi jaate**.
+- **Udhaar ledger**: sale par kitna mila aur kitna baki hai; 0/full/partial collection, har partial payment ki date/mode/note history, outstanding summary, paid/pending filters aur WhatsApp reminder. Payment kabhi sale total se zyada add nahi ho sakta.
+- **Sales**: list, payment-due status, detail se PDF/payment ledger, aur sale cancel (phone wapas stock me; linked payment history bhi remove hoti hai)
+- **Reports**: Aaj / 7 din / Mahina / Saal / Custom: kharidi, bikri, profit, stock value, payment mode, pending receivables, top models, roz ki sales
 - **Back button (Android)**: Buy/Stock/Sales/Reports tab par back = pehle Home tab; Home par 2 second ke andar dobara back = app band. Super Admin jab kisi shop ka data dekh raha ho, tab back seedha shop list par wapas jata hai.
 
 ### IMEI auto-fill kaise kaam karta hai
@@ -79,6 +81,27 @@ Koi external API call nahi hoti, koi IMEI server se bahar nahi jata, aur iska ko
     `GET /api/phones/:id` use karein.
   - **Rollout:** updated app se pehle backend deploy karein; startup migration optional back-photo
     column add karti hai aur purane front photos preserve rehte hain. [Details/tests](docs/buy-documents.md).
+
+### PDF bills, shop logo aur WhatsApp
+
+- Super Admin → shop ke **Edit details** dialog me *Bill logo* choose karein. Logo compressed data URL ke roop me `shops.logo_data` me save hota hai (server cap 768 KB); logo na ho to PDF shop-name initial use karti hai.
+- **Buy save** → Purchase PDF; **Stock → phone detail** → *Purchase PDF & WhatsApp*.
+- **Sell save** → Sale invoice; **Sales → sale detail** → *PDF bill & WhatsApp*.
+- *WhatsApp* Android share intent ko WhatsApp/WhatsApp Business par target karta hai. PDF actual `application/pdf` attachment hoti hai; app recipient select ya Send automatically nahi karti. *Other apps* system chooser kholta hai.
+- *Save PDF* Storage permission nahi maangta: Android ka `ACTION_CREATE_DOCUMENT` picker user ko location/file-name choose karne deta hai.
+- Customer-safe receipt APIs alag allowlist use karti hain. Sale receipt response me buy price/profit/internal notes/ID proof columns hain hi nahi; purchase receipt me ID number/photo aur internal notes nahi hain.
+
+### Udhaar / pending-payment ledger
+
+- Sell form ka **Amount received now** full, partial ya `0` ho sakta hai. `0`/partial sale automatically Udhaar ledger me dikhti hai.
+- Har collection `sale_payments` me separate append-only row hai: amount, date, mode aur optional note. Backend transaction current balance lock/check karke overpayment aur cross-shop access rokta hai.
+- **Home → Udhaar**, ya **Sales top bar ka wallet icon**: pending/paid/all, customer/model/IMEI search, total outstanding aur collection progress.
+- Sale detail/payment detail se partial payment add, complete history, customer-safe PDF aur pre-filled WhatsApp reminder milta hai.
+- Existing deployment par migration purane non-credit sales ko fully paid opening entry banati hai; old `credit` rows unpaid rehti hain. Pehle updated backend deploy karein, phir APK.
+
+### IMEI scanner `genericError` fix
+
+`mobile_scanner` controller ab `autoStart: false` hai. Pehle widget auto-start aur screen ka manual `start()` ek saath CameraX ko start karte the, jis se kuch Android phones par `genericError` aata tha. Ab camera ka ek hi lifecycle owner hai, overlapping starts guard hote hain aur newer Android camera selector rear-camera variants handle karta hai.
 
 #### ⚠️ Free TAC catalog ki limitations (zaroor padhein)
 - **Data adhoora hai:** Osmocom me bahut se naye aur India-only models (Redmi/Realme/Poco/Vivo ke naye variants) **nahi** hain. Isliye extended catalog bhi hai; phir bhi bilkul naya model pehli baar manually bhar na pade — uske baad app khud seekh lega.
@@ -229,10 +252,14 @@ Note: download app ke process me chalta hai. App ko kuch der ke liye minimize ka
 | POST | /api/buy | Phone kharido (stock me add) |
 | GET | /api/stock?search= | Stock list |
 | GET/PUT/DELETE | /api/phones/:id | Phone detail/edit/delete |
-| POST | /api/sell | Phone becho |
-| GET | /api/sales?from=&to= | Sales list |
-| DELETE | /api/sales/:id | Sale cancel |
-| GET | /api/reports/summary?from=&to= | Report |
+| POST | /api/sell | Phone becho (`amount_received` full/partial/0) |
+| GET | /api/sales?from=&to= | Sales list + paid amount/balance/status |
+| DELETE | /api/sales/:id | Sale cancel + linked payment history remove |
+| GET | /api/receipts/purchase/:phone_id | Customer-safe purchase PDF payload |
+| GET | /api/receipts/sale/:sale_id | Customer-safe sale PDF payload |
+| GET | /api/ledger?status=pending&search= | Udhaar summary/list (`pending`, `paid`, `all`) |
+| GET/POST | /api/sales/:id/payments | Partial-payment history / naya collection |
+| GET | /api/reports/summary?from=&to= | Report + receivables |
 | GET | /api/reports/daily?from=&to= | Roz ka report |
 
 Super admin kisi bhi shop API me `?shop_id=` laga kar us shop ka data dekh sakta hai.

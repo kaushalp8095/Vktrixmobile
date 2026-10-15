@@ -20,15 +20,21 @@ function id(value, field = 'id') {
   if (!Number.isSafeInteger(n) || n > 2147483647) fail(`${field} invalid`);
   return n;
 }
-function money(value, field) {
+function decimalMoney(value, field, { allowZero = false } = {}) {
   if (!['string', 'number'].includes(typeof value)) fail(`${field} required`);
   const s = String(value).trim();
-  if (!/^\d{1,10}(\.\d{1,2})?$/.test(s) || !Number.isFinite(Number(s)) || Number(s) <= 0)
-    fail(`${field} must be positive, max 9999999999.99, with at most 2 decimal places`);
+  const n = Number(s);
+  if (!/^\d{1,10}(\.\d{1,2})?$/.test(s) || !Number.isFinite(n) || (allowZero ? n < 0 : n <= 0)) {
+    const kind = allowZero ? 'zero or positive' : 'positive';
+    fail(`${field} must be ${kind}, max 9999999999.99, with at most 2 decimal places`);
+  }
   // Preserve exact decimal text for PostgreSQL NUMERIC rather than coercing NaN/Infinity.
   const [whole, fraction = ''] = s.split('.');
   return `${Number(whole)}.${fraction.padEnd(2, '0')}`;
 }
+function money(value, field) { return decimalMoney(value, field); }
+function moneyOrZero(value, field) { return decimalMoney(value, field, { allowZero: true }); }
+function cents(value) { return Math.round(Number(value) * 100); }
 function date(value, field) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) fail(`${field} must be YYYY-MM-DD`);
   const d = new Date(value + 'T00:00:00Z');
@@ -63,21 +69,28 @@ const ID_TYPES = ['Aadhaar', 'PAN', 'Voter ID', 'Driving Licence', 'Visiting Car
 // limit per side for older clients; new clients target 100 KB per photo.
 // Two maximum-size photos including base64 must fit the JSON request limit.
 const ID_PHOTO_MAX_BYTES = 3 * 1024 * 1024;
+const SHOP_LOGO_MAX_BYTES = 768 * 1024;
 
 // Accepts a `data:image/...;base64,...` URL, or null/empty to clear it.
-function idPhoto(value, field = 'customer_id_photo') {
+function imageDataUrl(value, field, maxBytes) {
   if (value == null || value === '') return null;
   if (typeof value !== 'string') fail(`${field} must be a data URL`);
   // Check the length before running the regex on what could be a huge string.
-  const maxChars = Math.ceil((ID_PHOTO_MAX_BYTES * 4) / 3) + 64;
-  if (value.length > maxChars) fail(`${field} is too large (max ${Math.round(ID_PHOTO_MAX_BYTES / (1024 * 1024))}MB)`);
+  const maxChars = Math.ceil((maxBytes * 4) / 3) + 64;
+  const maxLabel = maxBytes >= 1024 * 1024
+    ? `${Math.round(maxBytes / (1024 * 1024))}MB` : `${Math.round(maxBytes / 1024)}KB`;
+  if (value.length > maxChars) fail(`${field} is too large (max ${maxLabel})`);
   if (!/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(value))
     fail(`${field} must be a JPEG, PNG or WebP data URL`);
   const encoded = value.slice(value.indexOf(',') + 1);
-  if (Buffer.from(encoded, 'base64').length > ID_PHOTO_MAX_BYTES)
-    fail(`${field} is too large (max 3MB)`);
+  if (Buffer.from(encoded, 'base64').length > maxBytes)
+    fail(`${field} is too large (max ${maxLabel})`);
   return value;
 }
+function idPhoto(value, field = 'customer_id_photo') {
+  return imageDataUrl(value, field, ID_PHOTO_MAX_BYTES);
+}
+function shopLogo(value) { return imageDataUrl(value, 'logo_data', SHOP_LOGO_MAX_BYTES); }
 
 const phoneFields = ['brand', 'model', 'ram', 'storage', 'color', 'condition', 'accessories', 'buy_price', 'buy_date',
   'seller_name', 'seller_phone', 'seller_id_type', 'seller_id_no', 'seller_address', 'notes', 'imei2',
@@ -106,9 +119,24 @@ function phoneData(b, partial = false) {
 function saleData(b) {
   const out = { phone_id: id(b.phone_id, 'phone_id'), sell_price: money(b.sell_price, 'sell_price'),
     sell_date: date(b.sell_date || today(), 'sell_date'),
-    payment_mode: choice(b.payment_mode, 'payment_mode', ['cash', 'upi', 'card', 'credit', 'emi']) || 'cash' };
+    payment_mode: choice(b.payment_mode, 'payment_mode', ['cash', 'upi', 'card', 'bank', 'credit', 'emi']) || 'cash' };
   for (const k of ['customer_name', 'customer_address', 'warranty', 'notes']) out[k] = text(b[k], k, { max: k === 'notes' ? 5000 : 255 });
   out.customer_phone = mobile(b.customer_phone, 'customer_phone');
+  // Old clients did not send amount_received and treated a sale as fully paid.
+  // A credit sale remains unpaid by default; new clients always send this field.
+  out.amount_received = Object.hasOwn(b, 'amount_received')
+    ? moneyOrZero(b.amount_received, 'amount_received')
+    : out.payment_mode === 'credit' ? '0.00' : out.sell_price;
+  if (cents(out.amount_received) > cents(out.sell_price)) fail('amount_received cannot exceed sell_price');
+  return out;
+}
+function paymentData(b) {
+  const out = {
+    amount: money(b.amount, 'amount'),
+    payment_date: date(b.payment_date || today(), 'payment_date'),
+    payment_mode: choice(b.payment_mode, 'payment_mode', ['cash', 'upi', 'card', 'bank', 'other']) || 'cash',
+    note: text(b.note, 'note', { max: 500 }),
+  };
   return out;
 }
 function range(query, defaults = [today(), today()]) {
@@ -118,9 +146,11 @@ function range(query, defaults = [today(), today()]) {
 }
 function shopData(b, partial = false) {
   const out = {};
-  for (const k of ['name', 'owner_name', 'phone', 'address', 'gst_no']) {
+  for (const k of ['name', 'owner_name', 'phone', 'address', 'gst_no', 'logo_data']) {
     if (partial && !Object.hasOwn(b, k)) continue;
-    out[k] = k === 'phone' ? mobile(b[k], k) : text(b[k], k, { required: k === 'name' });
+    if (k === 'phone') out[k] = mobile(b[k], k);
+    else if (k === 'logo_data') out[k] = shopLogo(b[k]);
+    else out[k] = text(b[k], k, { required: k === 'name' });
   }
   if (Object.hasOwn(b, 'active')) {
     // SQLite responses encode booleans as 0/1; accept those alongside JSON booleans.
@@ -130,5 +160,5 @@ function shopData(b, partial = false) {
   if (partial && !Object.keys(out).length) fail('No editable fields supplied');
   return out;
 }
-module.exports = { fail, body, text, id, money, date, imei, password, idPhoto, ID_TYPES, ID_PHOTO_MAX_BYTES,
-  phoneData, saleData, range, shopData, choice };
+module.exports = { fail, body, text, id, money, moneyOrZero, cents, date, imei, password, idPhoto, shopLogo,
+  ID_TYPES, ID_PHOTO_MAX_BYTES, SHOP_LOGO_MAX_BYTES, phoneData, saleData, paymentData, range, shopData, choice };

@@ -5,19 +5,35 @@ import 'package:mobile_shop/design/design.dart';
 import 'package:mobile_shop/screens/admin_home.dart';
 import 'package:mobile_shop/screens/reports.dart';
 import 'package:mobile_shop/screens/sales.dart';
+import 'package:mobile_shop/screens/ledger.dart';
 import 'showcase_golden_test.dart' show loadFonts;
 
 final _sales = [
   {'id': 11, 'brand': 'Samsung', 'model': 'Galaxy S23', 'ram': '8GB', 'storage': '256GB', 'imei': '351122334455667',
-   'sell_price': 26500, 'buy_price': 23000, 'sell_date': '2026-09-28', 'customer_name': 'Ramesh Patel', 'payment_mode': 'upi'},
+   'sell_price': 26500, 'buy_price': 23000, 'sell_date': '2026-09-28', 'customer_name': 'Ramesh Patel', 'payment_mode': 'upi',
+   'paid_amount': 12000, 'balance_due': 14500, 'payment_status': 'partial'},
   {'id': 10, 'brand': 'Redmi', 'model': 'Note 12', 'ram': '6GB', 'storage': '128GB', 'imei': '867788990011223',
-   'sell_price': 9200, 'buy_price': 7800, 'sell_date': '2026-09-26', 'customer_name': 'Walk-in', 'payment_mode': 'cash'},
+   'sell_price': 9200, 'buy_price': 7800, 'sell_date': '2026-09-26', 'customer_name': 'Walk-in', 'payment_mode': 'cash',
+   'paid_amount': 9200, 'balance_due': 0, 'payment_status': 'paid'},
 ];
+
+final _ledger = <String, dynamic>{
+  'summary': {'outstanding': 21500, 'pending_count': 2, 'received': 27000, 'sales_total': 48500},
+  'items': [
+    {'id': 11, 'brand': 'Samsung', 'model': 'Galaxy S23', 'imei': '351122334455667',
+      'sell_price': 26500, 'sell_date': '2026-09-28', 'customer_name': 'Ramesh Patel',
+      'paid_amount': 12000, 'balance_due': 14500, 'payment_status': 'partial'},
+    {'id': 9, 'brand': 'Apple', 'model': 'iPhone 13', 'imei': '353328111234561',
+      'sell_price': 22000, 'sell_date': '2026-09-22', 'customer_name': 'Mehul Shah',
+      'paid_amount': 15000, 'balance_due': 7000, 'payment_status': 'partial'},
+  ],
+};
 
 const _summary = {
   'purchases': {'count': 9, 'amount': 84500},
   'sales': {'count': 7, 'amount': 112000, 'profit': 27500},
   'stock': {'count': 18, 'value': 124500},
+  'receivables': {'outstanding': 21500, 'received': 90500, 'pending_count': 2},
   'by_payment': [
     {'mode': 'cash', 'count': 4, 'total': 61500},
     {'mode': 'upi', 'count': 2, 'total': 38500},
@@ -51,6 +67,9 @@ void main() {
     'reports': (dark) => MaterialApp(debugShowCheckedModeBanner: false,
         theme: AppTheme.build(dark ? AppTheme.darkScheme : AppTheme.lightScheme),
         home: Scaffold(body: AuroraBackground(child: ReportsScreen(testSummary: _summary, testDaily: _daily, testPreset: 'week')))),
+    'ledger': (dark) => MaterialApp(debugShowCheckedModeBanner: false,
+        theme: AppTheme.build(dark ? AppTheme.darkScheme : AppTheme.lightScheme),
+        home: LedgerScreen(testData: _ledger)),
     'admin': (dark) => MaterialApp(debugShowCheckedModeBanner: false,
         theme: AppTheme.build(dark ? AppTheme.darkScheme : AppTheme.lightScheme),
         home: AdminHome(testDash: _dash, testShops: _shops)),
