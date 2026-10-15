@@ -41,7 +41,11 @@ class _StockScreenState extends State<StockScreen> {
   Future<void> _details(Map p) async {
     Haptics.tap();
     final action = await showModalBottomSheet<String>(
-      context: context, isScrollControlled: true, backgroundColor: Colors.transparent,
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.transparent,
+      isDismissible: true,
       builder: (c) => _PhoneDetailSheet(phone: p,
         onReceipt: () => Navigator.pop(c, 'receipt'),
         onSell: () => Navigator.pop(c, 'sell'), onDelete: () => Navigator.pop(c, 'delete')),
@@ -153,7 +157,7 @@ class _PhoneDetailSheet extends StatelessWidget {
       if ((p['color'] ?? '').toString().isNotEmpty) ('Color', '${p['color']}'),
       if ((p['condition'] ?? '').toString().isNotEmpty) ('Condition', '${p['condition']}'),
       if ((p['accessories'] ?? '').toString().isNotEmpty) ('Accessories', '${p['accessories']}'),
-      ('Buy price', rs(p['buy_price'])), ('Buy date', '${p['buy_date']}'),
+      ('Buy price', rs(p['buy_price'])), ('Buy date', dateOnly(p['buy_date'])),
       if ((p['seller_name'] ?? '').toString().isNotEmpty) ('Customer', '${p['seller_name']}${p['seller_phone'] != null ? ' · ${p['seller_phone']}' : ''}'),
       if ((p['seller_id_type'] ?? '').toString().isNotEmpty) ('ID', '${p['seller_id_type']} ${p['seller_id_no'] ?? ''}'),
       if ((p['notes'] ?? '').toString().isNotEmpty) ('Notes', '${p['notes']}'),

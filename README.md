@@ -87,8 +87,10 @@ Koi external API call nahi hoti, koi IMEI server se bahar nahi jata, aur iska ko
 - Super Admin → shop ke **Edit details** dialog me *Bill logo* choose karein. Logo compressed data URL ke roop me `shops.logo_data` me save hota hai (server cap 768 KB); logo na ho to PDF shop-name initial use karti hai.
 - **Buy save** → Purchase PDF; **Stock → phone detail** → *Purchase PDF & WhatsApp*.
 - **Sell save** → Sale invoice; **Sales → sale detail** → *PDF bill & WhatsApp*.
-- *WhatsApp* Android share intent ko WhatsApp/WhatsApp Business par target karta hai. PDF actual `application/pdf` attachment hoti hai; app recipient select ya Send automatically nahi karti. *Other apps* system chooser kholta hai.
+- *WhatsApp* Android share intent ko WhatsApp/WhatsApp Business par target karta hai. PDF actual `application/pdf` attachment hoti hai; app recipient select ya Send automatically nahi karti. OEM direct-share failure par wahi PDF system chooser me khulti hai, jahan recipient/app aur Send user select karta hai. *Other apps* bhi system chooser kholta hai.
+- APK updates aur bill PDFs ek non-exported `${applicationId}.updates` FileProvider se share hote hain; provider sirf `cache/updates/` aur `cache/bills/` expose karta hai.
 - *Save PDF* Storage permission nahi maangta: Android ka `ACTION_CREATE_DOCUMENT` picker user ko location/file-name choose karne deta hai.
+- Stock aur Sales detail sheets background ko dim nahi karti, lekin bahar tap karke band ki ja sakti hain. API ke ISO timestamps user-facing details me `YYYY-MM-DD` ke roop me dikhte hain.
 - Customer-safe receipt APIs alag allowlist use karti hain. Sale receipt response me buy price/profit/internal notes/ID proof columns hain hi nahi; purchase receipt me ID number/photo aur internal notes nahi hain.
 
 ### Udhaar / pending-payment ledger

@@ -41,7 +41,11 @@ class _SalesScreenState extends State<SalesScreen> {
   Future<void> _details(Map s) async {
     Haptics.tap();
     final action = await showModalBottomSheet<String>(
-      context: context, isScrollControlled: true, backgroundColor: Colors.transparent,
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.transparent,
+      isDismissible: true,
       builder: (c) => _SaleDetailSheet(
         sale: s, profit: _profit(s),
         onReceipt: () => Navigator.pop(c, 'receipt'),
@@ -137,7 +141,7 @@ class _SaleRow extends StatelessWidget {
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('${s['brand']} ${s['model']}', style: t.titleSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
               const SizedBox(height: 2),
-              Text([if ((s['customer_name'] ?? '').toString().isNotEmpty) s['customer_name'], '${s['sell_date']}',
+              Text([if ((s['customer_name'] ?? '').toString().isNotEmpty) s['customer_name'], dateOnly(s['sell_date']),
                     due > 0 ? '${rs(due)} due' : pay]
                   .join(' · '), style: t.bodySmall?.copyWith(color: due > 0 ? c.warningInk : c.textSecondary), maxLines: 1, overflow: TextOverflow.ellipsis),
             ])),
@@ -167,7 +171,7 @@ class _SaleDetailSheet extends StatelessWidget {
       ('IMEI', '${s['imei']}'),
       ('RAM / Storage', '${s['ram'] ?? '—'} / ${s['storage'] ?? '—'}'),
       ('Bought at', rs(s['buy_price'])), ('Sold at', rs(s['sell_price'])),
-      ('Sell date', '${s['sell_date']}'), ('Payment', '${s['payment_mode'] ?? 'cash'}'.toUpperCase()),
+      ('Sell date', dateOnly(s['sell_date'])), ('Payment', '${s['payment_mode'] ?? 'cash'}'.toUpperCase()),
       ('Received', rs(s['paid_amount'] ?? s['sell_price'])),
       ('Balance due', rs(s['balance_due'] ?? 0)),
       if ((s['customer_name'] ?? '').toString().isNotEmpty) ('Customer', '${s['customer_name']}${s['customer_phone'] != null ? ' · ${s['customer_phone']}' : ''}'),

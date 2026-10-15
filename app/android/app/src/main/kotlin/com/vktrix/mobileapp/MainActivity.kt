@@ -7,6 +7,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.util.Log
 import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -16,6 +17,16 @@ import java.io.File
 class MainActivity : FlutterActivity() {
     private var pendingPdfBytes: ByteArray? = null
     private var pendingPdfResult: MethodChannel.Result? = null
+    private var pendingWhatsAppUri: Uri? = null
+
+    override fun onResume() {
+        super.onResume()
+        // The direct WhatsApp grant is needed only while the user is in WhatsApp.
+        pendingWhatsAppUri?.let { uri ->
+            revokeUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            pendingWhatsAppUri = null
+        }
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -134,21 +145,39 @@ class MainActivity : FlutterActivity() {
 
     private fun sharePdf(bytes: ByteArray, name: String, caption: String?, whatsApp: Boolean): String {
         val file = writeSharedPdf(bytes, name)
-        val uri = FileProvider.getUriForFile(this, "$packageName.bills", file)
-        val intent = Intent(Intent.ACTION_SEND).apply {
+        // Updates and bills intentionally share one declared provider authority.
+        val uri = FileProvider.getUriForFile(this, "$packageName.updates", file)
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
             type = "application/pdf"
             putExtra(Intent.EXTRA_STREAM, uri)
             if (!caption.isNullOrBlank()) putExtra(Intent.EXTRA_TEXT, caption)
+            // ClipData is required on some Android/OEM builds to propagate URI grants.
             clipData = ClipData.newUri(contentResolver, name, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
+
         if (whatsApp) {
             val target = whatsAppPackage() ?: return "whatsapp_not_installed"
-            intent.setPackage(target)
-            startActivity(intent)
-        } else {
-            startActivity(Intent.createChooser(intent, "Share PDF bill"))
+            try {
+                // Explicitly grant the PDF to WhatsApp; only the user chooses a recipient and sends it.
+                grantUriPermission(target, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                pendingWhatsAppUri = uri
+                startActivity(Intent(shareIntent).setPackage(target))
+                return "started"
+            } catch (e: Exception) {
+                pendingWhatsAppUri = null
+                revokeUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                Log.w(TAG, "Direct WhatsApp PDF share failed; opening Android share sheet instead", e)
+                // OEM share targets can reject direct intents. The exact same PDF URI
+                // goes to Android's chooser, where the user selects an app/recipient.
+            }
         }
+
+        val chooser = Intent.createChooser(shareIntent, "Share PDF bill").apply {
+            clipData = shareIntent.clipData
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        startActivity(chooser)
         return "started"
     }
 
@@ -212,6 +241,7 @@ class MainActivity : FlutterActivity() {
     }
 
     companion object {
+        private const val TAG = "VktrixMobile"
         private const val UPDATER_CHANNEL = "com.vktrix.mobileapp/updater"
         private const val BILLING_CHANNEL = "com.vktrix.mobileapp/billing"
         private const val SAVE_PDF_REQUEST = 54127

@@ -213,7 +213,7 @@ class _LedgerRow extends StatelessWidget {
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(name.isEmpty ? 'Walk-in customer' : name, style: t.titleSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
             const SizedBox(height: 2),
-            Text('${item['brand']} ${item['model']} · ${item['sell_date']}',
+            Text('${item['brand']} ${item['model']} · ${dateOnly(item['sell_date'])}',
               style: t.bodySmall?.copyWith(color: c.textSecondary), maxLines: 1, overflow: TextOverflow.ellipsis),
             const SizedBox(height: Space.x8),
             ClipRRect(borderRadius: Shapes.pill, child: LinearProgressIndicator(
@@ -438,7 +438,7 @@ class _PaymentRow extends StatelessWidget {
         const SizedBox(width: Space.x12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('${payment['payment_mode'] ?? 'cash'}'.toUpperCase(), style: t.titleSmall),
-          Text('${payment['payment_date']}${'${payment['note'] ?? ''}'.trim().isEmpty ? '' : ' · ${payment['note']}'}',
+          Text('${dateOnly(payment['payment_date'])}${'${payment['note'] ?? ''}'.trim().isEmpty ? '' : ' · ${payment['note']}'}',
             style: t.bodySmall?.copyWith(color: c.textSecondary), maxLines: 2, overflow: TextOverflow.ellipsis),
         ])),
         Text(rs(payment['amount']), style: t.titleSmall?.copyWith(color: c.successInk)),
