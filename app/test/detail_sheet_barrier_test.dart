@@ -80,10 +80,13 @@ Future<void> _expectTransparentDismissibleSheet(
 
   final barriers = tester.widgetList<ModalBarrier>(
     find.byWidgetPredicate((widget) => widget is ModalBarrier),
-  );
+  ).toList();
   expect(barriers, isNotEmpty);
-  expect(barriers.last.color, Colors.transparent);
-  expect(barriers.last.dismissible, isTrue);
+  expect(barriers.any((barrier) => barrier.dismissible), isTrue);
+  final barrier = barriers.lastWhere((barrier) => barrier.dismissible);
+  // ModalRoute represents a fully transparent barrier with either an explicit
+  // transparent color or null, depending on the Flutter version.
+  expect(barrier.color == null || barrier.color == Colors.transparent, isTrue);
   expect(find.text(actionLabel), findsOneWidget);
 
   // The route barrier occupies the area above the bottom sheet; tapping it
