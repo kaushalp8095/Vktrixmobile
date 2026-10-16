@@ -1,4 +1,11 @@
-// Sirf SUPER ADMIN: shops + unke login manage karna, TAC database import
+// Sirf SUPER ADMIN: shops + unke login manage karna, TAC database import.
+//
+// Yahan ka rule: Super Admin ko shop ke business data (stock, IMEI, sales,
+// profit, payment ledger, customer/ID proof) ka **default access nahi** milta.
+// Uske liye pehle ek temporary, reason-logged support session (`support_access`)
+// lena padta hai — wo bhi read-only (dekhein routes/shop.js ka guard). Is route
+// file se sirf manage karne layak basic details jaati hain: shop name, status,
+// login username aur **masked** contact.
 const r = require('express').Router();
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
@@ -7,23 +14,50 @@ const { requireAuth, requireRole } = require('../auth');
 const { wrap } = require('../util');
 const V = require('../validation');
 const TAC = require('../tac');
+const support = require('../support');
 r.use(requireAuth, requireRole('superadmin'));
 
+// Shop row ka public (admin-app safe) roop: business data ke bina.
+function safeShop(shop, access) {
+  const phone = shop.phone ? String(shop.phone) : null;
+  return {
+    id: shop.id,
+    name: shop.name,
+    owner_name: shop.owner_name,
+    address: shop.address,
+    gst_no: shop.gst_no,
+    active: shop.active,
+    created_at: shop.created_at,
+    // Full number jaan-boojh kar nahi bhejte — `POST /shops/:id/reveal-contact`
+    // ek support session ke andar, log me likh kar deta hai.
+    phone_masked: support.maskPhone(phone),
+    has_phone: !!phone,
+    login: shop.login ?? null,
+    support: access?.active ?? null,   // { reason, expires_in_ms } ya null
+    support_sessions: access?.total ?? 0,
+  };
+}
+
 r.get('/dashboard', wrap(async (req, res) => {
-  const shops = await db('shops').count('* as c').first();
-  const stock = await db('phones').where({ status: 'in_stock' }).count('* as c').sum('buy_price as v').first();
-  const sales = await db('sales').count('* as c').sum('sell_price as v').first();
-  res.json({ shops: +shops.c, stock_count: +stock.c, stock_value: +stock.v || 0, sales_count: +sales.c, sales_value: +sales.v || 0 });
+  // Sirf operational counts. Shop ka stock/sales/profit yahan bhi nahi.
+  const shops = await db('shops').select('active');
+  const active = shops.filter(s => s.active === true || s.active === 1).length;
+  const open = await db('support_access').whereNull('ended_at_ms').andWhere('expires_at_ms', '>', Date.now()).count('* as c').first();
+  res.json({
+    shops: shops.length,
+    active_shops: active,
+    inactive_shops: shops.length - active,
+    support_active: +open.c || 0,
+  });
 }));
 
 r.get('/shops', wrap(async (req, res) => {
   const shops = await db('shops').orderBy('id', 'desc');
+  const access = await support.summaryByShop();
   for (const s of shops) {
     s.login = await db('users').where({ shop_id: s.id, role: 'shop_admin' }).select('id', 'username', 'active').first();
-    const st = await db('phones').where({ shop_id: s.id, status: 'in_stock' }).count('* as c').first();
-    s.stock_count = +st.c;
   }
-  res.json(shops);
+  res.json(shops.map(s => safeShop(s, access.get(Number(s.id)))));
 }));
 
 // Nayi shop + uska login ek saath
@@ -70,6 +104,7 @@ r.delete('/shops/:id', wrap(async (req, res) => {
   const exists = await db('shops').where({ id: shopId }).first();
   if (!exists) return res.status(404).json({ error: 'Shop nahi mila' });
   await db.transaction(async trx => {
+    await trx('support_access').where({ shop_id: shopId }).del();
     await trx('sale_payments').where({ shop_id: shopId }).del();
     await trx('sales').where({ shop_id: shopId }).del();
     await trx('phones').where({ shop_id: shopId }).del();
@@ -77,6 +112,45 @@ r.delete('/shops/:id', wrap(async (req, res) => {
     await trx('shops').where({ id: shopId }).del();
   });
   res.json({ ok: true });
+}));
+
+// ---------- TEMPORARY SUPPORT ACCESS ----------
+// Session shuru karna. Reason zaroori hai, time limit chhoti rakhein.
+r.post('/shops/:id/support-access', wrap(async (req, res) => {
+  const shopId = V.id(req.params.id, 'shop id');
+  const shop = await db('shops').where({ id: shopId }).first();
+  if (!shop) return res.status(404).json({ error: 'Shop nahi mila' });
+  const b = V.body(req);
+  const session = await support.start({ shopId, userId: req.user.id, reason: b.reason, minutes: b.minutes });
+  res.status(201).json({ session });
+}));
+
+// Session khatam karna (shop khatam kar de ya admin).
+r.delete('/shops/:id/support-access', wrap(async (req, res) => {
+  const shopId = V.id(req.params.id, 'shop id');
+  const running = await support.activeGrant(shopId);
+  if (!running) return res.status(404).json({ error: 'Koi support session chal nahi raha' });
+  await support.end(running.id, req.user.id, 'admin_ended');
+  res.json({ ok: true, ended: true });
+}));
+
+// Access log: kaun, kis shop ka, kab, kyun, kitna dekha gaya.
+r.get('/support-access', wrap(async (req, res) => {
+  const shopId = req.query.shop_id == null || req.query.shop_id === '' ? null : V.id(req.query.shop_id, 'shop_id');
+  res.json({ items: await support.list({ shopId, limit: req.query.limit }) });
+}));
+
+// Masked contact kholna: sirf chalu support session me, aur log me likh kar.
+r.post('/shops/:id/reveal-contact', wrap(async (req, res) => {
+  const shopId = V.id(req.params.id, 'shop id');
+  const shop = await db('shops').where({ id: shopId }).first();
+  if (!shop) return res.status(404).json({ error: 'Shop nahi mila' });
+  const running = await support.activeGrant(shopId);
+  if (!running)
+    return res.status(403).json({ error: 'Poora number dekhne ke liye pehle support access shuru karein — reason aur time limit ke saath.',
+      code: 'support_access_required' });
+  const logged = await support.logReveal(running);
+  res.json({ phone: shop.phone, owner_name: shop.owner_name, contact_reveals: logged.contact_reveals });
 }));
 
 // TAC CSV import. Accepts `tac,brand,model[,ram,storage]` (admin data, may overwrite

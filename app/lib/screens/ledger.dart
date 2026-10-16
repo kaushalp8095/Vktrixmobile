@@ -270,6 +270,7 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen> {
   Future<void> _addPayment() async {
     final sale = _data?['sale'] as Map?;
     if (sale == null || _busy) return;
+    if (supportReadOnlyBlock(context, 'Adding a payment')) return;
     final body = await showModalBottomSheet<Map<String, dynamic>>(
       context: context, isScrollControlled: true, backgroundColor: Colors.transparent,
       builder: (_) => _AddPaymentSheet(sale: sale),
@@ -389,9 +390,12 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen> {
               const SizedBox(height: Space.x16),
               if (_busy) const LinearProgressIndicator(minHeight: 2),
               if (_busy) const SizedBox(height: Space.x8),
-              if (due > 0) PrimaryButton(label: 'Add partial payment', icon: Icons.add_card_outlined,
+              if (due > 0 && Api.supportReadOnly)
+                const Padding(padding: EdgeInsets.only(bottom: Space.x8),
+                    child: ReadOnlyNote(text: 'Support mode read-only hai — payment shop owner khud add karega.')),
+              if (due > 0 && !Api.supportReadOnly) PrimaryButton(label: 'Add partial payment', icon: Icons.add_card_outlined,
                 onPressed: _busy ? null : _addPayment),
-              if (due > 0) const SizedBox(height: Space.x8),
+              if (due > 0 && !Api.supportReadOnly) const SizedBox(height: Space.x8),
               Row(children: [
                 Expanded(child: OutlinedButton.icon(onPressed: _busy ? null : _shareReminder,
                   icon: const Icon(Icons.chat_outlined), label: const Text('Reminder'))),

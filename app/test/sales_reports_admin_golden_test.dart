@@ -52,11 +52,16 @@ final _daily = [
   {'date': '2026-09-29', 'sales': 14100}, {'date': '2026-09-30', 'sales': 20000},
 ];
 
-const _dash = {'shops': 3, 'stock_count': 41, 'stock_value': 312000, 'sales_count': 25, 'sales_value': 402500};
+// Super Admin ko sirf operational counts milte hain — shop ka stock/sales/profit nahi.
+const _dash = {'shops': 3, 'active_shops': 2, 'inactive_shops': 1, 'support_active': 1};
 final _shops = [
-  {'id': 1, 'name': 'Krishna Mobiles', 'login': {'username': 'krishna'}, 'stock_count': 18, 'active': 1},
-  {'id': 2, 'name': 'Shree Ganesh Mobile', 'login': {'username': 'ganesh22'}, 'stock_count': 15, 'active': 1},
-  {'id': 3, 'name': 'Om Communication', 'login': {'username': 'omcomm'}, 'stock_count': 8, 'active': 0},
+  {'id': 1, 'name': 'Krishna Mobiles', 'owner_name': 'Krishna Patel', 'login': {'username': 'krishna'}, 'active': 1,
+   'phone_masked': '98•••••210', 'has_phone': true, 'created_at': '2025-04-12',
+   'support': {'reason': 'Shop owner called: sale entry stuck in ledger', 'expires_in_ms': 12 * 60 * 1000}, 'support_sessions': 2},
+  {'id': 2, 'name': 'Shree Ganesh Mobile', 'login': {'username': 'ganesh22'}, 'active': 1,
+   'phone_masked': '99•••••451', 'has_phone': true, 'created_at': '2025-06-02', 'support': null, 'support_sessions': 0},
+  {'id': 3, 'name': 'Om Communication', 'login': {'username': 'omcomm'}, 'active': 0,
+   'phone_masked': '97•••••884', 'has_phone': true, 'created_at': '2025-09-18', 'support': null, 'support_sessions': 1},
 ];
 
 void main() {

@@ -46,3 +46,24 @@ class ErrorState extends StatelessWidget {
   Widget build(BuildContext context) => _StateView(icon: Icons.cloud_off_outlined, iconColor: context.colors.errorInk,
       title: title, message: message, actionLabel: onRetry == null ? null : 'Retry', onAction: onRetry, live: true);
 }
+
+/// Support mode (Super Admin ka temporary read-only session) me jo action band hai,
+/// uski jagah ye saaf note dikhta hai — chhupana kaafi nahi, wajah bhi batani hai.
+class ReadOnlyNote extends StatelessWidget {
+  final String text;
+  const ReadOnlyNote({super.key, required this.text});
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Container(
+      padding: const EdgeInsets.all(Space.x12),
+      decoration: BoxDecoration(color: c.textPrimary.withValues(alpha: .04), borderRadius: Shapes.md,
+          border: Border.all(color: c.textPrimary.withValues(alpha: .10))),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(Icons.lock_outline, size: 17, color: c.textSecondary),
+        const SizedBox(width: Space.x8),
+        Expanded(child: Text(text, style: context.type.bodySmall?.copyWith(color: c.textSecondary))),
+      ]),
+    );
+  }
+}

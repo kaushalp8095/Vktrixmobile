@@ -8,8 +8,12 @@ String baseUrl = 'https://vktrixmobile.onrender.com';
 class Api {
   static String? token;
   static Map<String, dynamic>? user;
-  /// Super admin kisi shop ka data dekh raha ho to
+  /// Super admin kisi shop ka data dekh raha ho to (sirf chalu support session me)
   static int? viewShopId;
+  /// Chalu support session ka reason (shop owner ko bhi yahi dikhta hai).
+  static String? supportReason;
+  /// Support session kab khatam hoga (server ke bache hue time se ginte hain).
+  static DateTime? supportUntil;
 
   static Future<void> load() async {
     final p = await SharedPreferences.getInstance();
@@ -23,8 +27,28 @@ class Api {
     final p = await SharedPreferences.getInstance();
     await p.remove('token');
     await p.remove('user');
-    token = null; user = null; viewShopId = null;
+    token = null; user = null;
+    endSupport();
   }
+
+  // ---- Temporary support access (Super Admin) ----
+  /// Super admin chalu support session me hai: shop data ab read-only hai.
+  static bool get supportReadOnly => isSuperAdmin && viewShopId != null;
+  static bool get supportActive => supportReadOnly;
+  static Duration get supportRemaining {
+    final until = supportUntil;
+    if (until == null) return Duration.zero;
+    final left = until.difference(DateTime.now());
+    return left.isNegative ? Duration.zero : left;
+  }
+  static bool get supportExpired => supportReadOnly && supportUntil != null && supportRemaining == Duration.zero;
+  /// Session shuru (backend reason + time limit + log ke saath deta hai).
+  static void beginSupport({required int shopId, required String reason, required int expiresInMs}) {
+    viewShopId = shopId;
+    supportReason = reason;
+    supportUntil = DateTime.now().add(Duration(milliseconds: expiresInMs));
+  }
+  static void endSupport() { viewShopId = null; supportReason = null; supportUntil = null; }
 
   static Map<String, String> get _h => {
         'Content-Type': 'application/json',
@@ -44,6 +68,10 @@ class Api {
 
   static Future<dynamic> get(String path, [Map<String, String>? q]) async =>
       _parse(await http.get(_u(path, q), headers: _h));
+  /// Bina shop scope ke read (support access log): chalu support session ka
+  /// `shop_id` yahan nahi judta, warna "sab shops ka log" ek shop me simat jata.
+  static Future<dynamic> getUnscoped(String path) async =>
+      _parse(await http.get(Uri.parse('$baseUrl/api$path'), headers: _h));
   static Future<dynamic> post(String path, Map body) async =>
       _parse(await http.post(_u(path), headers: _h, body: jsonEncode(body)));
   static Future<dynamic> put(String path, Map body) async =>

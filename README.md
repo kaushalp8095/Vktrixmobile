@@ -9,7 +9,7 @@
 | Login security | JWT token + bcrypt password hashing | |
 
 ## Features
-- **Super Admin**: shops banana, har shop ko alag login dena, shop band/chalu karna, password reset, delete, har shop ka stock/sales/report dekhna, overall dashboard, TAC (IMEI model) CSV import + **do free TAC catalog sync**: Osmocom community list aur **extended India-models list** (Redmi/Realme/Poco/Vivo ke naye variants + internal model code, koi API key/paisa nahi)
+- **Super Admin**: shops banana, har shop ko alag login dena, shop band/chalu karna, password reset, delete, TAC (IMEI model) CSV import + **do free TAC catalog sync**: Osmocom community list aur **extended India-models list** (Redmi/Realme/Poco/Vivo ke naye variants + internal model code, koi API key/paisa nahi). **Shop ka business data (stock, IMEI, sales, profit, payment ledger, customer/ID proof) usse default me nahi dikhta** — uske liye reason ke saath *temporary, read-only support access* lena padta hai (neeche section dekhein).
 - **Shop Login**: sirf apni shop ka data dikhega (dusri shop ka nahi)
 - **Buy Form**: IMEI likhte hi/scan karte hi **Brand + Model free me apne aap** bhar jata hai (local TAC catalog, koi external API/paisa nahi), RAM/Storage/Color ke liye **dropdown** (app ke apne purane data se), IMEI valid hai ya nahi (Luhn check), duplicate check, pehle kab aaya tha wo history (**catalog miss ho to wahi entry sab fields auto-fill karti hai**), **Serial number (optional)**, Customer details + ID proof (**photo upload: camera ya gallery**)
 - **Save karte hi stock me add** → Stock list me "BECHO" button → Sell form (profit/loss live dikhega)
@@ -17,7 +17,8 @@
 - **Udhaar ledger**: sale par kitna mila aur kitna baki hai; 0/full/partial collection, har partial payment ki date/mode/note history, outstanding summary, paid/pending filters aur WhatsApp reminder. Payment kabhi sale total se zyada add nahi ho sakta.
 - **Sales**: list, payment-due status, detail se PDF/payment ledger, aur sale cancel (phone wapas stock me; linked payment history bhi remove hoti hai)
 - **Reports**: Aaj / 7 din / Mahina / Saal / Custom: kharidi, bikri, profit, stock value, payment mode, pending receivables, top models, roz ki sales
-- **Back button (Android)**: Buy/Stock/Sales/Reports tab par back = pehle Home tab; Home par 2 second ke andar dobara back = app band. Super Admin jab kisi shop ka data dekh raha ho, tab back seedha shop list par wapas jata hai.
+- **Back button (Android)**: Buy/Stock/Sales/Reports tab par back = pehle Home tab; Home par 2 second ke andar dobara back = app band. Super Admin jab support session me kisi shop ka data dekh raha ho, tab back seedha shop list par wapas jata hai.
+- **Logout confirmation (dono side)**: shop owner aur Super Admin — dono ke liye ek hi popup (Indigo/Mint glass card, brand hairline, account identity). Options: **Stay logged in** aur **Log out**. Logout sirf confirm karne ke baad hota hai; Super Admin pehle seedha logout kar deta tha, ab nahi.
 
 ### IMEI auto-fill kaise kaam karta hai
 IMEI ke pehle 8 digit (TAC) model batate hain. Database `tac_models` me har row ka `source` save hota hai:
@@ -100,6 +101,38 @@ Koi external API call nahi hoti, koi IMEI server se bahar nahi jata, aur iska ko
 - **Home → Udhaar**, ya **Sales top bar ka wallet icon**: pending/paid/all, customer/model/IMEI search, total outstanding aur collection progress.
 - Sale detail/payment detail se partial payment add, complete history, customer-safe PDF aur pre-filled WhatsApp reminder milta hai.
 - Existing deployment par migration purane non-credit sales ko fully paid opening entry banati hai; old `credit` rows unpaid rehti hain. Pehle updated backend deploy karein, phir APK.
+
+### Super Admin: manage karein, data sirf support session me
+
+Shop ke liye ye sabse bada security sawal hai: *"admin mera stock, IMEI, sale, profit aur customer ka ID proof dekhta rehta hai?"* Isliye Super Admin ko ab **default me kuch nahi** dikhta.
+
+| Kya | Super Admin ko default | Kaise |
+|---|---|---|
+| Shop name, status (active/off), login username, owner/address/GST, shop since | ✅ Dikhta hai | `GET /api/admin/shops` |
+| Contact number | ⚠️ **Masked** (`98•••••210`) | Full number sirf chalu support session me, aur wo bhi log hokar |
+| Stock, IMEI, serial, buy price | ❌ Nahi | `?shop_id=` **403** deta hai |
+| Sales, profit, PDF bills, receivables/ledger | ❌ Nahi | 403 |
+| Customer details + ID proof photos | ❌ Nahi | 403 |
+| "Open as shop" (bina wajah ke andar jhaka) | ❌ **Hata diya gaya** | Ab sirf chalu support session me, read-only |
+
+**Support access kaise kaam karta hai**
+
+1. Super Admin → shop row → **Start support access** → **reason** (min 10 characters) + **time limit** (15 min / 30 min / 1 hour / 2 hours) chunein.
+2. Backend `support_access` table me row banata hai: kaun, kis shop ka, kyun, kab tak, `expires_at_ms`.
+3. Session ke andar admin shop ko **read-only** dekhta hai (Stock/Sales/Reports/Ledger/PDF khul jaate hain). Buy, sell, payment, edit, delete aur sale-cancel **band** hain — screen par "*Support mode · read-only*" bar countdown ke saath chalti hai, aur backend bhi **403** deta hai (`support_access_read_only`).
+4. Time khatam = access khatam (`expires_at_ms` cross hone par wahi query 403). Admin **End access** se turant band kar sakta hai.
+5. Session admin ke local app me rehti hai, par **server hi sach hai**: `/api/admin/shops` jab tak chalu grant dikhata hai, tab tak hi app me session maani jaati hai.
+6. Sab kuch **log** hota hai: reason, started/expires, kitni baar data padha gaya (`read_count`, 1 minute me kai requests = ek view), aur contact reveal kitni baar hua.
+7. **Shop owner bhi wahi log dekhta hai**: Profile → **Support access** → "Vktrix support ne kab, kyun aur kitna data dekha". Isse support chori chhupe nahi hoti.
+
+Backend enforcement (screen se chhupana kaafi nahi):
+
+- `routes/shop.js` ka middleware: `role === 'superadmin'` + `shop_id` → **chalu reason-logged grant** hona zaroori, warna **403** `support_access_required`.
+- Us session me bhi sirf `GET` — koi bhi POST/PUT/DELETE **403** `support_access_read_only`.
+- Grant shop-scoped hai: shop A ka grant shop B ke liye kaam nahi karta; invalid `shop_id` 400.
+- `POST /api/admin/shops/:id/reveal-contact` bhi chalu session ke bina 403 deta hai, aur reveal bhi log hota hai.
+
+Isse purane deployment par kaam nahi rukta: agar kisi ko support chahiye, wo 15 second me reason ke saath session le leta hai — par har baar *likh kar*.
 
 ### IMEI scanner `genericError` fix
 
@@ -243,10 +276,15 @@ Note: download app ke process me chalta hai. App ko kuch der ke liye minimize ka
 |---|---|---|
 | POST | /api/auth/login | Login |
 | POST | /api/auth/change-password | Password badlo |
-| GET | /api/admin/dashboard | Super admin summary |
-| GET/POST | /api/admin/shops | Shops list / nayi shop + login |
+| GET | /api/admin/dashboard | Super admin summary (sirf operational counts: shops/active/support open) |
+| GET/POST | /api/admin/shops | Shops list (masked contact, koi business data nahi) / nayi shop + login |
 | PUT/DELETE | /api/admin/shops/:id | Edit, band/chalu / delete |
 | POST | /api/admin/shops/:id/reset-password | Password reset |
+| POST | /api/admin/shops/:id/support-access | Temporary support session (`reason` + `minutes`; 201 / 409) |
+| DELETE | /api/admin/shops/:id/support-access | Chalu session turant band |
+| POST | /api/admin/shops/:id/reveal-contact | Full contact (sirf chalu session me, log hokar) |
+| GET | /api/admin/support-access?shop_id= | Access log (kaun/kab/kyun/kitna dekha) |
+| GET | /api/support-access | Shop owner ko apni shop ka access log |
 | POST | /api/admin/tac/import | TAC CSV import |
 | GET | /api/admin/tac/status | TAC catalog coverage, last sync runs, limitations |
 | POST | /api/admin/tac/sync | Free TAC catalog sync shuru (202; pehle se chal raha ho to 409) |
@@ -264,4 +302,4 @@ Note: download app ke process me chalta hai. App ko kuch der ke liye minimize ka
 | GET | /api/reports/summary?from=&to= | Report + receivables |
 | GET | /api/reports/daily?from=&to= | Roz ka report |
 
-Super admin kisi bhi shop API me `?shop_id=` laga kar us shop ka data dekh sakta hai.
+Super admin `?shop_id=` sirf **chalu support session** ke saath laga sakta hai (read-only) — warna shop APIs 403 deti hain. Detail: *"Super Admin: manage karein, data sirf support session me"* section aur `docs/D6_SUPPORT_ACCESS.md`.
