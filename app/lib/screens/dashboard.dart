@@ -123,12 +123,15 @@ class _DashboardState extends State<Dashboard> {
                 ]),
               ])),
               const SizedBox(height: Space.x16),
-              // ---- Quick actions ----
-              Row(children: [
-                Expanded(child: PrimaryButton(label: 'Buy phone', icon: Icons.add, expand: true, onPressed: () => widget.onGo(1))),
-                const SizedBox(width: Space.x12),
-                Expanded(child: _SecondaryAction(label: 'Sell phone', icon: Icons.sell_outlined, onTap: () => widget.onGo(2))),
-              ]),
+              // ---- Quick actions (support mode me read-only note) ----
+              if (Api.supportReadOnly)
+                const ReadOnlyNote(text: 'Support mode read-only hai — buy/sell/payment shop owner khud karega.')
+              else
+                Row(children: [
+                  Expanded(child: PrimaryButton(label: 'Buy phone', icon: Icons.add, expand: true, onPressed: () => widget.onGo(1))),
+                  const SizedBox(width: Space.x12),
+                  Expanded(child: _SecondaryAction(label: 'Sell phone', icon: Icons.sell_outlined, onTap: () => widget.onGo(2))),
+                ]),
               if (widget.onOpenLedger != null) ...[
                 const SizedBox(height: Space.x12),
                 _LedgerAction(

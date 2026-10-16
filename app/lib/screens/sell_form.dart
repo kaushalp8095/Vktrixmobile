@@ -44,6 +44,7 @@ class _SellFormState extends State<SellForm> {
   void dispose() { for (final c in [price, received, name, mob, addr, warranty, notes]) { c.dispose(); } _scroll.dispose(); super.dispose(); }
 
   Future<void> _save() async {
+    if (supportReadOnlyBlock(context, 'Selling a phone')) return;
     FocusScope.of(context).unfocus();
     if (!_form.currentState!.validate()) return;
     setState(() => _phase = ButtonPhase.loading);

@@ -6,7 +6,42 @@ const { validImei, today, wrap } = require('../util');
 const V = require('../validation');
 const suggestions = require('../suggestions');
 const tacApi = require('../tacApi');
+const support = require('../support');
 r.use(requireAuth);
+
+// ---- SUPER ADMIN KA SHOP DATA PAR ACCESS (backend me, sirf screen par nahi) ----
+// Super Admin ke paas is router ke shop data (IMEI, stock, sales, profit, ledger,
+// customer/ID info) ka default access **nahi** hai. Wo sirf tab milta hai jab:
+//   1. usne us shop ke liye reason ke saath temporary support session li ho,
+//   2. session abhi khatam na hua ho,
+//   3. request **read-only** ho (GET) — support access se shop ka data badla nahi ja sakta.
+// Har read log me dikhti hai (shop owner apni app me dekh sakta hai).
+r.use(wrap(async (req, res, next) => {
+  if (req.user.role !== 'superadmin') return next();
+  const raw = req.query?.shop_id ?? req.body?.shop_id;
+  if (raw == null || raw === '') return next();   // catalog-only routes (e.g. /imei catalog lookup)
+  let sid;
+  try { sid = V.id(raw, 'shop_id'); } catch {
+    return res.status(400).json({ error: 'shop_id must be a positive integer', code: 'invalid_shop_id' });
+  }
+  const grant = await support.activeGrant(sid, req.user.id);
+  if (!grant) {
+    return res.status(403).json({
+      error: 'Shop data dekhne ke liye temporary support access zaroori hai (reason aur time limit ke saath).',
+      code: 'support_access_required',
+    });
+  }
+  if (req.method !== 'GET') {
+    return res.status(403).json({
+      error: 'Support access read-only hai — shop ka data change nahi ho sakta. Ye kaam shop owner khud kare.',
+      code: 'support_access_read_only',
+    });
+  }
+  req.supportGrant = grant;
+  req.supportShopId = sid;
+  await support.markRead(grant);
+  next();
+}));
 
 // Columns returned by list endpoints. Both customer ID photos are deliberately
 // left out: base64 images would bloat every stock/reports response.
@@ -15,18 +50,21 @@ const PHONE_LIST_COLUMNS = ['id', 'shop_id', 'imei', 'imei2', 'serial_number', '
   'color', 'condition', 'accessories', 'buy_price', 'buy_date', 'seller_name', 'seller_phone', 'seller_id_type',
   'seller_id_no', 'seller_address', 'notes', 'status', 'created_by', 'created_at'];
 
-// shop_id nikalna: shop user -> apni shop; superadmin -> ?shop_id
+// shop_id nikalna: shop user -> apni shop; superadmin -> apni chalu support session
+// ki shop (upar wala guard set karta hai, warna null).
 function shopId(req) {
-  if (req.user.role === 'superadmin') {
-    const raw = req.query?.shop_id ?? req.body?.shop_id;
-    if (raw == null || raw === '') return null;
-    try { return V.id(raw, 'shop_id'); } catch { return null; }
-  }
+  if (req.user.role === 'superadmin') return req.supportShopId ?? null;
   return req.user.shop_id;
 }
 function needShop(req, res) {
   const id = shopId(req);
-  if (!id) { res.status(400).json({ error: 'shop_id required' }); return null; }
+  if (!id) {
+    if (req.user.role === 'superadmin')
+      return void res.status(403).json({ error: 'Shop data dekhne ke liye temporary support access zaroori hai.',
+        code: 'support_access_required' });
+    res.status(400).json({ error: 'shop_id required' });
+    return null;
+  }
   return id;
 }
 function isUniqueViolation(err) {
@@ -69,6 +107,20 @@ async function safeSale(sid, saleId, runner = db) {
       'p.imei', 'p.imei2', 'p.serial_number', 'p.brand', 'p.model', 'p.ram', 'p.storage', 'p.color',
       'p.condition', 'p.accessories').first();
 }
+
+// ---------- SUPPORT ACCESS LOG (shop owner ke liye) ----------
+// Shop owner dekhta hai ki Vktrix support ne uske data ko kab, kyun aur kitna dekha.
+// Yahan sirf apni shop ka log milta hai (shop_id query ignore hoti hai).
+r.get('/support-access', wrap(async (req, res) => {
+  const sid = shopId(req);
+  if (!sid) return res.status(400).json({ error: 'shop_id required' });
+  const items = await support.list({ shopId: sid, limit: req.query.limit });
+  const running = await support.activeGrant(sid);
+  res.json({
+    items,
+    active: running ? support.shape(running) : null,
+  });
+}));
 
 // ---------- IMEI LOOKUP ----------
 r.get('/imei/:imei', wrap(async (req, res) => {

@@ -254,6 +254,7 @@ class _BuyFormState extends State<BuyForm> {
 
   Future<void> _save() async {
     if (_pickingSide != null || _saving) return;
+    if (supportReadOnlyBlock(context, 'Buying a phone')) return;
     FocusScope.of(context).unfocus();
     if (!_form.currentState!.validate()) return;
     setState(() => _phase = ButtonPhase.loading);

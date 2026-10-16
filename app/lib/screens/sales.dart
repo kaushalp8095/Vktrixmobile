@@ -64,13 +64,15 @@ class _SalesScreenState extends State<SalesScreen> {
       if (mounted && widget.testItems == null) _load();
       return;
     }
-    final ok = await showDialog<bool>(context: context, builder: (d) => AlertDialog(
-      title: const Text('Cancel this sale?'),
-      content: Text('${s['brand']} ${s['model']} will go back into stock. Payment history will also be removed.'),
-      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Keep sale')),
-        FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Cancel sale'))],
-    ));
-    if (ok == true) {
+    if (supportReadOnlyBlock(context, 'Cancelling a sale')) return;
+    final ok = await showConfirmDialog(context,
+      title: 'Cancel this sale?',
+      message: '${s['brand']} ${s['model']} will go back into stock. Payment history will also be removed.',
+      confirmLabel: 'Cancel sale',
+      cancelLabel: 'Keep sale',
+      icon: Icons.undo_outlined,
+      destructive: true);
+    if (ok) {
       try { await Api.delete('/sales/${s['id']}'); if (mounted) toast(context, 'Sale cancelled — phone is back in stock'); _load(); }
       catch (e) { if (mounted) toast(context, '$e', err: true); }
     }
@@ -167,6 +169,7 @@ class _SaleDetailSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors, t = context.type;
     final s = sale;
+    final readOnly = Api.supportReadOnly;
     final rows = <(String, String)>[
       ('IMEI', '${s['imei']}'),
       ('RAM / Storage', '${s['ram'] ?? '—'} / ${s['storage'] ?? '—'}'),
@@ -206,10 +209,13 @@ class _SaleDetailSheet extends StatelessWidget {
             style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
           ),
           const SizedBox(height: Space.x12),
-          Center(child: TextButton(
-            onPressed: onCancel,
-            child: Text('Cancel sale (returns to stock)', style: t.labelLarge?.copyWith(color: c.errorInk)),
-          )),
+          if (readOnly)
+            const ReadOnlyNote(text: 'Support mode read-only hai — payment ya sale change shop owner khud karega.')
+          else
+            Center(child: TextButton(
+              onPressed: onCancel,
+              child: Text('Cancel sale (returns to stock)', style: t.labelLarge?.copyWith(color: c.errorInk)),
+            )),
         ]),
       ))),
     );

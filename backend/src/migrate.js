@@ -50,6 +50,32 @@ async function migrate() {
       t.index(['status']);
     });
   }
+  // Super Admin ka temporary, reason-logged, read-only support access.
+  // Har row ek session hai: kaun (user_id), kis shop ka, kyun (reason), kitne
+  // minute ke liye, aur us session me kitni baar data padha gaya / contact
+  // reveal hua. Shop owner yahi log apni app me dekhta hai.
+  if (!(await db.schema.hasTable('support_access'))) {
+    await db.schema.createTable('support_access', t => {
+      t.increments('id');
+      t.integer('shop_id').notNullable().references('shops.id').onDelete('CASCADE');
+      t.integer('user_id').references('users.id').onDelete('SET NULL');
+      t.text('reason').notNullable();
+      t.integer('minutes').notNullable();
+      // Epoch milliseconds: SQLite aur PostgreSQL dono par ek jaisa compare hota hai
+      // (timestamp strings ka timezone format dono DBs me alag hota hai).
+      t.bigInteger('started_at_ms').notNullable();
+      t.bigInteger('expires_at_ms').notNullable();
+      t.bigInteger('ended_at_ms');
+      t.integer('ended_by').references('users.id').onDelete('SET NULL');
+      t.string('end_reason', 24);            // expired | admin_ended | shop_ended
+      t.integer('read_count').notNullable().defaultTo(0);
+      t.bigInteger('first_read_ms'); t.bigInteger('last_read_ms');
+      t.integer('contact_reveals').notNullable().defaultTo(0);
+      t.bigInteger('last_reveal_ms');
+      t.timestamp('created_at').defaultTo(db.fn.now());
+      t.index(['shop_id']); t.index(['expires_at_ms']);
+    });
+  }
   if (!(await db.schema.hasTable('phones'))) {
     await db.schema.createTable('phones', t => {
       t.increments('id');

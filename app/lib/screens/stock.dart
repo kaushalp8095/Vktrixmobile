@@ -53,8 +53,10 @@ class _StockScreenState extends State<StockScreen> {
     if (action == 'receipt' && mounted) {
       await SharedAxisRoute.push(context, (_) => ReceiptScreen(type: 'purchase', id: int.parse('${p['id']}')));
     } else if (action == 'delete') {
+      if (supportReadOnlyBlock(context, 'Removing stock')) return;
       try { await Api.delete('/phones/${p['id']}'); _load(); } catch (e) { if (mounted) toast(context, '$e', err: true); }
     } else if (action == 'sell' && mounted) {
+      if (supportReadOnlyBlock(context, 'Selling a phone')) return;
       final ok = await SharedAxisRoute.push<bool>(context, (_) => SellForm(phone: Map<String, dynamic>.from(p)));
       if (ok == true) _load();
     }
@@ -149,6 +151,7 @@ class _PhoneDetailSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors, t = context.type;
     final p = phone;
+    final readOnly = Api.supportReadOnly;
     final rows = <(String, String)>[
       ('IMEI', '${p['imei']}'),
       if (p['imei2'] != null && '${p['imei2']}'.isNotEmpty) ('IMEI 2', '${p['imei2']}'),
@@ -191,20 +194,25 @@ class _PhoneDetailSheet extends StatelessWidget {
               style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
             ),
             const SizedBox(height: Space.x8),
-            PrimaryButton(label: 'Sell this phone', icon: Icons.sell_outlined, onPressed: onSell),
-            const SizedBox(height: Space.x12),
-            Center(child: TextButton(
-              onPressed: () async {
-                final ok = await showDialog<bool>(context: context, builder: (d) => AlertDialog(
-                  title: const Text('Remove from stock?'),
-                  content: Text('${p['brand']} ${p['model']} will be deleted permanently.'),
-                  actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
-                      FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Delete'))],
-                ));
-                if (ok == true) onDelete();
-              },
-              child: Text('Remove from stock', style: t.labelLarge?.copyWith(color: c.errorInk)),
-            )),
+            if (readOnly)
+              const ReadOnlyNote(text: 'Support mode read-only hai — sell ya remove shop owner khud karega.')
+            else ...[
+              PrimaryButton(label: 'Sell this phone', icon: Icons.sell_outlined, onPressed: onSell),
+              const SizedBox(height: Space.x12),
+              Center(child: TextButton(
+                onPressed: () async {
+                  final ok = await showConfirmDialog(context,
+                    title: 'Remove from stock?',
+                    message: '${p['brand']} ${p['model']} will be deleted permanently.',
+                    confirmLabel: 'Delete',
+                    cancelLabel: 'Cancel',
+                    icon: Icons.delete_outline,
+                    destructive: true);
+                  if (ok) onDelete();
+                },
+                child: Text('Remove from stock', style: t.labelLarge?.copyWith(color: c.errorInk)),
+              )),
+            ],
           ]),
         )),
       ),

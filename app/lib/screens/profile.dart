@@ -8,6 +8,7 @@ import '../design/design.dart';
 import '../main.dart' show themeMode;
 import 'common.dart';
 import 'login.dart';
+import 'support_access.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -84,13 +85,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _logout() async {
-    final ok = await showDialog<bool>(context: context, builder: (d) => AlertDialog(
-      title: const Text('Log out?'),
-      content: const Text('You will need your username and password to sign back in.'),
-      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
-        FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Log out'))],
-    ));
-    if (ok != true) return;
+    final u = Api.user ?? const {};
+    final shop = (u['shop'] as Map?) ?? const {};
+    // Super Admin side bhi yahi popup use karta hai (admin_home.dart).
+    final ok = await showLogoutDialog(context,
+        identity: '${shop['name'] ?? u['name'] ?? 'My Shop'} · @${u['username'] ?? ''}');
+    if (ok != true || !mounted) return;
     await Api.logout();
     if (mounted) SharedAxisRoute.replace(context, (_) => const LoginScreen());
   }
@@ -153,6 +153,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   trailing: _passPhase == ButtonPhase.loading
                       ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                       : _passPhase == ButtonPhase.success ? Icon(Icons.check_circle, color: c.success, size: 20) : null),
+              Divider(height: 1, indent: 56, color: c.textPrimary.withValues(alpha: .08)),
+              _RowTap(icon: Icons.shield_outlined, title: 'Support access',
+                  subtitle: 'Vktrix support ne kab, kyun aur kitna data dekha',
+                  onTap: () => showSupportLogSheet(context, title: 'Support access')),
               Divider(height: 1, indent: 56, color: c.textPrimary.withValues(alpha: .08)),
               _RowTap(icon: Icons.dns_outlined, title: 'Server', subtitle: baseUrl, onTap: () async {
                 final ctrl = TextEditingController(text: baseUrl);
