@@ -72,7 +72,7 @@ void main() {
     expect(find.byType(ConfirmDialogCard), findsNothing);
     expect(find.byType(ProfileScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
-    expect(Api.token, 'test-token', 'session must survive a cancelled logout');
+    expect(Api.token, 'test-token', reason: 'session must survive a cancelled logout');
     await tester.pumpWidget(const SizedBox());
   });
 
@@ -94,7 +94,7 @@ void main() {
     expect(find.text('Stay logged in'), findsOneWidget);
     expect(find.text('Log out'), findsOneWidget);
     expect(find.textContaining('@superadmin'), findsOneWidget);
-    expect(find.byType(LoginScreen), findsNothing, 'logout must wait for confirmation');
+    expect(find.byType(LoginScreen), findsNothing, reason: 'logout must wait for confirmation');
     expect(Api.token, 'test-token');
 
     await tester.tap(find.text('Stay logged in'));
@@ -135,7 +135,7 @@ void main() {
     await tester.pumpWidget(harness());
     await tester.tap(find.text('sell'));
     await tester.pump();
-    expect(blocked, isFalse, 'shop owner ka apna session block nahi hota');
+    expect(blocked, isFalse, reason: 'shop owner ka apna session block nahi hota');
 
     Api.user = {'id': 1, 'name': 'Super Admin', 'username': 'superadmin', 'role': 'superadmin'};
     Api.beginSupport(shopId: 1, reason: 'Shop owner called: ledger stuck', expiresInMs: 60 * 1000);

@@ -6,7 +6,6 @@
 // → [Cancel] [Confirm]. Enter: fade + scale .94→1 (320ms FastOutSlowIn), reduced
 // motion par instant.
 import 'package:flutter/material.dart';
-import '../colors.dart';
 import '../design.dart';
 
 Color _scrim(BuildContext context) {
