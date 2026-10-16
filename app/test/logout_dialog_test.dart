@@ -62,7 +62,8 @@ void main() {
     expect(find.byType(ConfirmDialogCard), findsOneWidget);
     expect(find.text('Log out?'), findsOneWidget);
     expect(find.text('Stay logged in'), findsOneWidget);
-    expect(find.text('Log out'), findsOneWidget);
+    // Confirm button popup ke andar (Profile row par bhi 'Log out' likha hai).
+    expect(find.descendant(of: find.byType(ConfirmDialogCard), matching: find.text('Log out')), findsOneWidget);
     // Identity: kaun logout kar raha hai wo popup me dikhta hai.
     expect(find.textContaining('Krishna Mobiles'), findsWidgets);
 
@@ -92,7 +93,7 @@ void main() {
     await _openLogoutDialog(tester);
     expect(find.byType(ConfirmDialogCard), findsOneWidget);
     expect(find.text('Stay logged in'), findsOneWidget);
-    expect(find.text('Log out'), findsOneWidget);
+    expect(find.descendant(of: find.byType(ConfirmDialogCard), matching: find.text('Log out')), findsOneWidget);
     expect(find.textContaining('@superadmin'), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing, reason: 'logout must wait for confirmation');
     expect(Api.token, 'test-token');
