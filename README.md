@@ -136,21 +136,28 @@ Isse purane deployment par kaam nahi rukta: agar kisi ko support chahiye, wo 15 
 
 ### IMEI scanner `genericError` fix
 
-Android par `mobile_scanner` har camera failure ko ek hi code me bhejta hai: **`genericError`**. Asli wajah `errorDetails.message` me hoti hai (plugin 5.2.3 me `start()` throw nahi karta, `value.error` set karta hai) — wo message hi screen par dikhta hai:
+Scanner **mobile_scanner 7.4.2** par hai (CameraX 1.6.1, AGP 9 support). 5.2.3 (CameraX 1.3) Vivo/FunTouch aur naye devices par camera **kabhi** start nahi karta tha — plugin ke andar `bindToLifecycle`/HAL fail hote hi bas `genericError` aata tha. 7.4.1 me yahi cheez theek hui: CameraX init failure (camera kisi aur process ke paas, "Available cameras: 0", transient HAL error) ab app crash ki jagah normal error callback se aata hai.
 
-| Platform message | Matlab |
+Upgrade ke saath ye rules hain:
+
+1. **Ek hi owner:** controller `autoStart: false` aur `MobileScanner(useAppLifecycleState: false)` — camera ke saare `start()`/`stop()` ek hi `CameraTaskQueue` se jaate hain. `stop()` apna `isRunning` platform call se pehle false karta hai, isliye bina queue ke `resumed` ka `start()` unbind ke beech me bind kar deta hai.
+2. **Lifecycle:** camera sirf `paused`/`detached` par chhoota hai. `inactive`/`hidden` (permission dialog, system dialogs) par nahi — widget ka default behaviour har `inactive` par stop karta hai, isliye wo band hai.
+3. **Lens:** `lensType: normal` (26-35mm). `any` kai phones par ultra-wide/telephoto chun leta hai jahan close-range barcode focus theek nahi hota. Normal lens na mile to ek automatic retry `any` ke saath hota hai.
+4. **Retry sach me naya attempt hai:** purana controller native side par adhoora (leaked listeners, half-bound camera) chhod deta hai, isliye Retry controller dispose karke naya banata hai.
+
+`MobileScannerErrorCode` (7.x) ke hisaab se screen message:
+
+| Code / platform message | Matlab |
 | --- | --- |
-| `No camera found or failed to open camera!` | CameraX `bindToLifecycle` fail — camera kisi aur app ne pakda hua hai, ya pichla bind adhoora hai |
-| `Error occurred when setting up camera!` | `ProcessCameraProvider` hi nahi mila (service failure / OEM ROM) |
-| `Called start() while already started` | do start calls overlap ho gayi |
+| `genericError` + `No camera found or failed to open camera!` | CameraX bind fail — camera busy, ya HAL/ROM ne mana kiya |
+| `genericError` + `Error occurred when setting up camera!` | `ProcessCameraProvider` hi nahi mila |
+| `controllerNotAttached` | `start()` naye widget ke attach hone se pehle chala — retry theek kar deta hai |
+| `controllerInitializing` | pichhla start abhi chal raha hai (queue overlap na hone de) |
+| `permissionDenied` | Settings > Apps > Vktrix Mobile > Permissions me Camera allow karein |
 
-Isliye ab teen cheezein guarantee hain:
+UI asli platform message bhi dikhata hai (support ko sirf screenshot bhejna kaafi ho). Phir bhi camera na khule to `adb logcat | grep -iE "camera|camerax|mobile_scanner"` me CameraX ki asli exception dekhein.
 
-1. **Ek hi owner aur ek hi line:** screen camera ke saare `start()`/`stop()` ek hi `CameraTaskQueue` se bhejti hai. `stop()` apna `isRunning` platform call se pehle false karta hai, isliye bina queue ke `resumed` ka `start()` unbind ke beech me bind kar deta tha — yahi "No camera found" ka sabse aam kaaran hai.
-2. **Permission dialog camera release nahi karta:** `inactive`/`hidden` par camera chalta rehta hai; release sirf `paused`/`detached` par. Pehle permission popup aate hi stop() chala jata tha.
-3. **Retry sach me naya attempt hai:** purana controller native side par adhoora (leaked listeners, half-bound camera) chhod deta hai, isliye Retry controller dispose karke naya banata hai. Ek `genericError` par ek automatic retry (700ms baad) bhi hota hai, kyunki busy sensor tab tak free ho jata hai.
-
-Note: `useNewCameraSelector` 5.2.3 me sirf resolution selector badalta hai, aur tabhi jab `cameraResolution` di ho — IMEI scan me uska koi role nahi, isliye hata diya. Agar phir bhi camera na khule to `adb logcat | grep -iE "camera|camerax|mobile_scanner"` me CameraX ki asli exception dekhein; screen par dikhne wala detail line bhi wahi batata hai.
+Note: plugin ab **minSdk 23** maangta hai (pehle 21), isliye `app/android/app/build.gradle.kts` me `minSdk = maxOf(flutter.minSdkVersion, 23)` hai.
 
 #### ⚠️ Free TAC catalog ki limitations (zaroor padhein)
 - **Data adhoora hai:** Osmocom me bahut se naye aur India-only models (Redmi/Realme/Poco/Vivo ke naye variants) **nahi** hain. Isliye extended catalog bhi hai; phir bhi bilkul naya model pehli baar manually bhar na pade — uske baad app khud seekh lega.
