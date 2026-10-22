@@ -84,6 +84,30 @@ test('idPhoto accepts image data URLs and rejects everything else', () => {
   assert.throws(() => V.idPhoto(42), /must be a data URL/);
 });
 
+test('sale customer ID proof columns are added by migration', async () => {
+  await migrate();
+  for (const column of ['customer_id_type', 'customer_id_photo', 'customer_id_photo_back']) {
+    assert.equal(await db.schema.hasColumn('sales', column), true, `${column} should exist after migration`);
+  }
+});
+
+test('sale customer ID type and front/back photos validate for selling customers', () => {
+  const sale = V.saleData({
+    phone_id: 1, sell_price: '1000', sell_date: '2026-10-20', customer_id_type: 'Aadhaar',
+    customer_id_photo: PNG, customer_id_photo_back: PNG,
+  });
+  assert.equal(sale.customer_id_type, 'Aadhaar');
+  assert.equal(sale.customer_id_photo, PNG);
+  assert.equal(sale.customer_id_photo_back, PNG);
+  assert.equal(V.saleData({ phone_id: 1, sell_price: '1000', sell_date: '2026-10-20' }).customer_id_photo, null);
+  assert.throws(() => V.saleData({
+    phone_id: 1, sell_price: '1000', sell_date: '2026-10-20', customer_id_type: 'Ration Card',
+  }), /customer_id_type invalid/);
+  assert.throws(() => V.saleData({
+    phone_id: 1, sell_price: '1000', sell_date: '2026-10-20', customer_id_photo: 'not-an-image',
+  }), /must be a JPEG, PNG or WebP data URL/);
+});
+
 test('ID proof types now include Visiting Card', () => {
   assert.ok(V.ID_TYPES.includes('Visiting Card'));
   for (const t of ['Aadhaar', 'PAN', 'Voter ID', 'Driving Licence', 'Visiting Card']) {

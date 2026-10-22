@@ -154,6 +154,15 @@ async function migrate() {
   if (!(await db.schema.hasColumn('sales', 'buy_price_at_sale'))) {
     await db.schema.alterTable('sales', t => t.decimal('buy_price_at_sale', 12, 2));
   }
+  if (!(await db.schema.hasColumn('sales', 'customer_id_type'))) {
+    await db.schema.alterTable('sales', t => t.string('customer_id_type'));
+  }
+  if (!(await db.schema.hasColumn('sales', 'customer_id_photo'))) {
+    await db.schema.alterTable('sales', t => t.text('customer_id_photo'));
+  }
+  if (!(await db.schema.hasColumn('sales', 'customer_id_photo_back'))) {
+    await db.schema.alterTable('sales', t => t.text('customer_id_photo_back'));
+  }
   if (!(await db.schema.hasColumn('shops', 'logo_data'))) {
     await db.schema.alterTable('shops', t => t.text('logo_data'));
   }

@@ -17,7 +17,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _user = TextEditingController(), _pass = TextEditingController();
   late final _server = TextEditingController(text: baseUrl);
   ButtonPhase _phase = ButtonPhase.idle;
-  bool _showPass = false, _showServer = false;
+  bool _showPass = false, _showServer = false, _rememberMe = true;
   String? _error;
 
   @override
@@ -29,7 +29,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() { _phase = ButtonPhase.loading; _error = null; });
     try {
       await Api.setServer(_server.text);
-      await Api.login(_user.text.trim(), _pass.text);
+      await Api.login(_user.text.trim(), _pass.text, rememberMe: _rememberMe);
       if (!mounted) return;
       setState(() => _phase = ButtonPhase.success);
       await Future<void>.delayed(Motion.of(context).d(const Duration(milliseconds: 450)));
@@ -91,6 +91,18 @@ class _LoginScreenState extends State<LoginScreen> {
                         padding: const EdgeInsets.only(top: Space.x12),
                         child: Semantics(liveRegion: true, child: Align(alignment: Alignment.centerLeft,
                             child: StatusChip(label: _error!, tone: ChipTone.error))),
+                      ),
+                    ),
+                    const SizedBox(height: Space.x4),
+                    Semantics(
+                      checked: _rememberMe,
+                      child: CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        title: const Text('Remember me'),
+                        subtitle: const Text('Stay signed in on this device.'),
+                        value: _rememberMe,
+                        onChanged: (value) => setState(() => _rememberMe = value ?? false),
                       ),
                     ),
                     const SizedBox(height: Space.x8),

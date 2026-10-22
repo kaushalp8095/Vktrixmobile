@@ -50,17 +50,23 @@ Future<void> _chooseSource(WidgetTester t, int side, {bool camera = false}) asyn
   await t.tap(find.byKey(ValueKey('id-photo-$side')));
   await t.pump();
   await t.pump(const Duration(milliseconds: 400));
-  await t.tap(find.text(camera ? 'Camera se photo lein' : 'Gallery se choose karein'));
+  await t.tap(find.text(camera ? 'Take a photo' : 'Choose from gallery'));
   await t.pump(const Duration(milliseconds: 300));
 }
 
 void main() {
+  test('storage and colour suggestions include requested variants', () {
+    expect(kDefaultStorageOptions, contains('2TB'));
+    expect(kDefaultStorageOptions, contains('Others'));
+    expect(kDefaultColorOptions, contains('Red / Burgundy'));
+  });
+
   for (final dark in [false, true]) {
     for (final entry in {'RAM (e.g. 8GB)': '8GB', 'Storage (e.g. 128GB)': '256GB', 'Color': 'Blue'}.entries) {
       final title = entry.key.split(' ').first;
       testWidgets('$title themed options select, highlight and retain manual values (${dark ? 'dark' : 'light'})', (t) async {
         await _pump(t, BuyForm(onSaved: () {}), dark: dark);
-        final tooltip = '${entry.key} choose karein';
+        final tooltip = 'Choose ${entry.key}';
         await _scrollTo(t, find.byTooltip(tooltip));
         await t.tap(find.byTooltip(tooltip));
         await t.pumpAndSettle();
@@ -156,7 +162,7 @@ void main() {
     await t.tap(find.byKey(const ValueKey('id-photo-0')));
     await t.pump();
     await t.pump(const Duration(milliseconds: 400));
-    await t.tap(find.text('Photo hata dein'));
+    await t.tap(find.text('Remove photo'));
     await t.pumpAndSettle();
     expect(find.text('1/2'), findsOneWidget);
     expect(find.text('Preview'), findsOneWidget);
@@ -164,8 +170,8 @@ void main() {
 
   testWidgets('option sheet works with large text', (t) async {
     await _pump(t, BuyForm(onSaved: () {}), textScale: 2);
-    await _scrollTo(t, find.byTooltip('RAM (e.g. 8GB) choose karein'));
-    await t.tap(find.byTooltip('RAM (e.g. 8GB) choose karein'));
+    await _scrollTo(t, find.byTooltip('Choose RAM (e.g. 8GB)'));
+    await t.tap(find.byTooltip('Choose RAM (e.g. 8GB)'));
     await t.pumpAndSettle();
     expect(find.text('Choose RAM'), findsOneWidget);
     expect(t.takeException(), isNull);

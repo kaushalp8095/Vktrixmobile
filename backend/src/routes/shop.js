@@ -230,7 +230,8 @@ r.post('/sell', wrap(async (req, res) => {
   const sid = needShop(req, res); if (!sid) return;
   const b = V.body(req);
   const allowed = ['phone_id', 'sell_price', 'sell_date', 'customer_name', 'customer_phone', 'customer_address',
-    'payment_mode', 'amount_received', 'warranty', 'notes'];
+    'payment_mode', 'amount_received', 'warranty', 'notes', 'customer_id_type',
+    'customer_id_photo', 'customer_id_photo_back'];
   if (Object.keys(b).some(k => !allowed.includes(k))) return res.status(400).json({ error: 'Unsupported sale field' });
   const sale = V.saleData(b);
   try {
@@ -268,7 +269,10 @@ r.get('/sales', wrap(async (req, res) => {
   const { from, to } = V.range(req.query, ['1900-01-01', '2999-12-31']);
   const rows = await db('sales as s').join('phones as p', 'p.id', 's.phone_id')
     .where('s.shop_id', sid).whereBetween('s.sell_date', [from, to])
-    .select('s.*', 'p.imei', 'p.imei2', 'p.serial_number', 'p.brand', 'p.model', 'p.ram', 'p.storage', 'p.color')
+    .select('s.id', 's.shop_id', 's.phone_id', 's.sell_price', 's.buy_price_at_sale', 's.sell_date',
+      's.customer_name', 's.customer_phone', 's.customer_address', 's.customer_id_type', 's.payment_mode',
+      's.warranty', 's.notes', 's.created_by', 's.created_at',
+      'p.imei', 'p.imei2', 'p.serial_number', 'p.brand', 'p.model', 'p.ram', 'p.storage', 'p.color')
     .select(db.raw('COALESCE(??, ??) as ??', ['s.buy_price_at_sale', 'p.buy_price', 'buy_price']))
     .orderBy('s.id', 'desc');
   res.json(await withPaymentTotals(rows));

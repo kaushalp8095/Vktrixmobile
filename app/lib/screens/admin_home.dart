@@ -88,7 +88,7 @@ class _AdminHomeState extends State<AdminHome> {
 
   Future<void> _logout() async {
     final ok = await showLogoutDialog(context, identity: _identity,
-        note: 'Support sessions aapke logout ke baad bhi shop ke log me rehti hain.');
+        note: 'Support sessions remain in the shop access log even after you sign out.');
     if (ok != true || !mounted) return;
     await Api.logout();
     if (mounted) SharedAxisRoute.replace(context, (_) => const LoginScreen());
@@ -113,9 +113,9 @@ class _AdminHomeState extends State<AdminHome> {
         TextFormField(controller: owner, decoration: const InputDecoration(labelText: 'Owner name')),
         const SizedBox(height: 8),
         TextFormField(controller: phone, keyboardType: TextInputType.phone,
-          decoration: InputDecoration(labelText: shop == null ? 'Mobile' : 'Mobile (naya number, optional)',
+          decoration: InputDecoration(labelText: shop == null ? 'Mobile' : 'Mobile (new number, optional)',
             hintText: shop == null ? null : 'current: ${masked.isEmpty ? '—' : masked}',
-            helperText: shop == null ? null : 'Khali chhodein to purana number waisa hi rahega.')),
+            helperText: shop == null ? null : 'Leave blank to keep the current number.')),
         const SizedBox(height: 8),
         TextFormField(controller: addr, decoration: const InputDecoration(labelText: 'Address')),
         const SizedBox(height: 8),
@@ -151,7 +151,7 @@ class _AdminHomeState extends State<AdminHome> {
                     logoData = 'data:image/jpeg;base64,${base64Encode(prepared)}';
                   });
                 } catch (_) {
-                  if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Logo process nahi hua. Dobara try karein.')));
+                  if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Could not process the logo. Please try again.')));
                 }
               },
               child: Text(logoBytes == null ? 'Add' : 'Change'),
@@ -270,7 +270,7 @@ class _AdminHomeState extends State<AdminHome> {
   Future<void> _endSupport(Map s) async {
     final ok = await showConfirmDialog(context,
       title: 'End support access?',
-      message: 'Shop ka data turant lock ho jayega. Session log me "ended" likha jayega.',
+      message: 'Shop data will be locked immediately. The session will be marked as ended in the access log.',
       confirmLabel: 'End access',
       cancelLabel: 'Keep open',
       icon: Icons.lock_outline);
@@ -360,7 +360,7 @@ class _AdminHomeState extends State<AdminHome> {
                   Icon(Icons.lock_outline, size: 18, color: c.textSecondary),
                   const SizedBox(width: Space.x12),
                   Expanded(child: Text(
-                      'Shop ka stock, IMEI, sales, profit aur customer details aapko yahan nahi dikhte. Zaroorat par reason ke saath temporary, read-only support access lein — wo shop ke log me dikhega.',
+                      'Shop inventory, IMEI numbers, sales, profit, and customer details are not visible here. If needed, request temporary, read-only support access with a reason. The session will appear in the shop access log.',
                       style: context.type.bodySmall?.copyWith(color: c.textSecondary))),
                 ])),
                 const SizedBox(height: Space.section),
@@ -550,7 +550,7 @@ class _ShopSheet extends StatelessWidget {
             Row(children: [
               Icon(Icons.lock_outline, size: 16, color: c.textSecondary),
               const SizedBox(width: Space.x8),
-              Expanded(child: Text('Shop data aur full contact ke liye support access zaroori hai.',
+              Expanded(child: Text('Support access is required to view shop data and full contact details.',
                   style: t.bodySmall?.copyWith(color: c.textSecondary))),
             ]),
           ],

@@ -5,7 +5,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../api.dart';
 
-/// Phone box / *#06# screen ka barcode scan karke IMEI laata hai.
+/// Scans the barcode on a phone box or the *#06# screen to read its IMEI.
 ///
 /// The controller is deliberately `autoStart: false`: starting it manually while
 /// MobileScanner also auto-starts causes two overlapping CameraX start calls and
@@ -39,7 +39,8 @@ class _ImeiScannerState extends State<ImeiScanner> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _subscribe();
-    unawaited(_start());
+    // Wait until MobileScanner has attached the controller before starting it.
+    WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) unawaited(_start()); });
   }
 
   void _subscribe() {
@@ -54,6 +55,7 @@ class _ImeiScannerState extends State<ImeiScanner> with WidgetsBindingObserver {
       await _camera.start();
     } catch (_) {
       // The controller publishes camera failures in MobileScannerState.error.
+      if (mounted) setState(() => _hint = 'Could not start the camera. Check camera permission and retry.');
     } finally {
       _starting = false;
     }
@@ -61,7 +63,7 @@ class _ImeiScannerState extends State<ImeiScanner> with WidgetsBindingObserver {
 
   Future<void> _restart() async {
     if (_starting) return;
-    await _camera.stop();
+    try { await _camera.stop(); } catch (_) { /* It may not have started yet. */ }
     _subscribe();
     await _start();
   }
@@ -74,7 +76,7 @@ class _ImeiScannerState extends State<ImeiScanner> with WidgetsBindingObserver {
       final imei = match.group(0)!;
       if (!validImei(imei)) {
         // A 15-digit number that fails the Luhn check is a false read.
-        if (mounted) setState(() => _hint = 'Barcode mila, par IMEI sahi nahi hai: $imei');
+        if (mounted) setState(() => _hint = 'Barcode found, but the IMEI is invalid: $imei');
         continue;
       }
       _done = true;
@@ -109,7 +111,7 @@ class _ImeiScannerState extends State<ImeiScanner> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('IMEI scan karein')),
+      appBar: AppBar(title: const Text('Scan IMEI')),
       body: Stack(children: [
         Positioned.fill(child: MobileScanner(controller: _camera)),
         Positioned.fill(
@@ -139,14 +141,14 @@ class _ImeiScannerState extends State<ImeiScanner> with WidgetsBindingObserver {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: Column(mainAxisSize: MainAxisSize.min, children: [
                 Text(
-                  _hint ?? 'Phone ke box ya *#06# screen ke 15-digit barcode par camera rakhein',
+                  _hint ?? 'Point the camera at the 15-digit barcode on the phone box or *#06# screen',
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: Colors.white),
                 ),
                 const SizedBox(height: 6),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel / manually likhein', style: TextStyle(color: Colors.white)),
+                  child: const Text('Cancel / enter manually', style: TextStyle(color: Colors.white)),
                 ),
               ]),
             ),
@@ -175,8 +177,8 @@ class _CameraProblem extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               denied
-                  ? 'Camera permission chahiye.\nPhone ki Settings > Apps > Vktrix Mobile me camera allow karke wapas aayein.'
-                  : 'Camera start nahi ho paya (${error.errorCode.name}).',
+                  ? 'Camera permission is required.\nGo to Settings > Apps > Vktrix Mobile, allow camera access, then return here.'
+                  : 'Could not start the camera (${error.errorCode.name}).',
               textAlign: TextAlign.center,
               style: const TextStyle(color: Colors.white),
             ),
@@ -188,7 +190,7 @@ class _CameraProblem extends StatelessWidget {
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('IMEI manually likhein', style: TextStyle(color: Colors.white)),
+              child: const Text('Enter IMEI manually', style: TextStyle(color: Colors.white)),
             ),
           ]),
         ),
