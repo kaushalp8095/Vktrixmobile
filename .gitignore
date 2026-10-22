@@ -9,4 +9,6 @@ local.properties
 .idea/
 *.iml
 app/test/failures/
+# Golden diff output is written next to the goldens it compared (app/goldens/).
+app/failures/
 keystore/
