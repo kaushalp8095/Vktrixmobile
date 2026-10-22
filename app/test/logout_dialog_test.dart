@@ -6,8 +6,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_shop/api.dart';
 import 'package:mobile_shop/design/components/components.dart';
 import 'package:mobile_shop/design/design.dart';
-import 'package:mobile_shop/screens/common.dart';
 import 'package:mobile_shop/screens/admin_home.dart';
+import 'package:mobile_shop/screens/buy_form.dart';
+import 'package:mobile_shop/screens/common.dart';
 import 'package:mobile_shop/screens/login.dart';
 import 'package:mobile_shop/screens/profile.dart';
 import 'package:mobile_shop/screens/shop_home.dart';
@@ -120,8 +121,11 @@ void main() {
 
     await tester.tap(find.text('Buy').first);
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
-    expect(find.textContaining('support mode me band hai'), findsWidgets);
+    await tester.pump(const Duration(milliseconds: 400));   // page transition
+    // Buy tab support mode me write form ki jagah read-only note dikhata hai.
+    expect(find.text('Buy is unavailable in support mode'), findsOneWidget);
+    expect(find.textContaining('Support access is read-only'), findsOneWidget);
+    expect(find.byType(BuyForm), findsNothing, reason: 'support mode must never show the write form');
 
     Api.endSupport();
     await tester.pumpWidget(const SizedBox());
