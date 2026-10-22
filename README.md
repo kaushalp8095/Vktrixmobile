@@ -136,7 +136,21 @@ Isse purane deployment par kaam nahi rukta: agar kisi ko support chahiye, wo 15 
 
 ### IMEI scanner `genericError` fix
 
-`mobile_scanner` controller ab `autoStart: false` hai. Pehle widget auto-start aur screen ka manual `start()` ek saath CameraX ko start karte the, jis se kuch Android phones par `genericError` aata tha. Ab camera ka ek hi lifecycle owner hai, overlapping starts guard hote hain aur newer Android camera selector rear-camera variants handle karta hai.
+Android par `mobile_scanner` har camera failure ko ek hi code me bhejta hai: **`genericError`**. Asli wajah `errorDetails.message` me hoti hai (plugin 5.2.3 me `start()` throw nahi karta, `value.error` set karta hai) — wo message hi screen par dikhta hai:
+
+| Platform message | Matlab |
+| --- | --- |
+| `No camera found or failed to open camera!` | CameraX `bindToLifecycle` fail — camera kisi aur app ne pakda hua hai, ya pichla bind adhoora hai |
+| `Error occurred when setting up camera!` | `ProcessCameraProvider` hi nahi mila (service failure / OEM ROM) |
+| `Called start() while already started` | do start calls overlap ho gayi |
+
+Isliye ab teen cheezein guarantee hain:
+
+1. **Ek hi owner aur ek hi line:** screen camera ke saare `start()`/`stop()` ek hi `CameraTaskQueue` se bhejti hai. `stop()` apna `isRunning` platform call se pehle false karta hai, isliye bina queue ke `resumed` ka `start()` unbind ke beech me bind kar deta tha — yahi "No camera found" ka sabse aam kaaran hai.
+2. **Permission dialog camera release nahi karta:** `inactive`/`hidden` par camera chalta rehta hai; release sirf `paused`/`detached` par. Pehle permission popup aate hi stop() chala jata tha.
+3. **Retry sach me naya attempt hai:** purana controller native side par adhoora (leaked listeners, half-bound camera) chhod deta hai, isliye Retry controller dispose karke naya banata hai. Ek `genericError` par ek automatic retry (700ms baad) bhi hota hai, kyunki busy sensor tab tak free ho jata hai.
+
+Note: `useNewCameraSelector` 5.2.3 me sirf resolution selector badalta hai, aur tabhi jab `cameraResolution` di ho — IMEI scan me uska koi role nahi, isliye hata diya. Agar phir bhi camera na khule to `adb logcat | grep -iE "camera|camerax|mobile_scanner"` me CameraX ki asli exception dekhein; screen par dikhne wala detail line bhi wahi batata hai.
 
 #### ⚠️ Free TAC catalog ki limitations (zaroor padhein)
 - **Data adhoora hai:** Osmocom me bahut se naye aur India-only models (Redmi/Realme/Poco/Vivo ke naye variants) **nahi** hain. Isliye extended catalog bhi hai; phir bhi bilkul naya model pehli baar manually bhar na pade — uske baad app khud seekh lega.

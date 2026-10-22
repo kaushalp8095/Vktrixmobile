@@ -1,3 +1,13 @@
+// IMEI SCANNER: phone box ka barcode ya *#06# screen se 15-digit IMEI.
+//
+// Camera ka lifecycle owner sirf yahi screen hai: controller `autoStart: false`
+// hai aur MobileScanner widget external controller milne par khud start/stop
+// nahi karta (5.2.3 me `didChangeAppLifecycleState` turant return karta hai).
+//
+// Android par mobile_scanner har camera failure ko ek hi `genericError` me
+// bhejta hai; asli wajah (CameraX exception) `errorDetails.message` me hoti hai.
+// Isliye UI usi ko dikhata hai aur logcat/support ke liye poora exception print
+// hota hai — warna "genericError" ke sivay kuch pata nahi chalta.
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -5,19 +15,78 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../api.dart';
 
-/// Scans the barcode on a phone box or the *#06# screen to read its IMEI.
+/// Camera ke saare platform calls ek hi line me chalte hain.
 ///
-/// The controller is deliberately `autoStart: false`: starting it manually while
-/// MobileScanner also auto-starts causes two overlapping CameraX start calls and
-/// surfaces as `genericError` on Android. One owner now controls start/stop, and
-/// the newer CameraX selector handles devices with unusual rear-camera layouts.
-/// Kept as a small public factory so a regression test can guarantee that the
-/// widget and this screen never both auto-start the same camera again.
+/// `MobileScannerController.stop()` apna `isRunning` platform call se *pehle*
+/// false kar deta hai. Bina queue ke, `resumed` par bheja gaya `start()` us
+/// stop ke beech me ghus kar CameraX ko unbind ke dauran bind kar deta hai —
+/// Vivo/FunTouch aur MIUI jaise skins usi par "No camera found or failed to
+/// open camera!" dete hain (Dart me `genericError`). Isi tarah `Retry` bhi
+/// pehle wale stop ke saath race karta tha.
+class CameraTaskQueue {
+  Future<void> _tail = Future<void>.value();
+
+  /// [task] ko pehle queue hue kaam ke khatam hone ke baad chalata hai.
+  Future<void> run(Future<void> Function() task) {
+    final next = _tail.then((_) => task());
+    // Ek fail hua kaam queue ko hamesha ke liye band nahi karta.
+    _tail = next.catchError((Object _) {});
+    return next;
+  }
+}
+
+/// Sirf tab camera chhodein jab app sach me peeche chala gaya ho.
+///
+/// `inactive`/`hidden` tab bhi aate hain jab camera permission dialog ya koi
+/// system dialog upar khula ho — us waqt camera release karna hi upar likhe
+/// race ki shuruaat thi.
+bool shouldReleaseCameraFor(AppLifecycleState state) =>
+    state == AppLifecycleState.paused || state == AppLifecycleState.detached;
+
+/// `genericError` ke andar chhupi asli wajah ko user ke liye padhne layak banata hai.
+String cameraProblemMessage(MobileScannerException error) {
+  if (error.errorCode == MobileScannerErrorCode.permissionDenied) {
+    return 'Camera permission is blocked.\n\n'
+        'Open Settings > Apps > Vktrix Mobile > Permissions, allow Camera, then tap Retry.';
+  }
+  final details = (error.errorDetails?.message ?? '').toLowerCase();
+  if (details.contains('already started')) {
+    return 'The camera was already starting. Tap Retry.';
+  }
+  if (details.contains('no camera')) {
+    return 'The camera could not be opened — it is busy or the phone did not '
+        'release it.\n\nClose other apps that use the camera (including the '
+        'system Camera app), then tap Retry.';
+  }
+  if (details.contains('setting up camera')) {
+    return 'The camera service did not start. Close other camera apps and tap '
+        'Retry, or restart the app if it keeps happening.';
+  }
+  return 'The camera could not be started (${error.errorCode.name}).\n\n'
+      'Tap Retry, or enter the IMEI manually.';
+}
+
+/// Platform ka technical message (support/logcat ke liye), warna null.
+String? cameraProblemDetail(MobileScannerException error) {
+  final message = error.errorDetails?.message;
+  return (message == null || message.trim().isEmpty) ? null : message;
+}
+
+/// `genericError` aksar ek busy/failed CameraX bind hota hai jo agle attempt me
+/// saaf ho jata hai; permission denial ya disposed controller dobara try karne
+/// se theek nahi hote.
+bool isTransientCameraProblem(MobileScannerException error) =>
+    error.errorCode == MobileScannerErrorCode.genericError;
+
+/// Camera controller. `autoStart: false` — start/stop ka owner ye screen hai.
+///
+/// `useNewCameraSelector` jaan-boojh kar nahi set: 5.2.3 me wo sirf resolution
+/// selector badalta hai aur tabhi kaam karta hai jab `cameraResolution` di ho.
+/// IMEI scan ke liye camera select karne me iska koi role nahi hai.
 MobileScannerController createImeiScannerController() => MobileScannerController(
   autoStart: false,
   detectionSpeed: DetectionSpeed.noDuplicates,
   facing: CameraFacing.back,
-  useNewCameraSelector: true,
 );
 
 class ImeiScanner extends StatefulWidget {
@@ -28,10 +97,15 @@ class ImeiScanner extends StatefulWidget {
 }
 
 class _ImeiScannerState extends State<ImeiScanner> with WidgetsBindingObserver {
-  final MobileScannerController _camera = createImeiScannerController();
+  final CameraTaskQueue _queue = CameraTaskQueue();
+  MobileScannerController _camera = createImeiScannerController();
   StreamSubscription<BarcodeCapture>? _subscription;
   bool _done = false;
-  bool _starting = false;
+  /// Retry ke waqt purana controller tree se hata kar naya lagaya jata hai.
+  bool _rebuilding = false;
+  /// Ek hi automatic retry, warna fail hote rahne par loop ban jayega.
+  bool _autoRetried = false;
+  int _generation = 0;
   String? _hint;
 
   @override
@@ -39,33 +113,93 @@ class _ImeiScannerState extends State<ImeiScanner> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _subscribe();
-    // Wait until MobileScanner has attached the controller before starting it.
-    WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) unawaited(_start()); });
+    // Pehla frame: MobileScanner tree me aa jaye, phir camera start karein.
+    WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) unawaited(_startCamera()); });
   }
 
   void _subscribe() {
-    if (_subscription != null) return;
+    if (_subscription != null || _done) return;
     _subscription = _camera.barcodes.listen(_onBarcodes);
   }
 
-  Future<void> _start() async {
-    if (_done || _starting || _camera.value.isRunning) return;
-    _starting = true;
+  Future<void> _startCamera() => _queue.run(_startCameraNow);
+
+  Future<void> _startCameraNow() async {
+    final camera = _camera;
+    if (_done || !mounted || camera.value.isRunning) return;
     try {
-      await _camera.start();
-    } catch (_) {
-      // The controller publishes camera failures in MobileScannerState.error.
-      if (mounted) setState(() => _hint = 'Could not start the camera. Check camera permission and retry.');
-    } finally {
-      _starting = false;
+      // 5.2.3 me start() camera errors throw nahi karta — wo state.error me aate hain.
+      await camera.start();
+    } catch (e) {
+      // Screen band hone ke baad controllerDisposed aa sakta hai; baaki failures
+      // state.error se aate hain.
+      debugPrint('IMEI scanner: start() threw -> $e');
+      return;
     }
+    if (!mounted || _done || !identical(camera, _camera)) return;
+    final error = camera.value.error;
+    if (error == null) {
+      _autoRetried = false;
+      return;
+    }
+    debugPrint('IMEI scanner: camera start failed -> $error; detail: ${cameraProblemDetail(error)}');
+    // Busy sensor aksar agle attempt tak free ho jata hai. Ek baar khud try
+    // karein (naye controller ke saath), uske baad UI ko batayein.
+    if (_autoRetried || !isTransientCameraProblem(error)) return;
+    _autoRetried = true;
+    await Future<void>.delayed(const Duration(milliseconds: 700));
+    if (!mounted || _done) return;
+    await _replaceCamera();
+    await _startCameraNow();
   }
 
-  Future<void> _restart() async {
-    if (_starting) return;
-    try { await _camera.stop(); } catch (_) { /* It may not have started yet. */ }
+  /// User ne Retry dabaya: purana controller native side par adhoora pada reh
+  /// sakta hai (leaked listeners, half-bound camera), isliye naya banate hain.
+  Future<void> _retry() async {
+    _autoRetried = false;
+    if (mounted) setState(() => _hint = null);
+    await _queue.run(() async {
+      if (!mounted || _done) return;
+      await _replaceCamera();
+      await _startCameraNow();
+    });
+  }
+
+  /// Purana controller dispose karke naya lagata hai.
+  ///
+  /// Beech me ek frame chahiye: `ValueListenableBuilder`/`MobileScanner` ko
+  /// tree se hatne ka mauka mile, tabhi disposed controller par listener
+  /// remove karne ka assert nahi lagta.
+  Future<void> _replaceCamera() async {
+    final previous = _camera;
+    await _subscription?.cancel();
+    _subscription = null;
+    if (mounted) setState(() => _rebuilding = true);
+    await _nextFrame();
+    try {
+      // Native camera yahan release hota hai; fail ho to bhi naya controller
+      // lagana chahiye.
+      await previous.dispose();
+    } catch (e) {
+      debugPrint('IMEI scanner: dispose failed -> $e');
+    }
+    if (!mounted) return;
+    setState(() {
+      _camera = createImeiScannerController();
+      _generation++;
+      _rebuilding = false;
+    });
     _subscribe();
-    await _start();
+  }
+
+  /// Agla frame, maximum 2 second — app background me ho to frame aane tak
+  /// camera queue atakni nahi chahiye.
+  Future<void> _nextFrame() {
+    final binding = WidgetsBinding.instance;
+    final done = Completer<void>();
+    binding.addPostFrameCallback((_) { if (!done.isCompleted) done.complete(); });
+    binding.ensureVisualUpdate();
+    return done.future.timeout(const Duration(seconds: 2), onTimeout: () {});
   }
 
   void _onBarcodes(BarcodeCapture capture) {
@@ -91,20 +225,31 @@ class _ImeiScannerState extends State<ImeiScanner> with WidgetsBindingObserver {
     if (_done) return;
     if (state == AppLifecycleState.resumed) {
       _subscribe();
-      unawaited(_start());
+      unawaited(_startCamera());
       return;
     }
-    // Release the camera while backgrounded.
-    unawaited(_subscription?.cancel());
-    _subscription = null;
-    unawaited(_camera.stop());
+    // Permission dialog/chhoti interruptions par camera chalta rehna chahiye.
+    if (!shouldReleaseCameraFor(state)) return;
+    final camera = _camera;
+    unawaited(_queue.run(() async {
+      await _subscription?.cancel();
+      _subscription = null;
+      try {
+        await camera.stop();
+      } catch (e) {
+        debugPrint('IMEI scanner: stop failed -> $e');
+      }
+    }));
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _done = true;
     unawaited(_subscription?.cancel());
-    unawaited(_camera.dispose());
+    unawaited(_camera.dispose().catchError((Object e) {
+      debugPrint('IMEI scanner: dispose failed -> $e');
+    }));
     super.dispose();
   }
 
@@ -113,23 +258,7 @@ class _ImeiScannerState extends State<ImeiScanner> with WidgetsBindingObserver {
     return Scaffold(
       appBar: AppBar(title: const Text('Scan IMEI')),
       body: Stack(children: [
-        Positioned.fill(child: MobileScanner(controller: _camera)),
-        Positioned.fill(
-          child: ValueListenableBuilder<MobileScannerState>(
-            valueListenable: _camera,
-            builder: (context, state, _) {
-              final error = state.error;
-              if (error != null) return _CameraProblem(error: error, onRetry: _restart);
-              if (!state.isInitialized) {
-                return const ColoredBox(
-                  color: Colors.black,
-                  child: Center(child: CircularProgressIndicator()),
-                );
-              }
-              return const SizedBox.shrink();
-            },
-          ),
-        ),
+        Positioned.fill(child: _cameraLayer()),
         Positioned(
           left: 20, right: 20, bottom: 28,
           child: DecoratedBox(
@@ -157,6 +286,35 @@ class _ImeiScannerState extends State<ImeiScanner> with WidgetsBindingObserver {
       ]),
     );
   }
+
+  Widget _cameraLayer() {
+    if (_rebuilding) {
+      return const ColoredBox(
+        color: Colors.black,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    final camera = _camera;
+    return Stack(children: [
+      Positioned.fill(child: MobileScanner(key: ValueKey('imei-camera-$_generation'), controller: camera)),
+      Positioned.fill(
+        child: ValueListenableBuilder<MobileScannerState>(
+          valueListenable: camera,
+          builder: (context, state, _) {
+            final error = state.error;
+            if (error != null) return _CameraProblem(error: error, onRetry: _retry);
+            if (!state.isInitialized) {
+              return const ColoredBox(
+                color: Colors.black,
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    ]);
+  }
 }
 
 class _CameraProblem extends StatelessWidget {
@@ -166,22 +324,34 @@ class _CameraProblem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final denied = error.errorCode == MobileScannerErrorCode.permissionDenied;
+    final detail = cameraProblemDetail(error);
     return ColoredBox(
       color: Colors.black,
       child: Center(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(28),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.no_photography_outlined, color: Colors.white, size: 48),
+            Icon(
+              error.errorCode == MobileScannerErrorCode.permissionDenied
+                  ? Icons.no_photography_outlined
+                  : Icons.photo_camera_back_outlined,
+              color: Colors.white, size: 48),
             const SizedBox(height: 16),
             Text(
-              denied
-                  ? 'Camera permission is required.\nGo to Settings > Apps > Vktrix Mobile, allow camera access, then return here.'
-                  : 'Could not start the camera (${error.errorCode.name}).',
+              cameraProblemMessage(error),
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white),
+              style: const TextStyle(color: Colors.white, height: 1.35),
             ),
+            if (detail != null) ...[
+              const SizedBox(height: 12),
+              // Asli platform message: support ko screenshot bhejne par wajah
+              // turant pata chalti hai, andaaza nahi lagana padta.
+              Text(
+                detail,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white60, fontSize: 12),
+              ),
+            ],
             const SizedBox(height: 20),
             FilledButton.icon(
               onPressed: () => onRetry(),
