@@ -300,7 +300,7 @@ class _IdTypeDropdown extends StatelessWidget {
   const _IdTypeDropdown({required this.value, required this.onChanged});
   @override
   Widget build(BuildContext context) => DropdownButtonFormField<String>(
-    value: value, decoration: const InputDecoration(labelText: 'ID proof'),
+    initialValue: value, decoration: const InputDecoration(labelText: 'ID proof'),
     items: const ['Aadhaar', 'PAN', 'Voter ID', 'Driving Licence', 'Visiting Card']
       .map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
     onChanged: onChanged,
