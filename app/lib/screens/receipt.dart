@@ -68,10 +68,10 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
     try {
       final result = await PdfActions.savePdf(_pdf!, _fileName);
       if (mounted && result != 'cancelled') {
-        toast(context, result == 'shared' ? 'Save location choose karein' : 'PDF save ho gayi');
+        toast(context, result == 'shared' ? 'Choose a save location' : 'PDF saved');
       }
     } catch (e) {
-      if (mounted) toast(context, 'PDF save nahi hui: $e', err: true);
+      if (mounted) toast(context, 'Could not save the PDF: $e', err: true);
     } finally {
       if (mounted) setState(() => _actionBusy = false);
     }
@@ -85,8 +85,8 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
       if (!mounted) return;
       if (result == 'whatsapp_not_installed') {
         final fallback = await showDialog<bool>(context: context, builder: (d) => AlertDialog(
-          title: const Text('WhatsApp nahi mila'),
-          content: const Text('PDF ko kisi aur app se share karna hai?'),
+          title: const Text('WhatsApp is not available'),
+          content: const Text('Would you like to share the PDF using another app?'),
           actions: [
             TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
             FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Share PDF')),
@@ -97,7 +97,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
         }
       }
     } catch (e) {
-      if (mounted) toast(context, 'Share nahi ho paya: $e', err: true);
+      if (mounted) toast(context, 'Could not share: $e', err: true);
     } finally {
       if (mounted) setState(() => _actionBusy = false);
     }
@@ -121,7 +121,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
             padding: EdgeInsets.fromLTRB(Space.screen, top + 64 + Space.x8, Space.screen, bottom + Space.x16),
             child: _error != null
               ? Center(child: ErrorState(title: "Couldn't build PDF bill",
-                  message: 'Internet check karke dobara try karein.', onRetry: _load))
+                  message: 'Check your internet connection and try again.', onRetry: _load))
               : _pdf == null || _data == null
                 ? const Center(child: CircularProgressIndicator())
                 : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [

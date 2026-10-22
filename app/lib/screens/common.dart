@@ -27,7 +27,7 @@ void toast(BuildContext c, String m, {bool err = false}) => ScaffoldMessenger.of
 bool supportReadOnlyBlock(BuildContext c, String action) {
   if (!Api.supportReadOnly) return false;
   Haptics.error();
-  toast(c, 'Support mode read-only hai — $action shop owner khud karega.', err: true);
+  toast(c, 'Support mode is read-only. The shop owner must $action.', err: true);
   return true;
 }
 
@@ -68,7 +68,7 @@ Widget field(TextEditingController c, String label,
       child: TextFormField(
         controller: c, keyboardType: type, maxLength: maxLength, onChanged: onChanged, obscureText: obscure,
         decoration: InputDecoration(labelText: required ? '$label *' : label, suffixIcon: suffix, counterText: ''),
-        validator: required ? (v) => (v == null || v.trim().isEmpty) ? '$label zaroori hai' : null : null,
+        validator: required ? (v) => (v == null || v.trim().isEmpty) ? '$label is required' : null : null,
       ),
     );
 

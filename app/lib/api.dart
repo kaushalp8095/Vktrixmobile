@@ -85,12 +85,17 @@ class Api {
     await p.setString('server', baseUrl);
   }
 
-  static Future<void> login(String u, String pw) async {
+  static Future<void> login(String u, String pw, {bool rememberMe = true}) async {
     final r = await post('/auth/login', {'username': u, 'password': pw});
     token = r['token']; user = r['user']; viewShopId = null;
     final p = await SharedPreferences.getInstance();
-    await p.setString('token', token!);
-    await p.setString('user', jsonEncode(user));
+    if (rememberMe) {
+      await p.setString('token', token!);
+      await p.setString('user', jsonEncode(user));
+    } else {
+      await p.remove('token');
+      await p.remove('user');
+    }
   }
 
   static bool get isSuperAdmin => user?['role'] == 'superadmin';

@@ -195,7 +195,7 @@ class _PhoneDetailSheet extends StatelessWidget {
             ),
             const SizedBox(height: Space.x8),
             if (readOnly)
-              const ReadOnlyNote(text: 'Support mode read-only hai — sell ya remove shop owner khud karega.')
+              const ReadOnlyNote(text: 'Support mode is read-only. Only the shop owner can sell or remove stock.')
             else ...[
               PrimaryButton(label: 'Sell this phone', icon: Icons.sell_outlined, onPressed: onSell),
               const SizedBox(height: Space.x12),

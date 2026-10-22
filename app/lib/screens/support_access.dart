@@ -122,7 +122,7 @@ class _StartSupportDialogState extends State<_StartSupportDialog> {
                     ])),
                   ]),
                   const SizedBox(height: Space.x16),
-                  Text('Shop data dekhne ke liye reason likhein. Access time-limited aur read-only hoga, aur shop owner ko app me dikhega.',
+                  Text('Enter a reason to view shop data. Access is time-limited and read-only, and will be visible to the shop owner in the app.',
                       style: t.bodyMedium?.copyWith(color: c.textSecondary)),
                   const SizedBox(height: Space.x16),
                   TextField(
@@ -151,11 +151,11 @@ class _StartSupportDialogState extends State<_StartSupportDialog> {
                     decoration: BoxDecoration(color: c.textPrimary.withValues(alpha: .04), borderRadius: Shapes.md,
                         border: Border.all(color: c.textPrimary.withValues(alpha: .08))),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      _SupportRule(icon: Icons.visibility_off_outlined, text: 'Read-only — shop ka koi data badla nahi ja sakta.'),
+                      _SupportRule(icon: Icons.visibility_off_outlined, text: 'Read-only — shop data cannot be changed.'),
                       const SizedBox(height: Space.x8),
-                      _SupportRule(icon: Icons.timer_outlined, text: 'Time khatam hone par access khud band ho jata hai.'),
+                      _SupportRule(icon: Icons.timer_outlined, text: 'Access ends automatically when the time limit expires.'),
                       const SizedBox(height: Space.x8),
-                      _SupportRule(icon: Icons.receipt_long_outlined, text: 'Shop owner ko app me access log dikhta hai (reason ke saath).'),
+                      _SupportRule(icon: Icons.receipt_long_outlined, text: 'The shop owner can see the access log and its reason in the app.'),
                     ]),
                   ),
                 ]),
@@ -260,7 +260,7 @@ class _SupportLogBodyState extends State<SupportLogBody> {
     }
     if (items.isEmpty) {
       return const GlassCard(blur: false, child: EmptyState(icon: Icons.shield_outlined, title: 'No support access yet',
-          message: 'Jab Vktrix support shop ka data kholta hai, uska reason yahan dikhta hai.'));
+          message: 'When Vktrix Support views shop data, the reason is shown here.'));
     }
     final tiles = [
       for (final item in items)
@@ -383,7 +383,7 @@ class _SupportAccessLogScreenState extends State<SupportAccessLogScreen> {
               Icon(Icons.shield_outlined, size: 20, color: context.colors.brandInk),
               const SizedBox(width: Space.x12),
               Expanded(child: Text(
-                  'Super Admin ke paas shop data ka default access nahi hai. Har session reason ke saath, time-limited aur read-only hoti hai — shop owner yahi log apni app me dekhta hai.',
+                  'Super Admins do not have default access to shop data. Every session is reason-based, time-limited, and read-only. Shop owners can view this log in their app.',
                   style: context.type.bodySmall?.copyWith(color: context.colors.textSecondary))),
             ])),
             const SizedBox(height: Space.section),

@@ -1,7 +1,12 @@
 // SELL FORM: phone summary → live profit calc → customer + payment → confirm.
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../api.dart';
+import '../documents/document_photo.dart';
 import '../design/components/components.dart';
 import '../design/design.dart';
 import 'common.dart';
@@ -20,7 +25,9 @@ class _SellFormState extends State<SellForm> {
   final _scroll = ScrollController();
   final price = TextEditingController(), received = TextEditingController(), name = TextEditingController(),
       mob = TextEditingController(), addr = TextEditingController(), warranty = TextEditingController(), notes = TextEditingController();
-  String pay = 'Cash';
+  String pay = 'Cash', idType = 'Aadhaar';
+  final List<Uint8List?> _idPhotos = [null, null];
+  int? _pickingSide;
   DateTime date = DateTime.now();
   ButtonPhase _phase = ButtonPhase.idle;
   bool _receivedEdited = false;
@@ -43,19 +50,101 @@ class _SellFormState extends State<SellForm> {
   @override
   void dispose() { for (final c in [price, received, name, mob, addr, warranty, notes]) { c.dispose(); } _scroll.dispose(); super.dispose(); }
 
+  String _photoDataUrl(int side) => _idPhotos[side] == null
+      ? '' : 'data:image/jpeg;base64,${base64Encode(_idPhotos[side]!)}';
+
+  Future<void> _pickIdPhoto(int side) async {
+    if (_pickingSide != null || _phase == ButtonPhase.loading || _phase == ButtonPhase.success) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _pickingSide = side);
+    try {
+      final source = await showModalBottomSheet<ImageSource>(
+        context: context, showDragHandle: true,
+        builder: (sheet) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text('${side == 0 ? 'Front' : 'Back'} photo', style: context.type.titleMedium),
+          ListTile(leading: const Icon(Icons.photo_library_outlined), title: const Text('Choose from gallery'),
+            onTap: () => Navigator.pop(sheet, ImageSource.gallery)),
+          ListTile(leading: const Icon(Icons.photo_camera_outlined), title: const Text('Take a photo'),
+            onTap: () => Navigator.pop(sheet, ImageSource.camera)),
+          if (_idPhotos[side] != null) ListTile(leading: const Icon(Icons.delete_outline), title: const Text('Remove photo'),
+            onTap: () { setState(() => _idPhotos[side] = null); Navigator.pop(sheet); }),
+        ])),
+      );
+      if (source == null || !mounted) return;
+      final picked = await ImagePicker().pickImage(source: source, maxWidth: 2000, maxHeight: 2000,
+        imageQuality: 100, requestFullMetadata: false);
+      if (picked == null || !mounted) return;
+      if (await picked.length() > documentPhotoMaxInputBytes) {
+        throw const FormatException('Choose a photo smaller than 20 MB.');
+      }
+      final bytes = await prepareDocumentPhoto(await picked.readAsBytes());
+      if (mounted) setState(() => _idPhotos[side] = bytes);
+    } catch (_) {
+      if (mounted) toast(context, 'Could not process the photo. Please try a JPEG/PNG image or take a new photo.', err: true);
+    } finally {
+      if (mounted) setState(() => _pickingSide = null);
+    }
+  }
+
+  Widget _idProofSection() {
+    final c = context.colors, t = context.type;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      _IdTypeDropdown(value: idType, onChanged: (value) {
+        if (value != null) setState(() => idType = value);
+      }),
+      const SizedBox(height: Space.x12),
+      Row(children: [
+        Icon(Icons.verified_user_outlined, size: 20, color: c.brandInk),
+        const SizedBox(width: Space.x8),
+        Expanded(child: Text('Document photos', style: t.titleSmall)),
+        Text('${_idPhotos.whereType<Uint8List>().length}/2', style: t.labelLarge?.copyWith(color: c.brandInk)),
+      ]),
+      const SizedBox(height: Space.x4),
+      Text('Upload the front and back. One photo is also enough.', style: t.bodySmall?.copyWith(color: c.textSecondary)),
+      const SizedBox(height: Space.x8),
+      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Expanded(child: _idPhotoTile(0)), const SizedBox(width: Space.x12), Expanded(child: _idPhotoTile(1)),
+      ]),
+      const SizedBox(height: Space.x4),
+      Text('Photos are compressed automatically to about 100 KB. Clear text may require a larger file.',
+        style: t.bodySmall?.copyWith(color: c.textSecondary)),
+    ]);
+  }
+
+  Widget _idPhotoTile(int side) {
+    final c = context.colors, t = context.type, bytes = _idPhotos[side];
+    final name = side == 0 ? 'Front' : 'Back';
+    return Material(color: context.scheme.primary.withValues(alpha: .06),
+      shape: RoundedRectangleBorder(borderRadius: Shapes.md,
+        side: BorderSide(color: context.scheme.primary.withValues(alpha: bytes == null ? .2 : .5))),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(onTap: _pickingSide == null ? () => _pickIdPhoto(side) : null,
+        child: Padding(padding: const EdgeInsets.all(Space.x12), child: Column(children: [
+          SizedBox(height: 64, child: _pickingSide == side
+            ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+            : bytes == null ? Icon(side == 0 ? Icons.badge_outlined : Icons.flip_to_back_rounded, color: c.brandInk, size: 30)
+            : Image.memory(bytes, fit: BoxFit.contain)),
+          const SizedBox(height: Space.x4),
+          Text('$name photo', style: t.labelLarge),
+          Text(bytes == null ? 'Tap to upload' : '${(bytes.length / 1024).ceil()} KB · Change',
+            textAlign: TextAlign.center, style: t.bodySmall?.copyWith(color: c.brandInk)),
+        ]))));
+  }
+
   Future<void> _save() async {
-    if (supportReadOnlyBlock(context, 'Selling a phone')) return;
+    if (_pickingSide != null || supportReadOnlyBlock(context, 'Selling a phone')) return;
     FocusScope.of(context).unfocus();
     if (!_form.currentState!.validate()) return;
     setState(() => _phase = ButtonPhase.loading);
     final paymentCode = switch (pay) {
-      'UPI' => 'upi', 'Card' => 'card', 'Bank' => 'bank', 'Udhaar' => 'credit', _ => 'cash',
+      'UPI' => 'upi', 'Card' => 'card', 'Bank' => 'bank', 'Credit' => 'credit', _ => 'cash',
     };
     final body = {
       'phone_id': widget.phone['id'], 'sell_price': price.text, 'sell_date': DateFormat('yyyy-MM-dd').format(date),
       'customer_name': name.text, 'customer_phone': mob.text, 'customer_address': addr.text,
       'payment_mode': paymentCode, 'amount_received': received.text.isEmpty ? '0' : received.text,
-      'warranty': warranty.text, 'notes': notes.text,
+      'warranty': warranty.text, 'notes': notes.text, 'customer_id_type': idType,
+      'customer_id_photo': _photoDataUrl(0), 'customer_id_photo_back': _photoDataUrl(1),
     };
     try {
       int? saleId;
@@ -158,7 +247,7 @@ class _SellFormState extends State<SellForm> {
                     if (v == null) return;
                     setState(() {
                       pay = v;
-                      if (v == 'Udhaar') {
+                      if (v == 'Credit') {
                         _receivedEdited = true;
                         received.text = '0';
                       }
@@ -173,7 +262,7 @@ class _SellFormState extends State<SellForm> {
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   textInputAction: TextInputAction.next,
                   onChanged: (_) => _receivedEdited = true,
-                  helper: 'Full, partial ya 0 — baki amount Udhaar ledger mein rahega.',
+                  helper: 'Enter the full amount, a partial amount, or 0. Any balance will remain in the payment ledger.',
                   validator: (v) {
                     final amount = num.tryParse(v ?? '');
                     if (amount == null || amount < 0) return 'Enter 0 or a valid received amount';
@@ -185,6 +274,8 @@ class _SellFormState extends State<SellForm> {
                 _PaymentSummary(total: _saleAmount, received: _receivedAmount, balance: _balance),
                 const SizedBox(height: Space.x12),
                 GlassTextField(controller: addr, label: 'Address (optional)'),
+                const SizedBox(height: Space.x12),
+                _idProofSection(),
                 const SizedBox(height: Space.x12),
                 Row(children: [
                   Expanded(child: GlassTextField(controller: warranty, label: 'Warranty (e.g. 7 days)', textInputAction: TextInputAction.next)),
@@ -201,6 +292,19 @@ class _SellFormState extends State<SellForm> {
       ])),
     );
   }
+}
+
+class _IdTypeDropdown extends StatelessWidget {
+  final String value;
+  final ValueChanged<String?> onChanged;
+  const _IdTypeDropdown({required this.value, required this.onChanged});
+  @override
+  Widget build(BuildContext context) => DropdownButtonFormField<String>(
+    initialValue: value, decoration: const InputDecoration(labelText: 'ID proof'),
+    items: const ['Aadhaar', 'PAN', 'Voter ID', 'Driving Licence', 'Visiting Card']
+      .map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
+    onChanged: onChanged,
+  );
 }
 
 class _PaymentSummary extends StatelessWidget {
@@ -225,7 +329,7 @@ class _PaymentSummary extends StatelessWidget {
           Icon(paid ? Icons.check_circle_outline : Icons.account_balance_wallet_outlined,
             size: 20, color: paid ? c.successInk : balance > 0 ? c.warningInk : c.brandInk),
           const SizedBox(width: Space.x8),
-          Expanded(child: Text(paid ? 'Payment complete' : partial ? 'Partial payment' : 'Udhaar / payment pending',
+          Expanded(child: Text(paid ? 'Payment complete' : partial ? 'Partial payment' : 'Credit / payment pending',
             style: t.titleSmall)),
           StatusChip(label: paid ? 'PAID' : '${rs(balance)} DUE', tone: paid ? ChipTone.success : ChipTone.warning),
         ]),
@@ -268,7 +372,7 @@ class _PayDropdown extends StatelessWidget {
       child: DropdownButtonHideUnderline(child: DropdownButton<String>(
         value: value, isExpanded: true, dropdownColor: context.scheme.surface,
         style: context.type.bodyLarge?.copyWith(color: c.textPrimary),
-        items: const ['Cash', 'UPI', 'Card', 'Bank', 'Udhaar'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+        items: const ['Cash', 'UPI', 'Card', 'Bank', 'Credit'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
         onChanged: (v) { Haptics.tick(); onChanged(v); },
       )),
     );

@@ -121,6 +121,9 @@ function saleData(b) {
     sell_date: date(b.sell_date || today(), 'sell_date'),
     payment_mode: choice(b.payment_mode, 'payment_mode', ['cash', 'upi', 'card', 'bank', 'credit', 'emi']) || 'cash' };
   for (const k of ['customer_name', 'customer_address', 'warranty', 'notes']) out[k] = text(b[k], k, { max: k === 'notes' ? 5000 : 255 });
+  out.customer_id_type = choice(b.customer_id_type, 'customer_id_type', ID_TYPES);
+  out.customer_id_photo = idPhoto(b.customer_id_photo, 'customer_id_photo');
+  out.customer_id_photo_back = idPhoto(b.customer_id_photo_back, 'customer_id_photo_back');
   out.customer_phone = mobile(b.customer_phone, 'customer_phone');
   // Old clients did not send amount_received and treated a sale as fully paid.
   // A credit sale remains unpaid by default; new clients always send this field.

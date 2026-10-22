@@ -91,7 +91,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
               SectionHeader(title: _status == 'pending' ? 'Payment pending' : _status == 'paid' ? 'Completed' : 'All sales'),
               const SizedBox(height: Space.x12),
               if (_error != null)
-                ErrorState(title: "Couldn't load payment ledger", message: 'Internet check karke pull to retry karein.', onRetry: _load)
+                ErrorState(title: "Couldn't load payment ledger", message: 'Check your internet connection, then pull to retry.', onRetry: _load)
               else if (data == null)
                 GlassCard(blur: false, child: Shimmer(child: Column(children: List.generate(4, (_) => const SkeletonListTile()))))
               else if (items.isEmpty)
@@ -99,8 +99,8 @@ class _LedgerScreenState extends State<LedgerScreen> {
                   icon: _status == 'pending' ? Icons.verified_outlined : Icons.receipt_long_outlined,
                   title: _status == 'pending' ? 'No pending payments' : 'No payments here',
                   message: _status == 'pending'
-                    ? 'Sab customer payments clear hain. Partial ya udhaar sale yahan automatically dikhegi.'
-                    : 'Filter badal kar dusri entries dekhein.',
+                    ? 'All customer payments are clear. Partial or credit sales will appear here automatically.'
+                    : 'Change the filter to view other entries.',
                 ))
               else
                 GlassCard(blur: false, padding: EdgeInsets.zero, child: Column(children: [
@@ -111,13 +111,13 @@ class _LedgerScreenState extends State<LedgerScreen> {
                 ])),
               if (items.isNotEmpty) ...[
                 const SizedBox(height: Space.x12),
-                Text('Sale kholkar partial payment add karein, history dekhein ya WhatsApp reminder bhejein.',
+                Text('Open a sale to add a partial payment, view its history, or send a WhatsApp reminder.',
                   style: t.bodySmall?.copyWith(color: c.textSecondary), textAlign: TextAlign.center),
               ],
             ],
           ),
         ),
-        Positioned(top: 0, left: 0, right: 0, child: GlassTopBar(title: 'Udhaar ledger', scroll: _scroll,
+        Positioned(top: 0, left: 0, right: 0, child: GlassTopBar(title: 'Credit ledger', scroll: _scroll,
           actions: [GlassIconButton(icon: Icons.refresh, semanticLabel: 'Refresh ledger', onPressed: _load)])),
       ])),
     );
@@ -145,7 +145,7 @@ class _LedgerHero extends StatelessWidget {
           child: Icon(Icons.account_balance_wallet_outlined, color: c.warningInk)),
         const SizedBox(width: Space.x12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Total payment baki', style: t.labelLarge?.copyWith(color: c.textSecondary)),
+          Text('Total payment outstanding', style: t.labelLarge?.copyWith(color: c.textSecondary)),
           Text(rs(summary['outstanding']), style: t.headlineMedium?.copyWith(color: c.warningInk)),
         ])),
         StatusChip(label: '${summary['pending_count'] ?? 0} pending', tone: ChipTone.warning),
@@ -299,7 +299,7 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen> {
     return [
       'Namaste${customer.isEmpty ? '' : ' $customer'},',
       '',
-      '${shop['name'] ?? 'Mobile shop'} se payment reminder:',
+      'Payment reminder from ${shop['name'] ?? 'Mobile shop'}:',
       'Bill: ${sale['number'] ?? ''}',
       if (device.isNotEmpty) 'Phone: $device',
       'IMEI: ${sale['imei'] ?? ''}',
@@ -307,7 +307,7 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen> {
       'Received: ${rs(sale['paid_amount'])}',
       'Balance due: ${rs(sale['balance_due'])}',
       '',
-      'Kripya baki payment clear kar dein. Payment kar chuke hain to is message ko ignore karein.',
+      'Please clear the outstanding balance. If you have already paid, please ignore this message.',
       if ('${shop['phone'] ?? ''}'.trim().isNotEmpty) 'Contact: ${shop['phone']}',
       '— ${shop['name'] ?? 'Thank you'}',
     ].join('\n');
@@ -324,7 +324,7 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen> {
         if (result == 'unsupported' && mounted) toast(context, 'Reminder sharing is available on the Android app.', err: true);
       }
     } catch (e) {
-      if (mounted) toast(context, 'Reminder share nahi hua: $e', err: true);
+      if (mounted) toast(context, 'Could not share the reminder: $e', err: true);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -392,7 +392,7 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen> {
               if (_busy) const SizedBox(height: Space.x8),
               if (due > 0 && Api.supportReadOnly)
                 const Padding(padding: EdgeInsets.only(bottom: Space.x8),
-                    child: ReadOnlyNote(text: 'Support mode read-only hai — payment shop owner khud add karega.')),
+                    child: ReadOnlyNote(text: 'Support mode is read-only. The shop owner must add payments.')),
               if (due > 0 && !Api.supportReadOnly) PrimaryButton(label: 'Add partial payment', icon: Icons.add_card_outlined,
                 onPressed: _busy ? null : _addPayment),
               if (due > 0 && !Api.supportReadOnly) const SizedBox(height: Space.x8),

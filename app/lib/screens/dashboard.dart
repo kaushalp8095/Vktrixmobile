@@ -5,6 +5,7 @@ import '../api.dart';
 import '../design/components/components.dart';
 import '../design/design.dart';
 import 'profile.dart';
+import 'receipt.dart';
 
 class ActivityItem {
   final bool isSale;
@@ -125,7 +126,7 @@ class _DashboardState extends State<Dashboard> {
               const SizedBox(height: Space.x16),
               // ---- Quick actions (support mode me read-only note) ----
               if (Api.supportReadOnly)
-                const ReadOnlyNote(text: 'Support mode read-only hai — buy/sell/payment shop owner khud karega.')
+                const ReadOnlyNote(text: 'Support mode is read-only. The shop owner must handle buying, selling, and payments.')
               else
                 Row(children: [
                   Expanded(child: PrimaryButton(label: 'Buy phone', icon: Icons.add, expand: true, onPressed: () => widget.onGo(1))),
@@ -162,7 +163,11 @@ class _DashboardState extends State<Dashboard> {
                     : Column(children: [
                         for (var i = 0; i < _recent!.length; i++) ...[
                           if (i > 0) Divider(height: 1, indent: 68, color: c.textPrimary.withValues(alpha: .08)),
-                          _ActivityRow(item: _recent![i], date: _shortDate(_recent![i].date)),
+                          _ActivityRow(item: _recent![i], date: _shortDate(_recent![i].date), onTap: () {
+                            final item = _recent![i];
+                            final id = item.isSale ? item.id - 1000000 : item.id;
+                            SharedAxisRoute.push(context, (_) => ReceiptScreen(type: item.isSale ? 'sale' : 'purchase', id: id));
+                          }),
                         ],
                       ])),
             ],
@@ -204,8 +209,8 @@ class _LedgerAction extends StatelessWidget {
             child: Icon(Icons.account_balance_wallet_outlined, color: c.warningInk, size: 21)),
           const SizedBox(width: Space.x12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Udhaar / pending payments', style: t.titleSmall),
-            Text(count > 0 ? '$count customers · ${rs(outstanding)} baki' : 'Sab payments clear',
+            Text('Credit / pending payments', style: t.titleSmall),
+            Text(count > 0 ? '$count customers · ${rs(outstanding)} outstanding' : 'All payments are clear',
               style: t.bodySmall?.copyWith(color: c.textSecondary)),
           ])),
           StatusChip(label: count > 0 ? 'OPEN' : 'CLEAR', tone: count > 0 ? ChipTone.warning : ChipTone.success),
@@ -255,13 +260,15 @@ class _StatTile extends StatelessWidget {
 }
 
 class _ActivityRow extends StatelessWidget {
-  final ActivityItem item; final String date;
-  const _ActivityRow({required this.item, required this.date});
+  final ActivityItem item; final String date; final VoidCallback onTap;
+  const _ActivityRow({required this.item, required this.date, required this.onTap});
   @override
   Widget build(BuildContext context) {
     final c = context.colors, t = context.type, s = context.scheme;
     final tint = item.isSale ? c.success : s.primary;
-    return Padding(
+    return Semantics(
+      button: true, label: 'Open ${item.isSale ? 'sale' : 'purchase'} details for ${item.title}',
+      child: InkWell(onTap: onTap, child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: Space.x16, vertical: Space.x12),
       child: Row(children: [
         Container(width: 44, height: 44,
@@ -279,6 +286,7 @@ class _ActivityRow extends StatelessWidget {
           if (item.isSale) Text('+${rs(item.profit)}', style: t.labelSmall?.copyWith(color: c.successInk)),
         ]),
       ]),
+    )),
     );
   }
 }

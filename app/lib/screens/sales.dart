@@ -178,6 +178,7 @@ class _SaleDetailSheet extends StatelessWidget {
       ('Received', rs(s['paid_amount'] ?? s['sell_price'])),
       ('Balance due', rs(s['balance_due'] ?? 0)),
       if ((s['customer_name'] ?? '').toString().isNotEmpty) ('Customer', '${s['customer_name']}${s['customer_phone'] != null ? ' · ${s['customer_phone']}' : ''}'),
+      if ((s['customer_id_type'] ?? '').toString().isNotEmpty) ('ID proof', '${s['customer_id_type']}'),
       if ((s['customer_address'] ?? '').toString().isNotEmpty) ('Address', '${s['customer_address']}'),
       if ((s['warranty'] ?? '').toString().isNotEmpty) ('Warranty', '${s['warranty']}'),
       if ((s['notes'] ?? '').toString().isNotEmpty) ('Notes', '${s['notes']}'),
@@ -210,7 +211,7 @@ class _SaleDetailSheet extends StatelessWidget {
           ),
           const SizedBox(height: Space.x12),
           if (readOnly)
-            const ReadOnlyNote(text: 'Support mode read-only hai — payment ya sale change shop owner khud karega.')
+            const ReadOnlyNote(text: 'Support mode is read-only. The shop owner must change payments or sales.')
           else
             Center(child: TextButton(
               onPressed: onCancel,

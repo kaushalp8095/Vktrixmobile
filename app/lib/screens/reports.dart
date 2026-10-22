@@ -105,7 +105,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 StatusChip(label: '${d!['sales']['count']} sold · ${rs(d!['sales']['amount'])}', tone: ChipTone.brand, icon: Icons.sell_outlined),
                 StatusChip(label: '${d!['purchases']['count']} bought · ${rs(d!['purchases']['amount'])}', tone: ChipTone.neutral, icon: Icons.call_received),
                 if (d!['receivables'] != null && (num.tryParse('${d!['receivables']['outstanding']}') ?? 0) > 0)
-                  StatusChip(label: '${rs(d!['receivables']['outstanding'])} payment baki',
+                  StatusChip(label: '${rs(d!['receivables']['outstanding'])} outstanding',
                     tone: ChipTone.warning, icon: Icons.account_balance_wallet_outlined),
               ]),
             ])),

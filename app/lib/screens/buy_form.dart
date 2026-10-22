@@ -36,8 +36,8 @@ enum _ImeiState { none, looking, found, community, fromHistory, newModel, invali
 /// is not deployed with the `options` response). The dropdown stays usable
 /// instead of opening empty.
 const List<String> kDefaultRamOptions = ['2GB', '3GB', '4GB', '6GB', '8GB', '12GB', '16GB'];
-const List<String> kDefaultStorageOptions = ['16GB', '32GB', '64GB', '128GB', '256GB', '512GB', '1TB'];
-const List<String> kDefaultColorOptions = ['Black', 'White', 'Blue', 'Silver', 'Grey', 'Gold', 'Green', 'Purple', 'Red'];
+const List<String> kDefaultStorageOptions = ['16GB', '32GB', '64GB', '128GB', '256GB', '512GB', '1TB', '2TB', 'Others'];
+const List<String> kDefaultColorOptions = ['Black', 'White', 'Blue', 'Silver', 'Grey', 'Gold', 'Green', 'Purple', 'Red', 'Red / Burgundy'];
 
 class _BuyFormState extends State<BuyForm> {
   final _form = GlobalKey<FormState>();
@@ -84,7 +84,11 @@ class _BuyFormState extends State<BuyForm> {
     List<String> asList(dynamic v, List<String> fallback) {
       final list = (v as List? ?? const [])
           .map((e) => '$e'.trim()).where((e) => e.isNotEmpty).toList(growable: false);
-      return list.isEmpty ? fallback : list;
+      final merged = <String>[];
+      for (final value in [...list, ...fallback]) {
+        if (!merged.any((item) => item.toLowerCase() == value.toLowerCase())) merged.add(value);
+      }
+      return merged;
     }
     setState(() {
       _ramOptions
@@ -181,18 +185,18 @@ class _BuyFormState extends State<BuyForm> {
             Text('${side == 0 ? 'Front' : 'Back'} photo', style: context.type.titleMedium),
             ListTile(
               leading: Icon(Icons.photo_library_outlined, color: context.colors.brandInk),
-              title: const Text('Gallery se choose karein'),
+              title: const Text('Choose from gallery'),
               onTap: () => Navigator.pop(sheet, ImageSource.gallery),
             ),
             ListTile(
               leading: Icon(Icons.photo_camera_outlined, color: context.colors.brandInk),
-              title: const Text('Camera se photo lein'),
+              title: const Text('Take a photo'),
               onTap: () => Navigator.pop(sheet, ImageSource.camera),
             ),
             if (_idPhotos[side] != null)
               ListTile(
                 leading: Icon(Icons.delete_outline, color: context.colors.errorInk),
-                title: const Text('Photo hata dein'),
+                title: const Text('Remove photo'),
                 onTap: () {
                   setState(() => _idPhotos[side] = null);
                   Navigator.pop(sheet);
@@ -225,7 +229,7 @@ class _BuyFormState extends State<BuyForm> {
       setState(() => _idPhotos[side] = compressed);
       Haptics.success();
     } catch (_) {
-      if (mounted) toast(context, 'Photo process nahi ho payi. JPEG/PNG ya camera se dobara try karein.', err: true);
+      if (mounted) toast(context, 'Could not process the photo. Please try a JPEG/PNG image or take a new photo.', err: true);
     } finally {
       if (mounted) setState(() => _pickingSide = null);
     }
@@ -246,7 +250,7 @@ class _BuyFormState extends State<BuyForm> {
           Flexible(child: InteractiveViewer(minScale: 1, maxScale: 5,
             child: Image.memory(bytes, fit: BoxFit.contain))),
           const SizedBox(height: Space.x8),
-          const Text('Zoom karke document ka text check karein.'),
+          const Text('Zoom in to check that the document text is clear.'),
         ]),
       ),
     ));
@@ -435,7 +439,7 @@ class _BuyFormState extends State<BuyForm> {
         Text('${_idPhotos.whereType<Uint8List>().length}/2', style: t.labelLarge?.copyWith(color: c.brandInk)),
       ]),
       const SizedBox(height: Space.x8),
-      Text('Front aur back upload karein. Sirf 1 photo bhi chalegi.',
+      Text('Upload the front and back. One photo is also enough.',
         style: t.bodySmall?.copyWith(color: c.textSecondary)),
       const SizedBox(height: Space.x12),
       LayoutBuilder(builder: (context, box) => box.maxWidth < 280
@@ -446,7 +450,7 @@ class _BuyFormState extends State<BuyForm> {
             Expanded(child: _idUploadTile(1, c, t)),
           ])),
       const SizedBox(height: Space.x8),
-      Text('Auto-compress · Target 100 KB/photo. Text clarity ke liye size zyada ho sakta hai.',
+      Text('Photos are compressed automatically to about 100 KB. Clear text may require a larger file.',
         style: t.bodySmall?.copyWith(color: c.textSecondary)),
     ]);
   }
@@ -538,7 +542,7 @@ class _OptionField extends StatelessWidget {
                 const SizedBox(width: Space.x12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text('Choose $title', style: t.titleLarge?.copyWith(color: c.textPrimary)),
-                  Text('Apne phone ka variant select karein', style: t.bodySmall?.copyWith(color: c.textSecondary)),
+                  Text('Choose the phone variant', style: t.bodySmall?.copyWith(color: c.textSecondary)),
                 ])),
                 IconButton(tooltip: 'Close $title options', onPressed: () => Navigator.pop(sheet),
                   icon: Icon(Icons.close_rounded, color: c.textSecondary)),
@@ -560,7 +564,7 @@ class _OptionField extends StatelessWidget {
                 child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Icon(Icons.edit_outlined, size: 18, color: c.brandInk),
                   const SizedBox(width: Space.x8),
-                  Expanded(child: Text('Option nahi mila? Sheet band karke field mein apna value type karein.',
+                  Expanded(child: Text('Cannot find an option? Close this sheet and type a value in the field.',
                     style: t.bodySmall?.copyWith(color: c.textSecondary))),
                 ]),
               ),
@@ -608,7 +612,7 @@ class _OptionField extends StatelessWidget {
       label: label,
       textInputAction: TextInputAction.next,
       suffix: IconButton(
-        tooltip: '$label choose karein',
+        tooltip: 'Choose $label',
         icon: Icon(Icons.expand_more_rounded, color: context.colors.brandInk),
         style: IconButton.styleFrom(backgroundColor: context.scheme.primary.withValues(alpha: .08)),
         onPressed: () => _openPicker(context),

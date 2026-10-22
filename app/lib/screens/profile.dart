@@ -155,7 +155,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       : _passPhase == ButtonPhase.success ? Icon(Icons.check_circle, color: c.success, size: 20) : null),
               Divider(height: 1, indent: 56, color: c.textPrimary.withValues(alpha: .08)),
               _RowTap(icon: Icons.shield_outlined, title: 'Support access',
-                  subtitle: 'Vktrix support ne kab, kyun aur kitna data dekha',
+                  subtitle: 'When, why, and how much data Vktrix Support viewed',
                   onTap: () => showSupportLogSheet(context, title: 'Support access')),
               Divider(height: 1, indent: 56, color: c.textPrimary.withValues(alpha: .08)),
               _RowTap(icon: Icons.dns_outlined, title: 'Server', subtitle: baseUrl, onTap: () async {

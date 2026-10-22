@@ -83,7 +83,7 @@ class _ShopHomeState extends State<ShopHome> {
     final shopId = Api.viewShopId;
     final ok = await showConfirmDialog(context,
       title: 'End support access?',
-      message: 'Session turant band ho jayegi aur shop ka data lock ho jayega. Ye log me dikhega.',
+      message: 'The session will end immediately and shop data will be locked. This will be recorded in the access log.',
       confirmLabel: 'End access',
       cancelLabel: 'Keep open',
       icon: Icons.lock_outline);
@@ -187,9 +187,9 @@ class _SupportBar extends StatelessWidget {
           child: Icon(expired ? Icons.lock_outline : Icons.shield_outlined, size: 18, color: tint)),
         const SizedBox(width: Space.x12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(expired ? 'Support access khatam' : 'Support mode · read-only',
+          Text(expired ? 'Support access expired' : 'Support mode · read-only',
             style: t.titleSmall?.copyWith(color: tint), maxLines: 1, overflow: TextOverflow.ellipsis),
-          Text(expired ? 'Shop ka data lock ho gaya hai.' : '${clock(Api.supportRemaining)} left · shop owner ko dikhega',
+          Text(expired ? 'Shop data is locked.' : '${clock(Api.supportRemaining)} remaining · visible to the shop owner',
             style: t.bodySmall?.copyWith(color: c.textSecondary), maxLines: 1, overflow: TextOverflow.ellipsis),
         ])),
         const SizedBox(width: Space.x8),
@@ -213,8 +213,8 @@ class _SupportBlocked extends StatelessWidget {
         children: [
           GlassCard(blur: false, child: EmptyState(
             icon: Icons.lock_outline,
-            title: '$action support mode me band hai',
-            message: 'Support access sirf padhne ke liye hota hai — shop ka data change karna shop owner ka kaam hai.',
+            title: '$action is unavailable in support mode',
+            message: 'Support access is read-only. Only the shop owner can change shop data.',
             actionLabel: 'Back to Home',
             onAction: onHome,
           )),
