@@ -24,10 +24,12 @@ class Dashboard extends StatefulWidget {
 
   /// Test hook: injected data skips the network.
   final Map<String, dynamic>? testSummary;
+  /// All-time pending dues (`/ledger/summary`). Test hook, network path ke liye.
+  final Map<String, dynamic>? testDues;
   final List<ActivityItem>? testRecent;
   final String? greeting;
   const Dashboard({super.key, required this.onGo, required this.shopName, this.onOpenLedger,
-      this.isAdminView = false, this.testSummary, this.greeting, this.testRecent});
+      this.isAdminView = false, this.testSummary, this.testDues, this.greeting, this.testRecent});
   @override
   State<Dashboard> createState() => _DashboardState();
 }
@@ -35,20 +37,36 @@ class Dashboard extends StatefulWidget {
 class _DashboardState extends State<Dashboard> {
   final _scroll = ScrollController();
   Map<String, dynamic>? _s;
+  /// All-time pending dues — ledger screen ka hi source (`/ledger/summary`).
+  Map<String, dynamic>? _dues;
   List<ActivityItem>? _recent;
   Object? _error;
 
   @override
   void initState() {
     super.initState();
-    if (widget.testSummary != null) { _s = widget.testSummary; _recent = widget.testRecent ?? []; }
-    else _load();
+    if (widget.testSummary != null) {
+      _s = widget.testSummary;
+      _dues = widget.testDues;
+      _recent = widget.testRecent ?? [];
+    } else {
+      _load();
+    }
   }
 
   Future<void> _load() async {
     setState(() => _error = null);
     try {
-      final results = await Future.wait([Api.get('/reports/summary'), Api.get('/stock'), Api.get('/sales')]);
+      final results = await Future.wait([
+        Api.get('/reports/summary'),
+        Api.get('/stock'),
+        Api.get('/sales'),
+        // All-time dues: ledger screen bhi yahi endpoint use karta hai, isliye
+        // card aur ledger ka number alag nahi ho sakta. `/reports/summary` ka
+        // `receivables` period-scoped hai (bina from/to = sirf aaj ki sales),
+        // isliye purani udhaar par card galti se "clear" dikhata tha.
+        Api.get('/ledger/summary').catchError((Object _) => null),
+      ]);
       final stock = (results[1] as List).cast<Map>();
       final sales = (results[2] as List).cast<Map>();
       final items = <ActivityItem>[
@@ -66,7 +84,12 @@ class _DashboardState extends State<Dashboard> {
                   (num.tryParse('${s['buy_price']}') ?? 0)),
       ]..sort((a, b) => b.id.compareTo(a.id));
       if (!mounted) return;
-      setState(() { _s = results[0] as Map<String, dynamic>; _recent = items.take(5).toList(); });
+      final dues = results[3];
+      setState(() {
+        _s = results[0] as Map<String, dynamic>;
+        _dues = dues is Map ? dues.cast<String, dynamic>() : null;
+        _recent = items.take(5).toList();
+      });
     } catch (e) {
       if (mounted) setState(() => _error = e);
     }
@@ -136,8 +159,8 @@ class _DashboardState extends State<Dashboard> {
               if (widget.onOpenLedger != null) ...[
                 const SizedBox(height: Space.x12),
                 _LedgerAction(
-                  outstanding: _s!['receivables']?['outstanding'] ?? 0,
-                  count: int.tryParse('${_s!['receivables']?['pending_count'] ?? 0}') ?? 0,
+                  outstanding: _dues?['outstanding'] ?? _s!['receivables']?['outstanding'] ?? 0,
+                  count: int.tryParse('${_dues?['pending_count'] ?? _s!['receivables']?['pending_count'] ?? 0}') ?? 0,
                   onTap: widget.onOpenLedger!,
                 ),
               ],
@@ -210,7 +233,9 @@ class _LedgerAction extends StatelessWidget {
           const SizedBox(width: Space.x12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Credit / pending payments', style: t.titleSmall),
-            Text(count > 0 ? '$count customers · ${rs(outstanding)} outstanding' : 'All payments are clear',
+            Text(count > 0
+                ? '$count ${count == 1 ? 'customer' : 'customers'} · ${rs(outstanding)} outstanding'
+                : 'All payments are clear',
               style: t.bodySmall?.copyWith(color: c.textSecondary)),
           ])),
           StatusChip(label: count > 0 ? 'OPEN' : 'CLEAR', tone: count > 0 ? ChipTone.warning : ChipTone.success),
