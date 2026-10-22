@@ -59,7 +59,9 @@ async function login(username, password) {
   return r;
 }
 
-test('dashboard dues are all-time and always agree with the ledger', async t => {
+// Ek hi server/db lifecycle: doosre test me knex ko destroy karke dobara use
+// nahi kiya ja sakta, isliye subtests share karte hain.
+test('dashboard dues', async t => {
   await migrate();
   await db('sale_payments').del(); await db('sales').del(); await db('phones').del();
   await db('users').whereNot({ username: 'superadmin' }).del(); await db('shops').del();
@@ -81,6 +83,8 @@ test('dashboard dues are all-time and always agree with the ledger', async t => 
   });
 
   const admin = (await login('superadmin', 'AuditOnly@123')).body.token;
+
+  await t.test('are all-time and always agree with the ledger', async () => {
   const shop = await request('POST', '/admin/shops', admin,
     { name: 'Dues Mobiles', username: 'dues', password: 'Dues@123' });
   assert.equal(shop.status, 200, JSON.stringify(shop.body));
@@ -130,30 +134,9 @@ test('dashboard dues are all-time and always agree with the ledger', async t => 
   assert.equal(cleared.body.pending_count, 0);
   assert.equal(cleared.body.outstanding, 0);
   assert.deepEqual((await request('GET', '/ledger', token)).body.summary, cleared.body);
-});
-
-test('ledger summary stays shop-scoped and refuses support-mode reads', async t => {
-  await migrate();
-  await db('sale_payments').del(); await db('sales').del(); await db('phones').del();
-  await db('users').whereNot({ username: 'superadmin' }).del(); await db('shops').del();
-
-  const app = express();
-  app.use(express.json({ limit: '9mb' }));
-  app.use('/api/auth', require('../src/routes/auth'));
-  app.use('/api/admin', require('../src/routes/admin'));
-  app.use('/api', require('../src/routes/shop'));
-  app.use((err, req, res, next) => res.status(err.status || 500).json({ error: err.message }));
-  server = app.listen(0, '127.0.0.1');
-  await new Promise(resolve => server.once('listening', resolve));
-  base = `http://127.0.0.1:${server.address().port}/api`;
-  t.after(async () => {
-    await new Promise(resolve => server.close(resolve));
-    await db.destroy();
-    if (!process.env.TEST_DATABASE_URL)
-      for (const suffix of ['', '-shm', '-wal']) try { fs.unlinkSync(process.env.SQLITE_FILE + suffix); } catch {}
   });
 
-  const admin = (await login('superadmin', 'AuditOnly@123')).body.token;
+  await t.test('stay shop-scoped and refuse support-mode reads', async () => {
   await request('POST', '/admin/shops', admin, { name: 'Alpha Dues', username: 'alpha2', password: 'Alpha@123' });
   await request('POST', '/admin/shops', admin, { name: 'Beta Dues', username: 'beta2', password: 'Beta@123' });
   const alphaToken = (await login('alpha2', 'Alpha@123')).body.token;
@@ -169,4 +152,5 @@ test('ledger summary stays shop-scoped and refuses support-mode reads', async t 
   const asAdmin = await request('GET', '/ledger/summary', admin);
   assert.equal(asAdmin.status, 403);
   assert.equal(asAdmin.body.code, 'support_access_required');
+  });
 });
