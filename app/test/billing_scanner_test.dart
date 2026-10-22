@@ -47,9 +47,8 @@ void main() {
       reason: 'autoStart plus the screen start call races CameraX and causes genericError');
     expect(controller.facing, CameraFacing.back);
     expect(controller.detectionSpeed, DetectionSpeed.noDuplicates);
-    // useNewCameraSelector sirf resolution selector badalta hai (aur tabhi,
-    // jab cameraResolution di ho) — IMEI scan me uska koi role nahi hai.
-    expect(controller.useNewCameraSelector, isFalse);
+    // 7.x: paas se barcode padhne ke liye normal (26-35mm) lens, special nahi.
+    expect(controller.lensType, CameraLensType.normal);
     await controller.dispose();
   });
 }

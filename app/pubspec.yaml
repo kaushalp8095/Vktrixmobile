@@ -3,13 +3,14 @@ description: Old mobile shop - Buy, Sell, Stock, Reports
 publish_to: 'none'
 version: 1.0.0+1
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  # mobile_scanner 7.x needs Dart 3.7+ (Flutter 3.29+).
+  sdk: '>=3.7.0 <4.0.0'
 dependencies:
   flutter:
     sdk: flutter
   http: ^1.2.0
   shared_preferences: ^2.2.0
-  mobile_scanner: ^5.0.0
+  mobile_scanner: ^7.4.2
   image_picker: ^1.1.2   # ID proof photo: camera ya gallery
   image: ^4.5.4         # on-device document compression, off the UI isolate
   dynamic_color: ^1.7.0

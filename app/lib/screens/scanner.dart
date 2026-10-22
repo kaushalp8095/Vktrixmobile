@@ -1,13 +1,17 @@
 // IMEI SCANNER: phone box ka barcode ya *#06# screen se 15-digit IMEI.
 //
-// Camera ka lifecycle owner sirf yahi screen hai: controller `autoStart: false`
-// hai aur MobileScanner widget external controller milne par khud start/stop
-// nahi karta (5.2.3 me `didChangeAppLifecycleState` turant return karta hai).
+// mobile_scanner 7.4.x: CameraX 1.6, AGP 9 support aur CameraX init failure ka
+// saaf error callback. Pehle (5.2.3, CameraX 1.3) Vivo/FunTouch aur naye 16 KB
+// page devices par `bindToLifecycle` / HAL fail hote hi bas
+// "No camera found or failed to open camera!" aata tha aur camera kabhi nahi
+// khulta tha — plugin ke andar hi.
 //
-// Android par mobile_scanner har camera failure ko ek hi `genericError` me
-// bhejta hai; asli wajah (CameraX exception) `errorDetails.message` me hoti hai.
-// Isliye UI usi ko dikhata hai aur logcat/support ke liye poora exception print
-// hota hai — warna "genericError" ke sivay kuch pata nahi chalta.
+// Camera ka lifecycle owner sirf yahi screen hai (`autoStart: false` aur widget
+// par `useAppLifecycleState: false`), kyunki widget har `inactive` par camera
+// band karta hai — permission dialog bhi `inactive` bhejta hai.
+//
+// Android par plugin camera failures ko `genericError` me daalta hai; asli wajah
+// `errorDetails.message` me hoti hai, isliye UI usi ko dikhata hai.
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -49,8 +53,14 @@ String cameraProblemMessage(MobileScannerException error) {
     return 'Camera permission is blocked.\n\n'
         'Open Settings > Apps > Vktrix Mobile > Permissions, allow Camera, then tap Retry.';
   }
+  if (error.errorCode == MobileScannerErrorCode.controllerNotAttached) {
+    return 'The camera preview was not ready yet. Tap Retry.';
+  }
+  if (error.errorCode == MobileScannerErrorCode.controllerInitializing) {
+    return 'The camera is still starting. Wait a moment, then tap Retry.';
+  }
   final details = (error.errorDetails?.message ?? '').toLowerCase();
-  if (details.contains('already started')) {
+  if (details.contains('already started') || details.contains('already initiali')) {
     return 'The camera was already starting. Tap Retry.';
   }
   if (details.contains('no camera')) {
@@ -73,20 +83,26 @@ String? cameraProblemDetail(MobileScannerException error) {
 }
 
 /// `genericError` aksar ek busy/failed CameraX bind hota hai jo agle attempt me
-/// saaf ho jata hai; permission denial ya disposed controller dobara try karne
-/// se theek nahi hote.
+/// saaf ho jata hai. `controllerNotAttached` tab aata hai jab `start()` naye
+/// widget ke attach hone se pehle chala ho — agla frame usse theek kar deta hai.
+/// Permission denial ya disposed controller dobara try karne se theek nahi hote.
 bool isTransientCameraProblem(MobileScannerException error) =>
-    error.errorCode == MobileScannerErrorCode.genericError;
+    error.errorCode == MobileScannerErrorCode.genericError ||
+    error.errorCode == MobileScannerErrorCode.controllerNotAttached;
 
 /// Camera controller. `autoStart: false` — start/stop ka owner ye screen hai.
 ///
-/// `useNewCameraSelector` jaan-boojh kar nahi set: 5.2.3 me wo sirf resolution
-/// selector badalta hai aur tabhi kaam karta hai jab `cameraResolution` di ho.
-/// IMEI scan ke liye camera select karne me iska koi role nahi hai.
-MobileScannerController createImeiScannerController() => MobileScannerController(
+/// 7.x me `useNewCameraSelector` hata diya gaya hai; lens ab `lensType` se
+/// chunte hain. IMEI box ka barcode paas se padhna hota hai, isliye `normal`
+/// (26-35mm) sabse saaf hai — `any` kai phones par ultra-wide ya telephoto
+/// chun leta hai jahan close-range focus theek nahi hota.
+MobileScannerController createImeiScannerController({
+  CameraLensType lensType = CameraLensType.normal,
+}) => MobileScannerController(
   autoStart: false,
   detectionSpeed: DetectionSpeed.noDuplicates,
   facing: CameraFacing.back,
+  lensType: lensType,
 );
 
 class ImeiScanner extends StatefulWidget {
@@ -99,12 +115,17 @@ class ImeiScanner extends StatefulWidget {
 class _ImeiScannerState extends State<ImeiScanner> with WidgetsBindingObserver {
   final CameraTaskQueue _queue = CameraTaskQueue();
   MobileScannerController _camera = createImeiScannerController();
+  /// `normal` lens na mile to `any` par gir jate hain (kuch OEM ROMs me
+  /// normal lens report hi nahi hota).
+  CameraLensType _lens = CameraLensType.normal;
   StreamSubscription<BarcodeCapture>? _subscription;
   bool _done = false;
   /// Retry ke waqt purana controller tree se hata kar naya lagaya jata hai.
   bool _rebuilding = false;
   /// Ek hi automatic retry, warna fail hote rahne par loop ban jayega.
   bool _autoRetried = false;
+  /// 7.x me kuch failures `start()` throw karke deta hai (state.error me nahi).
+  MobileScannerException? _problem;
   int _generation = 0;
   String? _hint;
 
@@ -127,26 +148,34 @@ class _ImeiScannerState extends State<ImeiScanner> with WidgetsBindingObserver {
   Future<void> _startCameraNow() async {
     final camera = _camera;
     if (_done || !mounted || camera.value.isRunning) return;
+    MobileScannerException? thrown;
     try {
-      // 5.2.3 me start() camera errors throw nahi karta — wo state.error me aate hain.
       await camera.start();
+    } on MobileScannerException catch (e) {
+      // Attach/lifecycle problems start() throw karta hai; camera (CameraX)
+      // failures state.error me aate hain — dono ko ek jagah handle karte hain.
+      thrown = e;
     } catch (e) {
-      // Screen band hone ke baad controllerDisposed aa sakta hai; baaki failures
-      // state.error se aate hain.
       debugPrint('IMEI scanner: start() threw -> $e');
       return;
     }
     if (!mounted || _done || !identical(camera, _camera)) return;
-    final error = camera.value.error;
+    final error = thrown ?? camera.value.error;
     if (error == null) {
       _autoRetried = false;
+      if (_problem != null) setState(() => _problem = null);
       return;
     }
     debugPrint('IMEI scanner: camera start failed -> $error; detail: ${cameraProblemDetail(error)}');
-    // Busy sensor aksar agle attempt tak free ho jata hai. Ek baar khud try
-    // karein (naye controller ke saath), uske baad UI ko batayein.
-    if (_autoRetried || !isTransientCameraProblem(error)) return;
+    // Busy sensor / late attach aksar agle attempt tak theek ho jate hain. Ek
+    // baar khud try karein (naye controller ke saath), uske baad UI ko batayein.
+    if (_autoRetried || !isTransientCameraProblem(error)) {
+      if (mounted) setState(() => _problem = error);
+      return;
+    }
     _autoRetried = true;
+    // Normal lens hi fail hua ho to any lens se ek aur koshish.
+    _lens = CameraLensType.any;
     await Future<void>.delayed(const Duration(milliseconds: 700));
     if (!mounted || _done) return;
     await _replaceCamera();
@@ -157,7 +186,7 @@ class _ImeiScannerState extends State<ImeiScanner> with WidgetsBindingObserver {
   /// sakta hai (leaked listeners, half-bound camera), isliye naya banate hain.
   Future<void> _retry() async {
     _autoRetried = false;
-    if (mounted) setState(() => _hint = null);
+    if (mounted) setState(() { _hint = null; _problem = null; });
     await _queue.run(() async {
       if (!mounted || _done) return;
       await _replaceCamera();
@@ -185,9 +214,10 @@ class _ImeiScannerState extends State<ImeiScanner> with WidgetsBindingObserver {
     }
     if (!mounted) return;
     setState(() {
-      _camera = createImeiScannerController();
+      _camera = createImeiScannerController(lensType: _lens);
       _generation++;
       _rebuilding = false;
+      _problem = null;
     });
     _subscribe();
   }
@@ -296,12 +326,18 @@ class _ImeiScannerState extends State<ImeiScanner> with WidgetsBindingObserver {
     }
     final camera = _camera;
     return Stack(children: [
-      Positioned.fill(child: MobileScanner(key: ValueKey('imei-camera-$_generation'), controller: camera)),
+      Positioned.fill(child: MobileScanner(
+        key: ValueKey('imei-camera-$_generation'),
+        controller: camera,
+        // Widget har `inactive` par stop karta hai (permission dialog bhi
+        // `inactive` hai) — isliye lifecycle is screen ke paas hai.
+        useAppLifecycleState: false,
+      )),
       Positioned.fill(
         child: ValueListenableBuilder<MobileScannerState>(
           valueListenable: camera,
           builder: (context, state, _) {
-            final error = state.error;
+            final error = _problem ?? state.error;
             if (error != null) return _CameraProblem(error: error, onRetry: _retry);
             if (!state.isInitialized) {
               return const ColoredBox(

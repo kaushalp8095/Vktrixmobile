@@ -70,6 +70,21 @@ void main() {
     expect(message.toLowerCase(), isNot(contains('permission')));
   });
 
+  test('a late-attached preview asks for a retry, not a permission fix', () {
+    final message = cameraProblemMessage(
+      _error(MobileScannerErrorCode.controllerNotAttached, 'attach timed out'),
+    );
+
+    expect(message.toLowerCase(), contains('retry'));
+    expect(message.toLowerCase(), isNot(contains('permission')));
+  });
+
+  test('a still-starting controller is not told to fix the hardware', () {
+    final message = cameraProblemMessage(_error(MobileScannerErrorCode.controllerInitializing));
+
+    expect(message.toLowerCase(), contains('still starting'));
+  });
+
   test('permission denial points at Android app settings', () {
     final message = cameraProblemMessage(_error(MobileScannerErrorCode.permissionDenied));
 
@@ -94,6 +109,9 @@ void main() {
   test('only a generic failure is retried automatically', () {
     // Permission denial aur disposed controller retry se theek nahi hote.
     expect(isTransientCameraProblem(_error(MobileScannerErrorCode.genericError)), isTrue);
+    // Naya widget agle frame me attach ho jata hai.
+    expect(isTransientCameraProblem(_error(MobileScannerErrorCode.controllerNotAttached)), isTrue);
+    expect(isTransientCameraProblem(_error(MobileScannerErrorCode.controllerInitializing)), isFalse);
     expect(isTransientCameraProblem(_error(MobileScannerErrorCode.permissionDenied)), isFalse);
     expect(isTransientCameraProblem(_error(MobileScannerErrorCode.controllerDisposed)), isFalse);
     expect(isTransientCameraProblem(_error(MobileScannerErrorCode.unsupported)), isFalse);
