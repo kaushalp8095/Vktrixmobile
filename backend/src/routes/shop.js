@@ -92,6 +92,18 @@ async function withPaymentTotals(rows, runner = db) {
       payment_count: Number(p?.payment_count || 0) };
   });
 }
+// Ledger totals ek hi jagah bante hain: /ledger (jo bhi filter laga ho) aur
+// /ledger/summary (all-time) dono yahi use karte hain, taaki dashboard aur
+// ledger screen ka number kabhi alag na ho.
+function ledgerSummary(rows) {
+  const pending = rows.filter(x => x.balance_due > 0);
+  return {
+    outstanding: moneyNumber(pending.reduce((n, x) => n + x.balance_due, 0)),
+    pending_count: pending.length,
+    received: moneyNumber(rows.reduce((n, x) => n + x.paid_amount, 0)),
+    sales_total: moneyNumber(rows.reduce((n, x) => n + moneyNumber(x.sell_price), 0)),
+  };
+}
 async function safeShop(sid, runner = db) {
   return runner('shops').where({ id: sid })
     .select('id', 'name', 'owner_name', 'phone', 'address', 'gst_no', 'logo_data').first();
@@ -332,15 +344,18 @@ r.get('/ledger', wrap(async (req, res) => {
   const all = await withPaymentTotals(await q);
   const pending = all.filter(x => x.balance_due > 0);
   const filtered = status === 'all' ? all : status === 'paid' ? all.filter(x => x.balance_due <= 0) : pending;
-  res.json({
-    summary: {
-      outstanding: moneyNumber(pending.reduce((n, x) => n + x.balance_due, 0)),
-      pending_count: pending.length,
-      received: moneyNumber(all.reduce((n, x) => n + x.paid_amount, 0)),
-      sales_total: moneyNumber(all.reduce((n, x) => n + moneyNumber(x.sell_price), 0)),
-    },
-    items: filtered,
-  });
+  res.json({ summary: ledgerSummary(all), items: filtered });
+}));
+
+// Dashboard ka "Credit / pending payments" card: ALL-TIME dues, koi date range
+// nahi. Pehle wo /reports/summary ka `receivables` use karta tha, jo period
+// scoped hai (bina from/to → sirf aaj). Isliye kal ka udhaar ledger me pending
+// dikhta tha par dashboard par "All payments are clear".
+r.get('/ledger/summary', wrap(async (req, res) => {
+  const sid = needShop(req, res); if (!sid) return;
+  const rows = await withPaymentTotals(
+    await db('sales').where({ shop_id: sid }).select('id', 'sell_price'));
+  res.json(ledgerSummary(rows));
 }));
 
 r.get('/sales/:id/payments', wrap(async (req, res) => {
@@ -421,6 +436,8 @@ r.get('/reports/summary', wrap(async (req, res) => {
     purchases: { count: +buy.c, amount: +buy.v || 0 },
     sales: { count: +sale.c, amount: saleV, profit: saleV - cost },
     stock: { count: +stock.c, value: +stock.v || 0 },
+    // Period scoped by design: reports ek date range dikhate hain. All-time
+    // dues ke liye /ledger/summary use karein (dashboard wahi karta hai).
     receivables: {
       outstanding: moneyNumber(paidPeriodSales.reduce((n, x) => n + x.balance_due, 0)),
       received: moneyNumber(paidPeriodSales.reduce((n, x) => n + x.paid_amount, 0)),

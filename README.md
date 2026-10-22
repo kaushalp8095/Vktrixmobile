@@ -100,6 +100,7 @@ Koi external API call nahi hoti, koi IMEI server se bahar nahi jata, aur iska ko
 - Har collection `sale_payments` me separate append-only row hai: amount, date, mode aur optional note. Backend transaction current balance lock/check karke overpayment aur cross-shop access rokta hai.
 - **Home → Udhaar**, ya **Sales top bar ka wallet icon**: pending/paid/all, customer/model/IMEI search, total outstanding aur collection progress.
 - Sale detail/payment detail se partial payment add, complete history, customer-safe PDF aur pre-filled WhatsApp reminder milta hai.
+- **Home ka "Credit / pending payments" card all-time dues dikhata hai** (`/api/ledger/summary`), bilkul wahi hisaab jo ledger screen dikhata hai. Pehle wo `/api/reports/summary` ka `receivables` use karta tha, jo period scoped hai — bina `from`/`to` bheje backend sirf **aaj** leta hai, isliye kal ka udhaar ledger me pending dikhta tha par card par "All payments are clear". Reports ka `receivables` period-report ke liye hai, dues ke liye use na karein.
 - Existing deployment par migration purane non-credit sales ko fully paid opening entry banati hai; old `credit` rows unpaid rehti hain. Pehle updated backend deploy karein, phir APK.
 
 ### Super Admin: manage karein, data sirf support session me
@@ -319,8 +320,9 @@ Note: download app ke process me chalta hai. App ko kuch der ke liye minimize ka
 | GET | /api/receipts/purchase/:phone_id | Customer-safe purchase PDF payload |
 | GET | /api/receipts/sale/:sale_id | Customer-safe sale PDF payload |
 | GET | /api/ledger?status=pending&search= | Udhaar summary/list (`pending`, `paid`, `all`) |
+| GET | /api/ledger/summary | Sirf all-time dues totals (dashboard card ka source) |
 | GET/POST | /api/sales/:id/payments | Partial-payment history / naya collection |
-| GET | /api/reports/summary?from=&to= | Report + receivables |
+| GET | /api/reports/summary?from=&to= | Report + period receivables (dues ke liye `/api/ledger/summary`) |
 | GET | /api/reports/daily?from=&to= | Roz ka report |
 
 Super admin `?shop_id=` sirf **chalu support session** ke saath laga sakta hai (read-only) — warna shop APIs 403 deti hain. Detail: *"Super Admin: manage karein, data sirf support session me"* section aur `docs/D6_SUPPORT_ACCESS.md`.
