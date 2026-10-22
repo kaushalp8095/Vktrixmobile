@@ -116,7 +116,7 @@ void main() {
 
     expect(Api.supportReadOnly, isTrue);
     expect(find.text('Support mode · read-only'), findsOneWidget);
-    expect(find.textContaining('left · shop owner'), findsOneWidget);
+    expect(find.textContaining('remaining · visible to the shop owner'), findsOneWidget);
 
     await tester.tap(find.text('Buy').first);
     await tester.pump();
@@ -144,7 +144,7 @@ void main() {
     await tester.tap(find.text('sell'));
     await tester.pump();
     expect(blocked, isTrue);
-    expect(find.textContaining('read-only hai'), findsOneWidget);
+    expect(find.textContaining('Support mode is read-only.'), findsOneWidget);
     Api.endSupport();
   });
 }
