@@ -41,13 +41,15 @@ void main() {
     }
   });
 
-  test('IMEI scanner has one start owner and uses the Android camera selector', () async {
+  test('IMEI scanner has exactly one camera start owner', () async {
     final controller = createImeiScannerController();
     expect(controller.autoStart, isFalse,
       reason: 'autoStart plus the screen start call races CameraX and causes genericError');
     expect(controller.facing, CameraFacing.back);
     expect(controller.detectionSpeed, DetectionSpeed.noDuplicates);
-    expect(controller.useNewCameraSelector, isTrue);
+    // useNewCameraSelector sirf resolution selector badalta hai (aur tabhi,
+    // jab cameraResolution di ho) — IMEI scan me uska koi role nahi hai.
+    expect(controller.useNewCameraSelector, isFalse);
     await controller.dispose();
   });
 }
