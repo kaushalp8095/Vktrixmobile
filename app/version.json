@@ -1,8 +1,9 @@
 {
-  "versionCode": 20772,
-  "versionName": "1.0.0.20772",
-  "downloadUrl": "https://github.com/kaushalp8095/Vktrixmobile/releases/download/v1.0.0.20772/app-release.apk",
-  "releaseNotes": "Auto-generated release v1.0.0.20772",
+  "versionCode": 20773,
+  "versionName": "1.0.0.20773",
+  "downloadUrl": "https://github.com/kaushalp8095/Vktrixmobile/releases/download/v1.0.0.20773/app-release.apk",
+  "sha256": "f705c0e72386ba70120d01d1f641c273dbe5e5c4336c3ba8bbc52060aab928e8",
+  "releaseNotes": "Auto-generated release v1.0.0.20773",
   "minVersionCode": 1,
   "forceUpdate": false
 }
