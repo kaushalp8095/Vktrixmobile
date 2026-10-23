@@ -18,7 +18,7 @@ const support = require('../support');
 r.use(requireAuth, requireRole('superadmin'));
 
 // Shop row ka public (admin-app safe) roop: business data ke bina.
-function safeShop(shop, access) {
+function safeShop(shop, access, history) {
   const phone = shop.phone ? String(shop.phone) : null;
   return {
     id: shop.id,
@@ -35,7 +35,34 @@ function safeShop(shop, access) {
     login: shop.login ?? null,
     support: access?.active ?? null,   // { reason, expires_in_ms } ya null
     support_sessions: access?.total ?? 0,
+    // Delete sirf khaali shop par. Counts jaan-boojh kar nahi bhejte (business
+    // data), sirf permission — history ho to sirf deactivate hota hai.
+    can_delete: history === null,
   };
+}
+
+// Wo tables jinme shop ka itihaas rehta hai — inme ek bhi row ho to shop delete
+// nahi hota, sirf deactivate. (users/shop_phones/sale_payments to cascade me hi
+// delete hote hain, unhe ginti me nahi lete.)
+const HISTORY_TABLES = ['phones', 'sales', 'support_access'];
+
+/// Jin shops ke paas koi bhi history row hai, unke ids ek hi round-trip me.
+async function shopsWithHistory() {
+  const ids = new Set();
+  for (const table of HISTORY_TABLES) {
+    const rows = await db(table).distinct('shop_id');
+    for (const row of rows) if (row.shop_id != null) ids.add(Number(row.shop_id));
+  }
+  return ids;
+}
+
+/// Ek shop ke liye wahi check — delete route par.
+async function hasHistory(shopId) {
+  for (const table of HISTORY_TABLES) {
+    const row = await db(table).where({ shop_id: shopId }).first();
+    if (row) return true;
+  }
+  return false;
 }
 
 r.get('/dashboard', wrap(async (req, res) => {
@@ -54,10 +81,14 @@ r.get('/dashboard', wrap(async (req, res) => {
 r.get('/shops', wrap(async (req, res) => {
   const shops = await db('shops').orderBy('id', 'desc');
   const access = await support.summaryByShop();
-  for (const s of shops) {
-    s.login = await db('users').where({ shop_id: s.id, role: 'shop_admin' }).select('id', 'username', 'active').first();
-  }
-  res.json(shops.map(s => safeShop(s, access.get(Number(s.id)))));
+  // Ek query sab logins ke liye (pehle har shop par alag query chalti thi).
+  const logins = await db('users').where({ role: 'shop_admin' }).select('id', 'shop_id', 'username', 'active');
+  const byShop = new Map(logins.map(u => [Number(u.shop_id), u]));
+  const withHistory = await shopsWithHistory();
+  res.json(shops.map(s => {
+    s.login = byShop.get(Number(s.id)) ?? null;
+    return safeShop(s, access.get(Number(s.id)), withHistory.has(Number(s.id)) ? true : null);
+  }));
 }));
 
 // Nayi shop + uska login ek saath
@@ -103,6 +134,14 @@ r.delete('/shops/:id', wrap(async (req, res) => {
   const shopId = V.id(req.params.id, 'shop id');
   const exists = await db('shops').where({ id: shopId }).first();
   if (!exists) return res.status(404).json({ error: 'Shop nahi mila' });
+  // History (stock / sales / payments) aur support-access log — jo shop owner ko
+  // dikhta hai — delete se hamesha ke liye na mite. Aisi shop sirf deactivate hoti hai.
+  if (await hasHistory(shopId)) {
+    return res.status(409).json({
+      error: 'This shop has stock, sales or support history, so it cannot be deleted. Deactivate it instead.',
+      code: 'shop_has_history',
+    });
+  }
   await db.transaction(async trx => {
     await trx('support_access').where({ shop_id: shopId }).del();
     await trx('sale_payments').where({ shop_id: shopId }).del();
