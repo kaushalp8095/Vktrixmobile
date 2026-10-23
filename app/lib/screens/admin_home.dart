@@ -107,9 +107,13 @@ class _AdminHomeState extends State<AdminHome> {
     bool logoChanged = false;
     Uint8List? logoBytes;
     final key = GlobalKey<FormState>();
-    final ok = await showDialog<bool>(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, setDialogState) => AlertDialog(
-      title: Text(shop == null ? 'New shop' : 'Edit shop'),
-      content: Form(key: key, child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+    final ok = await showGlassFormDialog(context,
+      title: shop == null ? 'New shop' : 'Edit shop',
+      icon: shop == null ? Icons.add_business_outlined : Icons.edit_outlined,
+      confirmLabel: shop == null ? 'Create shop' : 'Save',
+      validate: () => key.currentState?.validate() ?? false,
+      body: (ctx) => StatefulBuilder(builder: (ctx, setDialogState) => Form(key: key,
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
         TextFormField(controller: name, decoration: const InputDecoration(labelText: 'Shop name *'), validator: (v) => (v ?? '').trim().isEmpty ? 'Required' : null),
         const SizedBox(height: 8),
         TextFormField(controller: owner, decoration: const InputDecoration(labelText: 'Owner name')),
@@ -125,19 +129,19 @@ class _AdminHomeState extends State<AdminHome> {
         const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.all(Space.x12),
-          decoration: BoxDecoration(color: context.colors.textPrimary.withValues(alpha: .04),
-            borderRadius: Shapes.md, border: Border.all(color: context.colors.textPrimary.withValues(alpha: .10))),
+          decoration: BoxDecoration(color: ctx.colors.textPrimary.withValues(alpha: .04),
+            borderRadius: Shapes.md, border: Border.all(color: ctx.colors.textPrimary.withValues(alpha: .10))),
           child: Row(children: [
             Container(width: 54, height: 54,
-              decoration: BoxDecoration(color: context.scheme.primary.withValues(alpha: .10), borderRadius: Shapes.md),
+              decoration: BoxDecoration(color: ctx.scheme.primary.withValues(alpha: .10), borderRadius: Shapes.md),
               clipBehavior: Clip.antiAlias,
               child: logoBytes == null
-                ? Icon(Icons.storefront_outlined, color: context.colors.brandInk)
+                ? Icon(Icons.storefront_outlined, color: ctx.colors.brandInk)
                 : Image.memory(logoBytes!, fit: BoxFit.contain)),
             const SizedBox(width: Space.x12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Bill logo', style: context.type.titleSmall),
-              Text('PDF bill par shop logo', style: context.type.bodySmall?.copyWith(color: context.colors.textSecondary)),
+              Text('Bill logo', style: ctx.type.titleSmall),
+              Text('PDF bill par shop logo', style: ctx.type.bodySmall?.copyWith(color: ctx.colors.textSecondary)),
             ])),
             TextButton(
               onPressed: () async {
@@ -166,7 +170,7 @@ class _AdminHomeState extends State<AdminHome> {
         ),
         if (shop == null) ...[
           const SizedBox(height: 16),
-          Align(alignment: Alignment.centerLeft, child: Text('Shop login', style: Theme.of(ctx).textTheme.titleSmall)),
+          Align(alignment: Alignment.centerLeft, child: Text('Shop login', style: ctx.type.titleSmall)),
           const SizedBox(height: 8),
           TextFormField(controller: user, decoration: const InputDecoration(labelText: 'Username *'),
               validator: (v) => (v ?? '').trim().length >= 3 ? null : 'Min 3 characters'),
@@ -175,26 +179,25 @@ class _AdminHomeState extends State<AdminHome> {
               validator: (v) => (v ?? '').length >= 6 ? null : 'Min 6 characters'),
         ],
       ]))),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-        FilledButton(onPressed: () { if (key.currentState!.validate()) Navigator.pop(ctx, true); },
-            child: Text(shop == null ? 'Create shop' : 'Save')),
-      ],
-    )));
-    if (ok != true) return;
+    );
+    // Dialog band hone se pehle values padh lete hain, phir controllers dispose
+    // (pehle saat controllers leak hote the).
+    final vName = name.text, vOwner = owner.text, vPhone = phone.text.trim(),
+        vAddr = addr.text, vGst = gst.text, vUser = user.text.trim(), vPass = pass.text;
+    name.dispose(); owner.dispose(); phone.dispose(); addr.dispose(); gst.dispose(); user.dispose(); pass.dispose();
+    if (!ok || !mounted) return;
     try {
-      final body = <String, dynamic>{'name': name.text, 'owner_name': owner.text, 'address': addr.text,
-        'gst_no': gst.text};
+      final body = <String, dynamic>{'name': vName, 'owner_name': vOwner, 'address': vAddr, 'gst_no': vGst};
       if (shop == null || logoChanged) body['logo_data'] = logoData ?? '';
       // Phone sirf tab bhejte hain jab admin ne poora naya number likha ho:
       // masked ("98•••••210") value kabhi save nahi hoti.
-      if (phone.text.trim().isNotEmpty) body['phone'] = phone.text.trim();
+      if (vPhone.isNotEmpty) body['phone'] = vPhone;
       if (shop == null) {
-        await Api.post('/admin/shops', {...body, 'username': user.text.trim(), 'password': pass.text});
-        if (mounted) toast(context, '${name.text} created — login: ${user.text.trim()}');
+        await Api.post('/admin/shops', {...body, 'username': vUser, 'password': vPass});
+        if (mounted) toast(context, '$vName created — login: $vUser');
       } else {
         await Api.put('/admin/shops/${shop['id']}', body);
-        if (mounted) toast(context, '${name.text} updated');
+        if (mounted) toast(context, '$vName updated');
       }
       _load();
     } catch (e) { if (mounted) toast(context, '$e', err: true); }
@@ -202,18 +205,23 @@ class _AdminHomeState extends State<AdminHome> {
 
   Future<void> _resetPass(Map shop) async {
     final p = TextEditingController();
-    final ok = await showDialog<bool>(context: context, builder: (d) => AlertDialog(
-      title: const Text('Reset password'),
-      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('${shop['name']}', style: Theme.of(d).textTheme.bodyMedium),
-        const SizedBox(height: 8),
-        TextFormField(controller: p, obscureText: true, decoration: const InputDecoration(labelText: 'New password *')),
-      ]),
-      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
-        FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Reset'))],
-    ));
-    if (ok != true || p.text.length < 6) { if (ok == true && mounted) toast(context, 'Password min 6 characters', err: true); return; }
-    try { await Api.post('/admin/shops/${shop['id']}/reset-password', {'password': p.text}); if (mounted) toast(context, 'Password changed'); }
+    final form = GlobalKey<FormState>();
+    final ok = await showGlassFormDialog(context,
+      title: 'Reset password',
+      icon: Icons.password_outlined,
+      message: '${shop['name']}',
+      identity: '@${shop['login']?['username'] ?? '—'}',
+      confirmLabel: 'Reset',
+      note: 'The shop owner is signed out everywhere and logs in with the new password.',
+      validate: () => form.currentState?.validate() ?? false,
+      body: (_) => Form(key: form, child: TextFormField(controller: p, obscureText: true, autofocus: true,
+        decoration: const InputDecoration(labelText: 'New password *'),
+        validator: (v) => (v ?? '').length >= 6 ? null : 'Min 6 characters')),
+    );
+    final pw = p.text;
+    p.dispose();
+    if (!ok || !mounted) return;
+    try { await Api.post('/admin/shops/${shop['id']}/reset-password', {'password': pw}); if (mounted) toast(context, 'Password changed'); }
     catch (e) { if (mounted) toast(context, '$e', err: true); }
   }
 
@@ -236,10 +244,14 @@ class _AdminHomeState extends State<AdminHome> {
     } catch (e) { if (mounted) toast(context, '$e', err: true); }
   }
 
+  /// Delete sirf khaali shop par hota hai. Jisme stock, sales, payment ya
+  /// support-access ka itihaas hai wo delete nahi hoti — server 409 deta hai,
+  /// aur app deactivate karne ka raasta dikhata hai (history hamesha bachi rahe).
   Future<void> _delete(Map s) async {
+    if (s['can_delete'] == false) return _explainDeleteBlocked(s);
     final ok = await showConfirmDialog(context,
       title: 'Delete shop permanently?',
-      message: '${s['name']} — all stock, sales and payment history will be deleted forever. This cannot be undone.',
+      message: '${s['name']} — this shop has no stock or sales yet, so it can be deleted. This cannot be undone.',
       confirmLabel: 'Delete forever',
       cancelLabel: 'Cancel',
       icon: Icons.delete_forever_outlined,
@@ -250,7 +262,32 @@ class _AdminHomeState extends State<AdminHome> {
       await Api.delete('/admin/shops/${s['id']}');
       if (mounted) toast(context, '${s['name']} deleted');
       _load();
-    } catch (e) { if (mounted) toast(context, '$e', err: true); }
+    } on ApiException catch (e) {
+      // Beech me stock/sale aa gaya (list purani thi) — wahi deactivate ka raasta.
+      if (!mounted) return;
+      if (e.code == 'shop_has_history') return _explainDeleteBlocked(s);
+      toast(context, '$e', err: true);
+    } catch (e) {
+      if (mounted) toast(context, '$e', err: true);
+    }
+  }
+
+  /// History wali shop ke liye: delete nahi, sirf deactivate.
+  Future<void> _explainDeleteBlocked(Map s) async {
+    final active = _on(s['active']);
+    final deactivate = await showGlassDialog<bool>(context,
+      title: 'This shop cannot be deleted',
+      icon: Icons.lock_outline,
+      message: '${s['name']} has stock, sales, payment or support-access records. Deleting it would erase the shop owner\'s books, so the server keeps this shop.',
+      identity: '@${s['login']?['username'] ?? '—'}',
+      note: active ? 'It can only be deactivated — sign-in stops, but every record stays.'
+        : 'This shop is already deactivated. Its records stay intact.',
+      footer: (ctx) => SizedBox(width: double.infinity, child: OutlinedButton(
+        onPressed: () => Navigator.pop(ctx, active),
+        child: Text(active ? 'Deactivate shop' : 'Close'))),
+    );
+    if (deactivate != true || !mounted) return;
+    await _toggle(s);
   }
 
   // ---- Temporary support access (reason + time limit + read-only + log) ----
@@ -585,10 +622,18 @@ class _ShopSheet extends StatelessWidget {
             style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
           ),
           const SizedBox(height: Space.x12),
-          Center(child: TextButton(
-            onPressed: () => Navigator.pop(context, 'delete'),
-            child: Text('Delete shop', style: t.labelLarge?.copyWith(color: c.errorInk)),
-          )),
+          if (shop['can_delete'] != false)
+            Center(child: TextButton(
+              onPressed: () => Navigator.pop(context, 'delete'),
+              child: Text('Delete shop', style: t.labelLarge?.copyWith(color: c.errorInk)),
+            ))
+          else
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Icon(Icons.lock_outline, size: 16, color: c.textSecondary),
+              const SizedBox(width: Space.x8),
+              Expanded(child: Text('Has stock, sales or support history — it can only be deactivated.',
+                  style: t.bodySmall?.copyWith(color: c.textSecondary))),
+            ]),
         ]),
       ))),
     );

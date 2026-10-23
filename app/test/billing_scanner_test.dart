@@ -41,6 +41,19 @@ void main() {
     }
   });
 
+  test('a bill with paise keeps them (₹12,500.50, not ₹12,501)', () async {
+    // Ledger 12500.50 rakhta hai; invoice bhi wahi dikhaye. Pehle rs() 0 decimal
+    // par round kar deta tha, to customer ke bill par ₹12,501 chhapta tha (ab `rs()`
+    // paise rakhta hai, isliye PDF me bhi 12,500.50 hi jata hai).
+    final receipt = _receipt('sale');
+    receipt['amount'] = 12500.5;
+    receipt['paid_amount'] = 5000.25;
+    receipt['balance_due'] = 7500.25;
+    final bytes = await ReceiptDocument.build(receipt);
+    expect(ascii.decode(bytes.sublist(0, 5)), '%PDF-');
+    expect(ascii.decode(bytes.sublist(bytes.length - 16), allowInvalid: true), contains('%%EOF'));
+  });
+
   test('IMEI scanner has exactly one camera start owner', () async {
     final controller = createImeiScannerController();
     expect(controller.autoStart, isFalse,

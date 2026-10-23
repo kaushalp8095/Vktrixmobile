@@ -226,7 +226,8 @@ class _SellFormState extends State<SellForm> {
                     final d = await showDatePicker(context: context, initialDate: date, firstDate: DateTime(2020), lastDate: DateTime.now());
                     if (d != null) setState(() => date = d);
                   },
-                  child: Container(height: 56, padding: const EdgeInsets.symmetric(horizontal: Space.x16),
+                  child: Container(constraints: const BoxConstraints(minHeight: 56),
+                    padding: const EdgeInsets.symmetric(horizontal: Space.x16),
                     decoration: BoxDecoration(borderRadius: Shapes.md, color: c.textPrimary.withValues(alpha: .05),
                         border: Border.all(color: c.textPrimary.withValues(alpha: .10))),
                     child: Row(children: [
@@ -368,7 +369,8 @@ class _PayDropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return Container(height: 56, padding: const EdgeInsets.symmetric(horizontal: Space.x16),
+    return Container(constraints: const BoxConstraints(minHeight: 56),
+      padding: const EdgeInsets.symmetric(horizontal: Space.x16),
       decoration: BoxDecoration(borderRadius: Shapes.md, color: c.textPrimary.withValues(alpha: .05),
           border: Border.all(color: c.textPrimary.withValues(alpha: .10))),
       child: DropdownButtonHideUnderline(child: DropdownButton<String>(

@@ -7,6 +7,7 @@
 // motion par instant.
 import 'package:flutter/material.dart';
 import '../design.dart';
+import 'glass_dialog.dart';
 
 Color _scrim(BuildContext context) {
   final dark = Theme.of(context).brightness == Brightness.dark;
@@ -59,6 +60,8 @@ Future<bool> showLogoutDialog(BuildContext context, {String? identity, String? n
       note: note ?? 'Your data stays safe on the server — this only ends the session on this phone.',
     );
 
+/// Confirmation popup — chrome `GlassDialogCard` se aata hai, isliye form
+/// dialogs aur confirms bilkul ek jaise dikhte hain.
 class ConfirmDialogCard extends StatelessWidget {
   final String title, message, confirmLabel, cancelLabel;
   final IconData icon, identityIcon;
@@ -69,86 +72,13 @@ class ConfirmDialogCard extends StatelessWidget {
     this.destructive = false, this.identity, this.identityIcon = Icons.storefront_outlined, this.note});
 
   @override
-  Widget build(BuildContext context) {
-    final c = context.colors, t = context.type, s = context.scheme;
-    final accent = destructive ? c.errorInk : c.brandInk;
-    final fill = destructive ? c.error : c.brandInk;
-    final onFill = destructive ? s.onError : s.onPrimary;
-    return Semantics(
-      container: true, explicitChildNodes: true, label: title,
-      child: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: Space.x24, vertical: Space.x24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: Material(
-              color: s.surfaceContainer,
-              elevation: 0,
-              clipBehavior: Clip.antiAlias,
-              shape: RoundedRectangleBorder(borderRadius: Shapes.xl,
-                  side: BorderSide(color: c.textPrimary.withValues(alpha: .08))),
-              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                // 4dp brand hairline: Indigo → Mint.
-                Container(height: 4, decoration: const BoxDecoration(gradient: AppColors.brandGradient)),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(Space.x24, Space.x24, Space.x24, Space.x16),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Row(children: [
-                      Container(
-                        width: 52, height: 52,
-                        decoration: BoxDecoration(color: accent.withValues(alpha: .12), borderRadius: Shapes.md,
-                            border: Border.all(color: accent.withValues(alpha: .24))),
-                        child: Icon(icon, size: 26, color: accent),
-                      ),
-                      const SizedBox(width: Space.x16),
-                      Expanded(child: Text(title, style: t.titleLarge)),
-                    ]),
-                    const SizedBox(height: Space.x16),
-                    Text(message, style: t.bodyMedium?.copyWith(color: c.textSecondary)),
-                    if (identity != null) ...[
-                      const SizedBox(height: Space.x16),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: Space.x12, vertical: Space.x8),
-                        decoration: BoxDecoration(color: c.textPrimary.withValues(alpha: .04), borderRadius: Shapes.md,
-                            border: Border.all(color: c.textPrimary.withValues(alpha: .08))),
-                        child: Row(children: [
-                          Icon(identityIcon, size: 18, color: c.textSecondary),
-                          const SizedBox(width: Space.x8),
-                          Expanded(child: Text(identity!, style: t.labelSmall?.copyWith(color: c.textSecondary),
-                              maxLines: 1, overflow: TextOverflow.ellipsis)),
-                        ]),
-                      ),
-                    ],
-                    if (note != null) ...[
-                      const SizedBox(height: Space.x12),
-                      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Icon(Icons.info_outline, size: 16, color: c.textSecondary),
-                        const SizedBox(width: Space.x8),
-                        Expanded(child: Text(note!, style: t.bodySmall?.copyWith(color: c.textSecondary))),
-                      ]),
-                    ],
-                  ]),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(Space.x24, 0, Space.x24, Space.x24),
-                  child: Row(children: [
-                    Expanded(child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      child: Text(cancelLabel, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
-                    )),
-                    const SizedBox(width: Space.x12),
-                    Expanded(child: FilledButton(
-                      style: FilledButton.styleFrom(backgroundColor: fill, foregroundColor: onFill),
-                      onPressed: () => Navigator.pop(context, true),
-                      child: Text(confirmLabel, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
-                    )),
-                  ]),
-                ),
-              ]),
-            ),
-          ),
+  Widget build(BuildContext context) => GlassDialogCard(
+        title: title, icon: icon, message: message, identity: identity,
+        identityIcon: identityIcon, note: note, destructive: destructive,
+        footer: GlassDialogActions(
+          cancelLabel: cancelLabel, confirmLabel: confirmLabel, destructive: destructive,
+          onCancel: () => Navigator.pop(context, false),
+          onConfirm: () => Navigator.pop(context, true),
         ),
-      ),
-    );
-  }
+      );
 }

@@ -36,6 +36,19 @@ void main() {
     expect('$e', contains('Shop band hai'));
   });
 
+  test('a structured error keeps its status and machine code', () {
+    try {
+      Api.parseResponse(http.Response(
+          jsonEncode({'error': 'This shop has history.', 'code': 'shop_has_history'}), 409));
+      fail('expected an ApiException');
+    } on ApiException catch (e) {
+      expect(e.statusCode, 409);
+      expect(e.code, 'shop_has_history');
+      // Purana behaviour: `Exception: <message>` — har screen `'$e'` dikhati hai.
+      expect('$e', 'Exception: This shop has history.');
+    }
+  });
+
   test('an empty body error still reports the status', () {
     final e = _error(() => Api.parseResponse(http.Response('', 500)));
     expect('$e', contains('Error 500'));

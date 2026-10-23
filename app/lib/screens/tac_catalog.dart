@@ -105,18 +105,16 @@ class _TacCatalogScreenState extends State<TacCatalogScreen> {
   Future<void> _sync(Map catalog) async {
     final label = '${catalog['label'] ?? 'catalog'}';
     final note = '${catalog['note'] ?? ''}';
-    final ok = await showDialog<bool>(context: context, builder: (d) => AlertDialog(
-      title: Text('Sync $label?'),
-      content: Text('The server downloads the free $label and adds missing brand + model entries. '
-          'Nothing is deleted and models learned from your shop\'s purchases are never overwritten.\n\n'
-          '${note.isEmpty ? '' : '$note\n\n'}'
-          'The sync runs in the background — you can leave this screen.'),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
-        FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Start sync')),
-      ],
-    ));
-    if (ok != true || !mounted) return;
+    final ok = await showConfirmDialog(context,
+      title: 'Sync $label?',
+      message: 'The server downloads the free $label and adds missing brand + model entries. '
+          'Nothing is deleted and models learned from your shop\'s purchases are never overwritten.',
+      confirmLabel: 'Start sync',
+      cancelLabel: 'Cancel',
+      icon: Icons.sync,
+      note: '${note.isEmpty ? 'The sync runs in the background — you can leave this screen.'
+        : '$note\n\nThe sync runs in the background — you can leave this screen.'}');
+    if (!ok || !mounted) return;
     setState(() => _starting = '${catalog['source']}');
     try {
       await Api.post('/admin/tac/sync/${catalog['source']}', {});

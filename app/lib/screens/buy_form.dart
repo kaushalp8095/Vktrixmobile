@@ -648,7 +648,10 @@ class _GlassDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Container(
-      height: 56, padding: const EdgeInsets.symmetric(horizontal: Space.x16),
+      // `height` nahi, `minHeight`: 100% par field wahi 56 rehta hai, aur 200%
+      // text par dropdown apne text ke saath badh jata hai (clip nahi hota).
+      constraints: const BoxConstraints(minHeight: 56),
+      padding: const EdgeInsets.symmetric(horizontal: Space.x16),
       decoration: BoxDecoration(borderRadius: Shapes.md, color: c.textPrimary.withValues(alpha: .05),
           border: Border.all(color: c.textPrimary.withValues(alpha: .10))),
       child: DropdownButtonHideUnderline(
