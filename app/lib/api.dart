@@ -44,7 +44,11 @@ class Api {
 
   static Future<void> load() async {
     final p = await SharedPreferences.getInstance();
-    baseUrl = p.getString('server') ?? baseUrl;
+    // Purane install me http:// server save ho sakta hai (jab wo allowed tha).
+    // Wo address load na karein — warna request plain HTTP par jane ki koshish
+    // karti hai (Android to block karta hai, par default HTTPS zyada saaf hai).
+    final saved = p.getString('server');
+    baseUrl = (saved != null && validateServer(saved) == null) ? saved : defaultBaseUrl;
     token = p.getString('token');
     final u = p.getString('user');
     if (u != null) user = jsonDecode(u);

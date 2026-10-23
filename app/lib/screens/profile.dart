@@ -60,7 +60,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             autofillHints: const [AutofillHints.password], validator: (v) => (v ?? '').isEmpty ? 'Required' : null),
         const SizedBox(height: 12),
         TextFormField(controller: nw, obscureText: true, decoration: const InputDecoration(labelText: 'New password *'),
-            autofillHints: const [AutofillHints.newPassword], validator: (v) => (v ?? '').length >= 6 ? null : 'Min 6 characters'),
+            autofillHints: const [AutofillHints.newPassword], validator: (v) => (v ?? '').length >= 8 ? null : 'Min 8 characters'),
         const SizedBox(height: 12),
         TextFormField(controller: cf, obscureText: true, decoration: const InputDecoration(labelText: 'Confirm new password *'),
             autofillHints: const [AutofillHints.newPassword], validator: (v) => v == nw.text ? null : "Doesn't match"),

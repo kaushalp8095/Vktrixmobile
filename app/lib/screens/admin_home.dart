@@ -176,7 +176,7 @@ class _AdminHomeState extends State<AdminHome> {
               validator: (v) => (v ?? '').trim().length >= 3 ? null : 'Min 3 characters'),
           const SizedBox(height: 8),
           TextFormField(controller: pass, obscureText: true, decoration: const InputDecoration(labelText: 'Password *'),
-              validator: (v) => (v ?? '').length >= 6 ? null : 'Min 6 characters'),
+              validator: (v) => (v ?? '').length >= 8 ? null : 'Min 8 characters'),
         ],
       ]))),
     );
@@ -216,7 +216,7 @@ class _AdminHomeState extends State<AdminHome> {
       validate: () => form.currentState?.validate() ?? false,
       body: (_) => Form(key: form, child: TextFormField(controller: p, obscureText: true, autofocus: true,
         decoration: const InputDecoration(labelText: 'New password *'),
-        validator: (v) => (v ?? '').length >= 6 ? null : 'Min 6 characters')),
+        validator: (v) => (v ?? '').length >= 8 ? null : 'Min 8 characters')),
     );
     final pw = p.text;
     p.dispose();

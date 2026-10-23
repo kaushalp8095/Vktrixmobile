@@ -22,7 +22,7 @@ const tacFallbackCatalogs = <Map<String, dynamic>>[
   {
     'source': 'osmocom', 'label': 'Community catalog (Osmocom)', 'short': 'Osmocom',
     'note': 'Free community list (brand + model only). Weakest for recent India-only phones.',
-    'homepage': 'http://tacdb.osmocom.org/',
+    'homepage': 'https://tacdb.osmocom.org/',
   },
   {
     'source': 'tacdb', 'label': 'Extended catalog (India models)', 'short': 'Extended',
@@ -331,7 +331,7 @@ class _TacCatalogScreenState extends State<TacCatalogScreen> {
         ? [for (final l in licenses) '${l['attribution'] ?? l['name']}\n${l['homepage'] ?? ''}'.trim()]
         : [
             '${(_s?['catalog'] as Map?)?['attribution'] ?? 'TAC data: Osmocom TAC database, CC-BY-SA 3.0'}\n'
-                '${(_s?['catalog'] as Map?)?['homepage'] ?? 'http://tacdb.osmocom.org/'}',
+                '${(_s?['catalog'] as Map?)?['homepage'] ?? 'https://tacdb.osmocom.org/'}',
           ];
     return Text(lines.join('\n\n'), textAlign: TextAlign.center, style: t.labelSmall?.copyWith(color: c.textSecondary));
   }

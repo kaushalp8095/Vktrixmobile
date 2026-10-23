@@ -83,11 +83,16 @@ jobs:
 
       - name: Create version.json
         run: |
+          # App installer kholne se pehle isi hash se APK verify karti hai — adhoora
+          # ya CDN se badla hua file install nahi ho sakta.
+          SHA256=$(sha256sum app/build/app/outputs/flutter-apk/app-release.apk | cut -d' ' -f1)
+          echo "APK SHA-256: $SHA256"
           cat > app/version.json << EOF
           {
             "versionCode": ${{ steps.version.outputs.build_number }},
             "versionName": "${{ steps.version.outputs.version_name }}",
             "downloadUrl": "https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version_name }}/app-release.apk",
+            "sha256": "$SHA256",
             "releaseNotes": "Auto-generated release v${{ steps.version.outputs.version_name }}",
             "minVersionCode": 1,
             "forceUpdate": false

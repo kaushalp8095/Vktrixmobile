@@ -56,9 +56,12 @@ function mobile(value, field) {
   if (v && (!/^\+?[\d ()-]+$/.test(v) || !/^\d{7,15}$/.test(v.replace(/\D/g, '')))) fail(`${field} invalid phone number`);
   return v;
 }
+// NIST SP 800-63B: lambai hi asli suraksha hai (8+). Pehle 6 tha — brute force
+// ke liye bahut chhota. Purane passwords band nahi hote; sirf naye set karte
+// waqt lagoo hota hai (change-password / admin reset / nayi shop).
 function password(value, field = 'password') {
-  if (typeof value !== 'string' || value.length < 6 || Buffer.byteLength(value, 'utf8') > 72)
-    fail(`${field} must be at least 6 characters and at most 72 UTF-8 bytes`);
+  if (typeof value !== 'string' || value.length < 8 || Buffer.byteLength(value, 'utf8') > 72)
+    fail(`${field} must be at least 8 characters and at most 72 UTF-8 bytes`);
   return value;
 }
 

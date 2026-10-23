@@ -6,7 +6,18 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
     <!-- In-app update: lets the app open the system installer for its own downloaded APK. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
-    <application android:usesCleartextTraffic="true"
+    <!-- Security:
+         * cleartext HTTP band — API/update URLs sab https hain, to koi MITM plain
+           HTTP par token ya bill nahi pakad sakta (Play ki pre-launch report bhi
+           usesCleartextTraffic=true ko flag karti hai).
+         * allowBackup=false — SharedPreferences me login token aur cached shop data
+           hota hai; ADB/cloud backup se wo phone se bahar nahi jana chahiye.
+         * network security config + data extraction rules neeche res/xml me. -->
+    <application android:usesCleartextTraffic="false"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:label="Vktrix Mobile"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">

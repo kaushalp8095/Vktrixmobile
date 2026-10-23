@@ -13,6 +13,25 @@ val keystoreProperties = Properties().apply {
     if (f.exists()) load(FileInputStream(f))
 }
 
+// Release builds MUST be signed with the persistent key: Android only installs an update
+// over the existing app when both APKs share the same signing certificate. A debug-signed
+// "release" silently broke in-app updates ("App not installed") and could never be fixed
+// later for installed users, so a missing keystore is now a build failure, not a fallback.
+val releaseKeystoreProperty = keystoreProperties.getProperty("storeFile")
+val releaseKeystoreFile = releaseKeystoreProperty?.let { rootProject.file(it) }
+val releaseKeystoreReady = releaseKeystoreFile?.isFile == true
+val releaseBuildRequested = gradle.startParameter.taskNames.any {
+    it.contains("release", ignoreCase = true)
+}
+
+if (releaseBuildRequested && !releaseKeystoreReady) {
+    throw GradleException(
+        "Release build needs a signing key. Create keystore/key.properties with " +
+            "storeFile, storePassword, keyAlias and keyPassword (see README) or set the " +
+            "ANDROID_KEYSTORE_BASE64 secrets in CI. Refusing to ship a debug-signed build."
+    )
+}
+
 android {
     namespace = "com.vktrix.mobileapp"
     compileSdk = flutter.compileSdkVersion
@@ -41,19 +60,24 @@ android {
 
     signingConfigs {
         create("release") {
-            if (keystoreProperties.containsKey("storeFile")) {
-                storeFile = file(keystoreProperties["storeFile"]!!)
-                storePassword = keystoreProperties["storePassword"] as String
-                keyAlias = keystoreProperties["keyAlias"] as String
-                keyPassword = keystoreProperties["keyPassword"] as String
+            if (releaseKeystoreReady) {
+                storeFile = releaseKeystoreFile
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
             }
         }
     }
 
     buildTypes {
         release {
-            signingConfig = if (keystoreProperties.containsKey("storeFile"))
-                signingConfigs.getByName("release") else signingConfigs.getByName("debug")
+            // Never the debug key: a debug-signed "release" cannot be updated in place.
+            signingConfig = if (releaseKeystoreReady) {
+                signingConfigs.getByName("release")
+            } else {
+                // Unreachable for release tasks (checked above); keep debug builds working.
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }
