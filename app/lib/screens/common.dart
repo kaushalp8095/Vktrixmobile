@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../api.dart';
 import '../design/components/components.dart';
-import '../design/design.dart';
 
 /// Keeps API timestamps compact in business screens without shifting a UTC
 /// calendar date into the previous/next local day.

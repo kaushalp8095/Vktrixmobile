@@ -116,7 +116,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       if (action == 'reset') {
         await Api.resetServer();
-        if (mounted) { setState(() {}); toast(context, 'Server reset to ${Api.baseUrl}'); }
+        if (mounted) { setState(() {}); toast(context, 'Server reset to $baseUrl'); }
       } else {
         await Api.setServer(typed);
         if (mounted) { setState(() {}); toast(context, 'Server saved'); }
