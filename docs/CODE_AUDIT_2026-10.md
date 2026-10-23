@@ -250,7 +250,11 @@ P0 #1, #2 · P1 #3, #4, #5, #6, #7, #8, #9, #10 (validation + reset), #11, #14,
 
 New tests: `backend/test/security_defaults.test.js` (5), `app/test/api_response_test.dart` (6),
 `app/test/dashboard_activity_test.dart` (3), `app/test/buy_lookup_race_test.dart` (1).
-Existing backend suite: 61/61 local.
+Existing backend suite: 61/61 local; Flutter analyze + full widget/golden suite green in CI.
+
+The "Update goldens" bot refreshed 10 PNGs for this branch; pixel comparison against the previous
+files shows ≤ 0.22 % of pixels changed with a mean channel delta < 0.12/255 — font antialiasing
+noise, not layout drift. None of the fixed screens changes its layout at rest.
 
 ## Checked and found correct
 
