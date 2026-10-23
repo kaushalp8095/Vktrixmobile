@@ -132,7 +132,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         padding: const EdgeInsets.only(top: Space.x8),
                         child: GlassTextField(controller: _server, label: 'Server URL', prefixIcon: Icons.link,
                             keyboardType: TextInputType.url, required: true,
-                            validator: (v) => (v ?? '').startsWith('http') ? null : 'Must start with https://'),
+                            validator: (v) => Api.validateServer(v ?? '')),
                       ),
                     ),
                   ]),

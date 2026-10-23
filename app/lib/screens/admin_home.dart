@@ -56,6 +56,8 @@ class _AdminHomeState extends State<AdminHome> {
   }
 
   Future<void> _load() async {
+    // Save/delete ke baad list reload ho sakti hai jab screen already band ho.
+    if (!mounted) return;
     setState(() { loading = true; _error = null; });
     try {
       final r = await Future.wait([Api.get('/admin/dashboard'), Api.get('/admin/shops')]);

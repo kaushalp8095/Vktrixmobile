@@ -32,6 +32,8 @@ class _StockScreenState extends State<StockScreen> {
   void dispose() { _search.dispose(); _scroll.dispose(); super.dispose(); }
 
   Future<void> _load() async {
+    // Delete/save ke baad reload ho sakta hai jab screen band ho chuki ho.
+    if (!mounted) return;
     setState(() { loading = true; _error = null; });
     try { items = await Api.get('/stock', {'search': _search.text}); }
     catch (e) { if (mounted) setState(() => _error = e); }

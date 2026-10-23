@@ -2,6 +2,14 @@ const jwt = require('jsonwebtoken');
 const db = require('./db');
 const SECRET = () => process.env.JWT_SECRET || 'dev_secret';
 
+// PRODUCTION GUARD: `dev_secret` public hai — usse koi bhi `{role:'superadmin'}`
+// token bana kar har shop ka data padh sakta hai. Isliye prod me bina secret ke
+// server chalna hi nahi chahiye (Render `JWT_SECRET` khud generate karta hai).
+if (process.env.NODE_ENV === 'production' && !(process.env.JWT_SECRET || '').trim()) {
+  throw new Error('JWT_SECRET is required in production — otherwise every session token can be forged. '
+    + 'Set JWT_SECRET in the environment (Render → Environment) and redeploy.');
+}
+
 const sign = u => jwt.sign({
   id: u.id,
   role: u.role,

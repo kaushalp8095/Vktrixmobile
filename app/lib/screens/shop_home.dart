@@ -89,7 +89,16 @@ class _ShopHomeState extends State<ShopHome> {
       icon: Icons.lock_outline);
     if (ok != true || !mounted) return;
     try {
-      if (shopId != null) await Api.delete('/admin/shops/$shopId/support-access');
+      if (shopId != null) {
+        // Server side best-effort: session pehle hi expire ho chuka ho to server 404
+        // deta hai. Local support mode har haal me band hona chahiye, warna admin
+        // read-only shell me phansa rehta hai.
+        try {
+          await Api.delete('/admin/shops/$shopId/support-access');
+        } catch (_) {
+          // Already expired (404) — local mode phir bhi band karna hai.
+        }
+      }
       Api.endSupport();
       if (mounted) toast(context, 'Support access ended');
       if (mounted) Navigator.of(context).pop();
@@ -110,6 +119,10 @@ class _ShopHomeState extends State<ShopHome> {
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.viewPaddingOf(context).bottom;
+    // Keyboard khula ho to scroll area keyboard ke upar khatam ho — warna focused
+    // field (Notes/Address) aur Save button keyboard ke neeche chhup jate hain
+    // (shell ka resizeToAvoidBottomInset jaan-boojh kar off hai).
+    final keyboard = MediaQuery.viewInsetsOf(context).bottom;
     final expired = Api.supportExpired;
     final locked = _readOnly && expired;
     final barSpace = _readOnly ? 92.0 : 0.0;
@@ -122,10 +135,10 @@ class _ShopHomeState extends State<ShopHome> {
         resizeToAvoidBottomInset: false,
         body: AuroraBackground(child: Stack(children: [
           Positioned.fill(
-            bottom: 76 + bottom + Space.x16 + barSpace,
-            child: IgnorePointer(
-              ignoring: locked,
-              child: PageView(
+            bottom: 76 + bottom + Space.x16 + barSpace + keyboard,
+            // Session expire -> data screen par se hata dete hain. Sirf taps block
+            // karna kaafi nahi tha: customer naam, IMEI aur sales dikhte rehte the.
+            child: locked ? const _SupportLocked() : PageView(
                 controller: _pager,
                 physics: const NeverScrollableScrollPhysics(),
                 onPageChanged: (i) => setState(() => tab = i),
@@ -141,7 +154,6 @@ class _ShopHomeState extends State<ShopHome> {
                   KeyedSubtree(key: _keys[4], child: const ReportsScreen()),
                 ],
               ),
-            ),
           ),
           Positioned(left: Space.x16, right: Space.x16, bottom: bottom + Space.x16,
             child: IgnorePointer(
@@ -222,5 +234,29 @@ class _SupportBlocked extends StatelessWidget {
       ),
       Positioned(top: 0, left: 0, right: 0, child: GlassTopBar(title: action, leading: const SizedBox(width: Space.x12))),
     ]);
+  }
+}
+
+/// Support session expire hone par: shop ka data screen se poori tarah hata kar
+/// lock card dikhate hain (read-only + time limit ka wada sirf taps rokne se poora
+/// nahi hota).
+class _SupportLocked extends StatelessWidget {
+  const _SupportLocked();
+  @override
+  Widget build(BuildContext context) {
+    final top = MediaQuery.viewPaddingOf(context).top;
+    return ListView(
+      padding: EdgeInsets.fromLTRB(Space.screen, top + 64 + Space.x8, Space.screen, Space.x24),
+      children: [
+        GlassCard(blur: false, child: EmptyState(
+          icon: Icons.lock_outline,
+          title: 'Support access ended',
+          message: 'Shop data is locked. Ask the shop owner to start a new support session if help is still needed.',
+          actionLabel: 'Back to shops',
+          // Local support mode bhi band karo, warna admin home read-only hi rahega.
+          onAction: () { Api.endSupport(); Navigator.of(context).pop(); },
+        )),
+      ],
+    );
   }
 }

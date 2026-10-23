@@ -42,6 +42,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() => _error = null);
     try {
       final raw = await Api.get('/ledger', {'status': _status, 'search': _search.text.trim()});

@@ -39,7 +39,16 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: flutter analyze --no-pub
+      # Analyzer output ko check-run annotations me bhi likhte hain: Actions ka
+      # log blob storage kabhi-kabhi reachable nahi hota, par annotations API se
+      # padhe ja sakte hain (file:line + message seedha PR me dikhta hai).
+      - name: Flutter analyze
+        run: |
+          set +e
+          flutter analyze --no-pub 2>&1 | tee "$RUNNER_TEMP/analyze.log"
+          status=${PIPESTATUS[0]}
+          python3 ../.github/scripts/analyze_annotations.py "$RUNNER_TEMP/analyze.log" || true
+          exit $status
       - run: flutter test --no-pub
       # Catches AndroidManifest/FileProvider and Kotlin MethodChannel errors that
       # widget tests cannot see (PDF save + WhatsApp attachment sharing).

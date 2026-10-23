@@ -212,9 +212,19 @@ async function migrate() {
   // Super admin seed
   const u = process.env.SUPERADMIN_USERNAME || 'superadmin';
   if (!(await db('users').where({ username: u }).first())) {
+    const configured = (process.env.SUPERADMIN_PASSWORD || '').trim();
+    // Pehle `Admin@123` default chhapta tha — var missing hone par internet par
+    // khula panel known password ke saath. Prod me password ke bina seed hi nahi.
+    if (!configured && process.env.NODE_ENV === 'production') {
+      throw new Error('SUPERADMIN_PASSWORD is required to create the first super admin. '
+        + 'Set it in the environment (Render → Environment) and redeploy.');
+    }
+    const password = configured || require('crypto').randomBytes(12).toString('base64url');
     await db('users').insert({ username: u, name: 'Super Admin', role: 'superadmin',
-      password_hash: bcrypt.hashSync(process.env.SUPERADMIN_PASSWORD || 'Admin@123', 10) });
-    console.log(`Super admin created -> ${u}`);
+      password_hash: bcrypt.hashSync(password, 10) });
+    console.log(configured
+      ? `Super admin created -> ${u}`
+      : `Super admin created -> ${u} / temporary password: ${password} (change it after login)`);
   }
   // Kuch sample TAC (baaki app use karte-karte khud seekhega / CSV import)
   const seed = [

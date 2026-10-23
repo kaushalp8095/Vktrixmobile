@@ -152,7 +152,10 @@ class ReceiptDocument {
         decoration: pw.BoxDecoration(borderRadius: pw.BorderRadius.circular(10), border: pw.Border.all(color: _line)),
         child: pw.Image(image, fit: pw.BoxFit.contain));
     }
-    final initial = _text(shopName, fallback: 'V').trim().substring(0, 1).toUpperCase();
+    // `substring(0, 1)` emoji (surrogate pair) shop name ko tod deta tha; runes
+    // poora code point dete hain.
+    final name = _text(shopName, fallback: 'V').trim();
+    final initial = name.isEmpty ? 'V' : String.fromCharCode(name.runes.first).toUpperCase();
     return pw.Container(width: 58, height: 58,
       decoration: pw.BoxDecoration(color: _indigo, borderRadius: pw.BorderRadius.circular(12)),
       alignment: pw.Alignment.center,

@@ -45,6 +45,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() { loading = true; _error = null; });
     final q = {'from': f.format(range.start), 'to': f.format(range.end)};
     try {
