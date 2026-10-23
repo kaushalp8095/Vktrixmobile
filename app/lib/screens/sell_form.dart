@@ -227,7 +227,7 @@ class _SellFormState extends State<SellForm> {
                     if (d != null) setState(() => date = d);
                   },
                   child: Container(constraints: const BoxConstraints(minHeight: 56),
-                    padding: const EdgeInsets.symmetric(horizontal: Space.x16, vertical: Space.x4),
+                    padding: const EdgeInsets.symmetric(horizontal: Space.x16),
                     decoration: BoxDecoration(borderRadius: Shapes.md, color: c.textPrimary.withValues(alpha: .05),
                         border: Border.all(color: c.textPrimary.withValues(alpha: .10))),
                     child: Row(children: [
@@ -370,7 +370,7 @@ class _PayDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Container(constraints: const BoxConstraints(minHeight: 56),
-      padding: const EdgeInsets.symmetric(horizontal: Space.x16, vertical: Space.x4),
+      padding: const EdgeInsets.symmetric(horizontal: Space.x16),
       decoration: BoxDecoration(borderRadius: Shapes.md, color: c.textPrimary.withValues(alpha: .05),
           border: Border.all(color: c.textPrimary.withValues(alpha: .10))),
       child: DropdownButtonHideUnderline(child: DropdownButton<String>(
