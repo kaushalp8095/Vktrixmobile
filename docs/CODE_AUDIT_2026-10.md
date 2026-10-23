@@ -163,8 +163,10 @@ Prices are stored with 2 decimals (`validation.js: decimalMoney`), the ledger ke
 printed invoice shows ₹12,501 for a ₹12,500.50 sale. On the one document a customer keeps, the total
 does not match the books.
 
-**Fix (needs a product decision):** add a 2-decimal formatter for PDFs and use it whenever
-`amount % 1 != 0`; keep whole rupees elsewhere. Documented, not changed.
+**Fix:** `rs()` ab rupees + paise cents me ginta hai — poore amount par `₹12,500`, paise hone par
+`₹12,500.50` (`.00` force nahi hota). Ek hi formatter poore app me (invoice, ledger, receipts), to
+kisi bhi screen par books se alag number nahi aa sakta. Tests: `app/test/money_format_test.dart`
++ PDF build test. *(fixed in the follow-up PR)*
 
 ### 13. Deleting a shop destroys its support audit trail
 `backend/src/routes/admin.js:110-125`
@@ -173,8 +175,10 @@ The hard delete removes `support_access`, `sale_payments`, `sales`, `phones`, `u
 the record of *who looked at this shop's data*, which the owner is promised, disappears with the
 shop. It also allows wiping a shop that has thousands of sales in one tap.
 
-**Fix (needs a product decision):** block deletion when any sale exists (use `active=false`), or
-archive support rows. Documented, not changed.
+**Fix:** hard delete sirf **khaali** shop par — `phones` / `sales` / `support_access` me ek bhi row
+ho to `DELETE /admin/shops/:id` 409 `shop_has_history` deta hai aur app "Deactivate shop" ka raasta
+dikhata hai. List me `can_delete` flag aata hai, isliye button pehle hi chhup jata hai.
+`backend/test/shop_delete.test.js` in sab cases ko cover karta hai. *(fixed in the follow-up PR)*
 
 ### 14. Keyboard covers the Buy/Sell forms
 `app/lib/screens/shop_home.dart:122`, `app/lib/screens/sell_form.dart:184`
@@ -196,8 +200,11 @@ colour — next to glass cards and Manrope type. The three `TextEditingControlle
 The same pattern appears in `admin_home.dart:108-198` (7 controllers),
 `admin_home.dart:203`, `tac_catalog.dart:107`, `receipt.dart:87` (WhatsApp fallback).
 
-**Fix (partly):** dispose the controllers; moving the remaining dialogs to `showConfirmDialog`-style
-glass dialogs is a follow-up (they need their own widget, not a one-line change).
+**Fix:** naya `design/components/glass_dialog.dart` (`GlassDialogCard` + `GlassDialogActions` +
+`showGlassDialog` / `showGlassFormDialog`), aur `ConfirmDialogCard` bhi wahi chrome use karta hai.
+Chhe AlertDialog (shop form, reset password, change password, server address, WhatsApp fallback, TAC
+sync) ab isi glass shell me hain; saare controllers dispose hote hain, forms ke andar hi validate
+hote hain, aur poora card scrollable hai (200 % text scale + keyboard). *(fixed in the follow-up PR)*
 
 ### 16. Dashboard shows a loss as `+-₹500` in green
 `app/lib/screens/dashboard.dart:311`
@@ -227,10 +234,10 @@ the five visible rows by a sale from last month. The row subtitle calls it "Rece
 | # | Where | Issue | Fix |
 |---|-------|-------|-----|
 | 18 | `dashboard.dart:62-70` | Every Home load fetches `/stock`, `/sales` (all rows, unbounded), `/reports/summary`, `/ledger/summary`; only 4 rows are used. `/sales` also runs `withPaymentTotals` over every sale. | Add `?limit=` to `/sales`/`/stock` or a `/dashboard` endpoint. |
-| 19 | `design/components/primary_button.dart:82,120` | Fixed `height: _h` with `softWrap: true`; a two-line label at 200 % text scale overflows. | `minHeight` + intrinsic height. |
-| 20 | `buy_form.dart:634`, `sell_form.dart:227,369` | `Container(height: 56)` around dropdown/date text. | `ConstrainedBox(minHeight: 56)` + padding. |
+| 19 | `design/components/primary_button.dart:82,120` | Fixed `height: _h` with `softWrap: true`; a two-line label at 200 % text scale overflows. | `minHeight` + intrinsic height. *(fixed)* |
+| 20 | `buy_form.dart:634`, `sell_form.dart:227,369` | `Container(height: 56)` around dropdown/date text. | `ConstrainedBox(minHeight: 56)` + padding. *(fixed; also `reports.dart:163` range chip, `profile.dart:243` theme tile)* |
 | 21 | `billing/receipt_document.dart:155` | `substring(0, 1)` on the shop name splits an emoji (surrogate pair). | `String.fromCharCode(name.runes.first)`. *(fixed)* |
-| 22 | `admin_home.dart:201-216` | "Reset password" closes on a too-short password and loses what was typed; no validator. | Validate inside the dialog like `_shopForm`. |
+| 22 | `admin_home.dart:201-216` | "Reset password" closes on a too-short password and loses what was typed; no validator. | Validate inside the dialog like `_shopForm`. *(fixed)* |
 | 23 | `sell_form.dart:251-270` | Choosing Credit then back to Cash leaves "Received" at 0, so the cash sale is recorded as fully unpaid. | Reset to the price when leaving Credit. |
 | 24 | `sell_form.dart:240` | `maxLength: 10` on Mobile blocks `+91 98765 43210` even though the backend accepts it. | Strip spaces/`+91` on paste, or raise the limit. |
 | 25 | `backend/src/support.js:170-190` | Comment says "30 din ka total"; `summaryByShop` counts all sessions ever. | Fix the comment or filter by 30 days. |
@@ -243,10 +250,17 @@ the five visible rows by a sale from last month. The row subtitle calls it "Rece
 
 ---
 
-## Fixed in this PR
+## Fixed in the first audit PR
 
 P0 #1, #2 · P1 #3, #4, #5, #6, #7, #8, #9, #10 (validation + reset), #11, #14,
 #15 (controller leak), #16, #17 · P2 #21, #27.
+
+## Fixed in the follow-up PR (the four deferred decisions)
+
+#12 invoices keep paise · #13 only empty shops can be deleted · #15 all six dialogs on the glass
+shell + controller disposal · #19/#20 fixed heights become minHeight + padding · #22 reset-password
+validator. 200 % text-scale widget tests: `app/test/text_scale_test.dart` (Buy, Sell, Reports,
+Profile, Stock + both dialog kinds).
 
 New tests: `backend/test/security_defaults.test.js` (5), `app/test/api_response_test.dart` (6),
 `app/test/dashboard_activity_test.dart` (3), `app/test/buy_lookup_race_test.dart` (1).
