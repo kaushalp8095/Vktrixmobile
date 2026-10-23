@@ -41,7 +41,7 @@ void main() {
         {'id': 2, 'brand': 'Oppo', 'model': 'A15', 'sell_date': '2026-10-23', 'sell_price': 9000, 'buy_price': 7000, 'customer_name': null},
       ],
     );
-    // Same date par purchase id 9 > sale ka synthetic id nahi — ab real id se tie-break.
+    // Same date par real id 9 > 2 — sale ka synthetic id sort me nahi aata.
     expect(rows.map((r) => r.title), ['Vivo Y20', 'Oppo A15']);
   });
 

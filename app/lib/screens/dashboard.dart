@@ -50,7 +50,11 @@ class Dashboard extends StatefulWidget {
                 (num.tryParse('${s['buy_price']}') ?? 0)),
     ]..sort((a, b) {
         final byDate = b.date.compareTo(a.date);
-        return byDate != 0 ? byDate : b.id.compareTo(a.id);
+        if (byDate != 0) return byDate;
+        // Same din: synthetic id (sale = 1000000 + id) se compare karne par har sale
+        // purchase se upar aa jati thi. Tie-break real id se.
+        int real(ActivityItem x) => x.isSale ? x.id - 1000000 : x.id;
+        return real(b).compareTo(real(a));
       });
     return items;
   }
