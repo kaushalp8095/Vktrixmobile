@@ -68,6 +68,7 @@ class _TacCatalogScreenState extends State<TacCatalogScreen> {
   void dispose() { _poll?.cancel(); _scroll.dispose(); super.dispose(); }
 
   Future<void> _load({bool quiet = false}) async {
+    if (!mounted) return;
     if (!quiet) setState(() { _loading = true; _error = null; });
     try {
       final s = await Api.get('/admin/tac/status') as Map;

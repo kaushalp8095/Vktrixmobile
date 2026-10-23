@@ -2,6 +2,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../api.dart';
 import '../design/components/components.dart';
 import '../design/design.dart';
@@ -20,11 +21,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _scroll = ScrollController();
   String _theme = 'system';
   ButtonPhase _passPhase = ButtonPhase.idle;
+  /// Asli build (e.g. "1.0.0 (20769)") — hardcoded "v1.0" se support ko pata nahi
+  /// chalta tha ki shop kaun sa release chala rahi hai.
+  String? _version;
 
   @override
   void initState() {
     super.initState();
     Api.themeMode().then((m) { if (mounted) setState(() => _theme = m); });
+    PackageInfo.fromPlatform().then((info) {
+      final build = info.buildNumber.trim();
+      final label = info.version.isEmpty ? '' : '${info.version}${build.isEmpty ? '' : ' ($build)'}';
+      if (mounted && label.isNotEmpty) setState(() => _version = label);
+    }).catchError((Object _) {});
   }
 
   @override
@@ -55,10 +64,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
         FilledButton(onPressed: () { if (key.currentState!.validate()) Navigator.pop(d, true); }, child: const Text('Change'))],
     ));
+    final oldValue = old.text, newValue = nw.text;
+    // Dialog band hone par teeno controllers dispose — pehle leak hote the.
+    old.dispose(); nw.dispose(); cf.dispose();
     if (ok != true || !mounted) return;
     setState(() => _passPhase = ButtonPhase.loading);
     try {
-      await Api.changePassword(old.text, nw.text);
+      await Api.changePassword(oldValue, newValue);
       if (!mounted) return;
       setState(() => _passPhase = ButtonPhase.success);
       Haptics.success();
@@ -73,6 +85,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
       toast(context, '$e', err: true);
       await Future<void>.delayed(const Duration(seconds: 2));
       if (mounted && _passPhase == ButtonPhase.error) setState(() => _passPhase = ButtonPhase.idle);
+    }
+  }
+
+  /// Server address: sirf valid https URL save hota hai, aur galti ho jaye to
+  /// "Use default" se wapas. Pehle `https://` jaisa aadha address bhi save ho
+  /// jata tha aur uske baad app ka har request fail hota tha.
+  Future<void> _editServer() async {
+    final ctrl = TextEditingController(text: baseUrl);
+    final formKey = GlobalKey<FormState>();
+    final action = await showDialog<String>(context: context, builder: (d) => AlertDialog(
+      title: const Text('Server address'),
+      content: Form(key: formKey, child: TextFormField(
+        controller: ctrl, autofocus: true,
+        decoration: const InputDecoration(labelText: 'URL', hintText: 'https://…'),
+        keyboardType: TextInputType.url,
+        validator: (v) => Api.validateServer(v ?? ''),
+      )),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancel')),
+        TextButton(onPressed: () => Navigator.pop(d, 'reset'), child: const Text('Use default')),
+        FilledButton(
+          onPressed: () { if (formKey.currentState!.validate()) Navigator.pop(d, 'save'); },
+          child: const Text('Save')),
+      ],
+    ));
+    final typed = ctrl.text;
+    ctrl.dispose();
+    if (action == null || !mounted) return;
+    try {
+      if (action == 'reset') {
+        await Api.resetServer();
+        if (mounted) { setState(() {}); toast(context, 'Server reset to ${Api.baseUrl}'); }
+      } else {
+        await Api.setServer(typed);
+        if (mounted) { setState(() {}); toast(context, 'Server saved'); }
+      }
+    } catch (e) {
+      if (mounted) toast(context, '$e', err: true);
     }
   }
 
@@ -158,22 +208,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   subtitle: 'When, why, and how much data Vktrix Support viewed',
                   onTap: () => showSupportLogSheet(context, title: 'Support access')),
               Divider(height: 1, indent: 56, color: c.textPrimary.withValues(alpha: .08)),
-              _RowTap(icon: Icons.dns_outlined, title: 'Server', subtitle: baseUrl, onTap: () async {
-                final ctrl = TextEditingController(text: baseUrl);
-                final ok = await showDialog<bool>(context: context, builder: (d) => AlertDialog(
-                  title: const Text('Server address'),
-                  content: TextFormField(controller: ctrl, decoration: const InputDecoration(labelText: 'URL', hintText: 'https://…'),
-                      keyboardType: TextInputType.url),
-                  actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
-                    FilledButton(onPressed: () => Navigator.pop(d, ctrl.text.startsWith('http')), child: const Text('Save'))],
-                ));
-                if (ok == true) { await Api.setServer(ctrl.text); if (mounted) { setState(() {}); toast(context, 'Server saved'); } }
-              }),
+              _RowTap(icon: Icons.dns_outlined, title: 'Server', subtitle: baseUrl, onTap: _editServer),
               Divider(height: 1, indent: 56, color: c.textPrimary.withValues(alpha: .08)),
               _RowTap(icon: Icons.logout, title: 'Log out', destructive: true, onTap: _logout),
             ])),
             const SizedBox(height: Space.section),
-            Center(child: Text('Vktrix Mobile · v1.0\nBuy, sell and stock for mobile shops',
+            Center(child: Text('Vktrix Mobile · v${_version ?? '1.0'}\nBuy, sell and stock for mobile shops',
                 style: t.bodySmall?.copyWith(color: c.textSecondary), textAlign: TextAlign.center)),
           ],
         ),

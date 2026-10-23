@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../api.dart';
 import '../design/components/components.dart';
+import '../design/design.dart';
 
 /// Keeps API timestamps compact in business screens without shifting a UTC
 /// calendar date into the previous/next local day.
@@ -19,8 +20,18 @@ String dateOnly(dynamic value) {
       '${parsed.day.toString().padLeft(2, '0')}';
 }
 
-void toast(BuildContext c, String m, {bool err = false}) => ScaffoldMessenger.of(c)
-    .showSnackBar(SnackBar(content: Text(m.replaceFirst('Exception: ', '')), backgroundColor: err ? Colors.red : null));
+/// Error toast design tokens se — `Colors.red` theme ke error tone se match nahi
+/// karta tha (light #DC2626 / dark #F87171). Ek waqt par ek hi snackbar rehta hai.
+void toast(BuildContext c, String m, {bool err = false}) {
+  final scheme = Theme.of(c).colorScheme;
+  final message = m.replaceFirst('Exception: ', '');
+  ScaffoldMessenger.of(c)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(
+      content: Text(message, style: TextStyle(color: err ? scheme.onError : null)),
+      backgroundColor: err ? scheme.error : null,
+    ));
+}
 
 /// Support mode ka read-only guard. Screen se chhupane ke saath-saath likhne wale
 /// kaam yahan bhi rok dete hain (backend bhi 403 deta hai — ye sirf saaf message ke liye).
@@ -61,27 +72,3 @@ String agoFrom(int? ms) {
   return '${d.inDays} d ago';
 }
 
-Widget field(TextEditingController c, String label,
-        {TextInputType? type, int? maxLength, bool required = false, ValueChanged<String>? onChanged, Widget? suffix, bool obscure = false}) =>
-    Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: TextFormField(
-        controller: c, keyboardType: type, maxLength: maxLength, onChanged: onChanged, obscureText: obscure,
-        decoration: InputDecoration(labelText: required ? '$label *' : label, suffixIcon: suffix, counterText: ''),
-        validator: required ? (v) => (v == null || v.trim().isEmpty) ? '$label is required' : null : null,
-      ),
-    );
-
-Widget statCard(String title, String value, IconData icon, Color color) => Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(children: [
-          CircleAvatar(backgroundColor: color.withValues(alpha: .15), child: Icon(icon, color: color)),
-          const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(title, style: const TextStyle(color: Colors.grey)),
-            Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          ])),
-        ]),
-      ),
-    );

@@ -30,6 +30,31 @@ class Dashboard extends StatefulWidget {
   final String? greeting;
   const Dashboard({super.key, required this.onGo, required this.shopName, this.onOpenLedger,
       this.isAdminView = false, this.testSummary, this.testDues, this.greeting, this.testRecent});
+  /// "Recent activity" rows — sale aur purchase dono ek hi timeline par, newest
+  /// first. Pehle sale ko `1000000 + id` banakar sort kiya jata tha, isliye har
+  /// sale har purchase ke upar aa jati thi aur aaj ki kharidi purani sale ke neeche
+  /// chhup jati thi.
+  static List<ActivityItem> recentActivity(List<dynamic> stock, List<dynamic> sales) {
+    final items = <ActivityItem>[
+      for (final p in stock.take(4))
+        ActivityItem(isSale: false, id: p['id'] as int,
+            title: '${p['brand'] ?? ''} ${p['model']}'.trim(),
+            subtitle: 'Bought${p['seller_name'] != null ? ' · ${p['seller_name']}' : ''}',
+            date: '${p['buy_date']}', amount: num.tryParse('${p['buy_price']}') ?? 0, profit: 0),
+      for (final s in sales.take(4))
+        ActivityItem(isSale: true, id: 1000000 + (s['id'] as int),
+            title: '${s['brand'] ?? ''} ${s['model']}'.trim(),
+            subtitle: 'Sold${s['customer_name'] != null ? ' · ${s['customer_name']}' : ''}',
+            date: '${s['sell_date']}', amount: num.tryParse('${s['sell_price']}') ?? 0,
+            profit: (num.tryParse('${s['sell_price']}') ?? 0) -
+                (num.tryParse('${s['buy_price']}') ?? 0)),
+    ]..sort((a, b) {
+        final byDate = b.date.compareTo(a.date);
+        return byDate != 0 ? byDate : b.id.compareTo(a.id);
+      });
+    return items;
+  }
+
   @override
   State<Dashboard> createState() => _DashboardState();
 }
@@ -55,6 +80,7 @@ class _DashboardState extends State<Dashboard> {
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() => _error = null);
     try {
       final results = await Future.wait([
@@ -69,20 +95,7 @@ class _DashboardState extends State<Dashboard> {
       ]);
       final stock = (results[1] as List).cast<Map>();
       final sales = (results[2] as List).cast<Map>();
-      final items = <ActivityItem>[
-        for (final p in stock.take(4))
-          ActivityItem(isSale: false, id: p['id'] as int,
-              title: '${p['brand'] ?? ''} ${p['model']}'.trim(),
-              subtitle: 'Bought${p['seller_name'] != null ? ' · ${p['seller_name']}' : ''}',
-              date: '${p['buy_date']}', amount: num.tryParse('${p['buy_price']}') ?? 0, profit: 0),
-        for (final s in sales.take(4))
-          ActivityItem(isSale: true, id: 1000000 + (s['id'] as int),
-              title: '${s['brand'] ?? ''} ${s['model']}'.trim(),
-              subtitle: 'Sold${s['customer_name'] != null ? ' · ${s['customer_name']}' : ''}',
-              date: '${s['sell_date']}', amount: num.tryParse('${s['sell_price']}') ?? 0,
-              profit: (num.tryParse('${s['sell_price']}') ?? 0) -
-                  (num.tryParse('${s['buy_price']}') ?? 0)),
-      ]..sort((a, b) => b.id.compareTo(a.id));
+      final items = Dashboard.recentActivity(stock, sales);
       if (!mounted) return;
       final dues = results[3];
       setState(() {
@@ -308,7 +321,9 @@ class _ActivityRow extends StatelessWidget {
         const SizedBox(width: Space.x12),
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Text(rs(item.amount), style: t.titleSmall),
-          if (item.isSale) Text('+${rs(item.profit)}', style: t.labelSmall?.copyWith(color: c.successInk)),
+          // Sign pehle: loss "₹-500" nahi, "-₹500" (aur pehle "+-₹500" chhapta tha).
+          if (item.isSale) Text('${item.profit < 0 ? '-' : '+'}${rs(item.profit.abs())}',
+            style: t.labelSmall?.copyWith(color: item.profit < 0 ? c.errorInk : c.successInk)),
         ]),
       ]),
     )),

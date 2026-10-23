@@ -103,13 +103,26 @@ class _BuyFormState extends State<BuyForm> {
     });
   }
 
+  /// Har lookup ka apna number. Slow response purane IMEI ka ho to usse chhod
+  /// dete hain — warna A ka jawab B ke field par likh jata tha (galat model stock
+  /// me, aur aage galat invoice).
+  int _lookupGeneration = 0;
+
   Future<void> _lookup(String v) async {
-    if (v.length != 15) { setState(() => _imeiState = _ImeiState.none); return; }
-    if (!validImei(v)) { setState(() { _imeiState = _ImeiState.invalid; _imeiLabel = 'Invalid IMEI — please check the number'; }); return; }
+    final imeiText = v.trim();
+    final generation = ++_lookupGeneration;
+    if (imeiText.length != 15) { setState(() => _imeiState = _ImeiState.none); return; }
+    if (!validImei(imeiText)) {
+      setState(() { _imeiState = _ImeiState.invalid; _imeiLabel = 'Invalid IMEI — please check the number'; });
+      return;
+    }
     setState(() => _imeiState = _ImeiState.looking);
     try {
-      final r = widget.testLookup != null ? await widget.testLookup!(v) : (await Api.get('/imei/$v')) as Map<String, dynamic>;
-      if (!mounted) return;
+      final r = widget.testLookup != null
+          ? await widget.testLookup!(imeiText)
+          : (await Api.get('/imei/$imeiText')) as Map<String, dynamic>;
+      // Screen band ho gayi, ya user ne tab tak doosra IMEI type kar diya.
+      if (!mounted || generation != _lookupGeneration || imei.text.trim() != imeiText) return;
       final history = (r['history'] as List?) ?? const [];
       _timesBought = history.length;
       // Newest first: this shop's own last entry for the same IMEI/IMEI 2 — the most
@@ -141,7 +154,11 @@ class _BuyFormState extends State<BuyForm> {
         _imeiLabel = name.isEmpty ? 'Filled from your earlier entry' : '$name · filled from your earlier entry';
       } else { _imeiState = _ImeiState.newModel; _imeiLabel = 'New model — fill brand & model once, next time they auto-fill'; }
       Haptics.tick();
-    } catch (e) { _imeiState = _ImeiState.invalid; _imeiLabel = 'Lookup failed — you can still enter details manually'; }
+    } catch (e) {
+      if (!mounted || generation != _lookupGeneration) return;
+      _imeiState = _ImeiState.invalid;
+      _imeiLabel = 'Lookup failed — you can still enter details manually';
+    }
     if (mounted) setState(() {});
   }
 

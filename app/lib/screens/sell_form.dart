@@ -181,7 +181,9 @@ class _SellFormState extends State<SellForm> {
     final profit = _profit;
     final top = MediaQuery.viewPaddingOf(context).top;
     return Scaffold(
-      resizeToAvoidBottomInset: false,
+      // Keyboard ke liye body ko chhota hone dein (pehle false tha, isliye Notes/
+      // Address field aur Confirm button keyboard ke neeche chhup jate the).
+      resizeToAvoidBottomInset: true,
       body: AuroraBackground(child: Stack(children: [
         Form(
           key: _form,
