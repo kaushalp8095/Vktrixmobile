@@ -15,3 +15,4 @@ export 'transitions.dart';
 export 'brand_mark.dart';
 export 'status_chip.dart';
 export 'confirm_dialog.dart';
+export 'glass_dialog.dart';

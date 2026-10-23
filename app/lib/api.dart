@@ -14,6 +14,19 @@ String baseUrl = defaultBaseUrl;
 /// portal ho, ya connection mar raha ho — screen hamesha spinner par na atke.
 const apiRequestTimeout = Duration(seconds: 30);
 
+/// Server ka structured error: wahi message jo pehle `Exception` me tha, saath me
+/// HTTP status aur (ho to) machine-readable `code` — jaise `shop_has_history`.
+/// `toString()` jaan-boojh kar pehle jaisa hai, kyunki har screen `'$e'` hi
+/// dikhati hai aur wahan se `Exception: ` strip hota hai.
+class ApiException implements Exception {
+  final String message;
+  final int statusCode;
+  final String? code;
+  const ApiException(this.message, this.statusCode, [this.code]);
+  @override
+  String toString() => 'Exception: $message';
+}
+
 class Api {
   static String? token;
   static Map<String, dynamic>? user;
@@ -73,9 +86,11 @@ class Api {
   static dynamic _parse(http.Response r) {
     final body = _decode(r.body);
     final message = body is Map ? body['error'] : null;
+    final code = body is Map && body['code'] is String ? body['code'] as String : null;
     if (r.statusCode == 401) _handleUnauthorized();
     if (r.statusCode >= 400) {
-      throw Exception(message is String && message.trim().isNotEmpty ? message : 'Error ${r.statusCode}');
+      throw ApiException(message is String && message.trim().isNotEmpty ? message : 'Error ${r.statusCode}',
+          r.statusCode, code);
     }
     return body;
   }
@@ -186,10 +201,24 @@ class Api {
       post('/auth/change-password', {'old_password': oldPw, 'new_password': newPw});
 }
 
+/// Indian grouping (1,25,000) for a whole number already rendered as text.
+String _group(String digits) =>
+    digits.replaceAllMapped(RegExp(r'(\d)(?=(\d\d)+\d$)'), (m) => '${m[1]},');
+
+/// Money, poore app me ek hi tarah: `₹12,500` jab paise na hon, aur
+/// `₹12,500.50` jab hon (`.00` kabhi force nahi hota). Pehle `toStringAsFixed(0)`
+/// tha — ledger me 12,500.50 pada hota tha par invoice/customer ko ₹12,501
+/// dikhta tha. Ab rupees + paise cents me ginte hain, isliye rounding ka jhagda
+/// nahi (₹12500.50 → 500.50, not round-to-rupee).
 String rs(dynamic v) {
   final n = num.tryParse('$v') ?? 0;
-  return '₹${n.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d)(?=(\d\d)+\d$)'), (m) => '${m[1]},')}';
+  final cents = (n.abs() * 100).round();
+  final paise = cents % 100;
+  final sign = cents != 0 && n < 0 ? '-' : '';
+  return '$sign₹${_group('${cents ~/ 100}')}${paise == 0 ? '' : '.${paise.toString().padLeft(2, '0')}'}';
 }
+
+
 
 bool validImei(String s) {
   if (!RegExp(r'^\d{15}$').hasMatch(s)) return false;

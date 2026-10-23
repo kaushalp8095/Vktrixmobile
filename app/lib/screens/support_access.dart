@@ -239,6 +239,7 @@ class _SupportLogBodyState extends State<SupportLogBody> {
   void initState() { super.initState(); _load(); }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() { loading = true; _error = null; });
     try {
       final r = await Api.getUnscoped(widget.endpoint);

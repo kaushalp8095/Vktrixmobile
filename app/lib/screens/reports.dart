@@ -160,7 +160,8 @@ class _RangeChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(Radii.full), onTap: onTap,
         child: AnimatedContainer(
           duration: Motion.of(context).d(Durations2.enter), curve: Curves2.enter,
-          height: 40, padding: const EdgeInsets.symmetric(horizontal: Space.x16),
+          constraints: const BoxConstraints(minHeight: 40),
+          padding: const EdgeInsets.symmetric(horizontal: Space.x16, vertical: Space.x8),
           decoration: BoxDecoration(
             color: selected ? c.brandInk : c.textPrimary.withValues(alpha: .06),
             borderRadius: BorderRadius.circular(Radii.full),

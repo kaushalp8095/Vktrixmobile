@@ -78,8 +78,10 @@ class _PrimaryButtonState extends State<PrimaryButton> with TickerProviderStateM
               child: Center(
                 child: Transform.scale(
                   scale: 1 - (1 - MotionValues.pressScaleButton) * p,
-                  child: SizedBox(
-                    width: w, height: _h,
+                  // Fixed height nahi: 200% text scale par label do line leta hai,
+                  // to button utna hi ooncha ho jata hai (clip/overflow nahi).
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minWidth: w ?? 0, minHeight: _h),
                     child: Material(
                       color: widget.onPressed == null ? s.onSurface.withValues(alpha: .12) : fill,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),

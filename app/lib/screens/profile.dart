@@ -49,9 +49,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _changePassword() async {
     final old = TextEditingController(), nw = TextEditingController(), cf = TextEditingController();
     final key = GlobalKey<FormState>();
-    final ok = await showDialog<bool>(context: context, builder: (d) => AlertDialog(
-      title: const Text('Change password'),
-      content: Form(key: key, child: Column(mainAxisSize: MainAxisSize.min, children: [
+    final ok = await showGlassFormDialog(context,
+      title: 'Change password',
+      icon: Icons.lock_reset,
+      message: "You'll be signed out and will log in again with the new password.",
+      confirmLabel: 'Change',
+      validate: () => key.currentState?.validate() ?? false,
+      body: (_) => Form(key: key, child: Column(mainAxisSize: MainAxisSize.min, children: [
         TextFormField(controller: old, obscureText: true, decoration: const InputDecoration(labelText: 'Current password *'),
             autofillHints: const [AutofillHints.password], validator: (v) => (v ?? '').isEmpty ? 'Required' : null),
         const SizedBox(height: 12),
@@ -61,13 +65,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         TextFormField(controller: cf, obscureText: true, decoration: const InputDecoration(labelText: 'Confirm new password *'),
             autofillHints: const [AutofillHints.newPassword], validator: (v) => v == nw.text ? null : "Doesn't match"),
       ])),
-      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
-        FilledButton(onPressed: () { if (key.currentState!.validate()) Navigator.pop(d, true); }, child: const Text('Change'))],
-    ));
+    );
     final oldValue = old.text, newValue = nw.text;
     // Dialog band hone par teeno controllers dispose — pehle leak hote the.
     old.dispose(); nw.dispose(); cf.dispose();
-    if (ok != true || !mounted) return;
+    if (!ok || !mounted) return;
     setState(() => _passPhase = ButtonPhase.loading);
     try {
       await Api.changePassword(oldValue, newValue);
@@ -94,22 +96,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _editServer() async {
     final ctrl = TextEditingController(text: baseUrl);
     final formKey = GlobalKey<FormState>();
-    final action = await showDialog<String>(context: context, builder: (d) => AlertDialog(
-      title: const Text('Server address'),
-      content: Form(key: formKey, child: TextFormField(
+    final action = await showGlassDialog<String>(context,
+      title: 'Server address',
+      icon: Icons.dns_outlined,
+      message: 'The address this app talks to. Change it only if your server moved.',
+      note: 'Default: $defaultBaseUrl',
+      child: Form(key: formKey, child: TextFormField(
         controller: ctrl, autofocus: true,
         decoration: const InputDecoration(labelText: 'URL', hintText: 'https://…'),
         keyboardType: TextInputType.url,
         validator: (v) => Api.validateServer(v ?? ''),
       )),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancel')),
-        TextButton(onPressed: () => Navigator.pop(d, 'reset'), child: const Text('Use default')),
-        FilledButton(
-          onPressed: () { if (formKey.currentState!.validate()) Navigator.pop(d, 'save'); },
-          child: const Text('Save')),
-      ],
-    ));
+      footer: (ctx) => GlassDialogActions(
+        cancelLabel: 'Cancel', confirmLabel: 'Save',
+        middleLabel: 'Use default',
+        onCancel: () => Navigator.pop(ctx),
+        onMiddle: () => Navigator.pop(ctx, 'reset'),
+        onConfirm: () { if (formKey.currentState!.validate()) Navigator.pop(ctx, 'save'); },
+      ),
+    );
     final typed = ctrl.text;
     ctrl.dispose();
     if (action == null || !mounted) return;
@@ -235,7 +240,8 @@ class _ThemeTile extends StatelessWidget {
         borderRadius: Shapes.md, onTap: onTap,
         child: AnimatedContainer(
           duration: Motion.of(context).d(Durations2.enter), curve: Curves2.enter,
-          height: 64,
+          constraints: const BoxConstraints(minHeight: 64),
+          padding: const EdgeInsets.symmetric(vertical: Space.x8),
           decoration: BoxDecoration(
             color: selected ? c.brandInk.withValues(alpha: .12) : c.textPrimary.withValues(alpha: .04),
             borderRadius: Shapes.md,

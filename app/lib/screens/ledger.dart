@@ -259,6 +259,8 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen> {
   void dispose() { _scroll.dispose(); super.dispose(); }
 
   Future<void> _load() async {
+    // Sheet/screen band hone ke baad bhi response aa sakta hai.
+    if (!mounted) return;
     setState(() => _error = null);
     try {
       final raw = widget.testData ?? await Api.get('/sales/${widget.saleId}/payments');

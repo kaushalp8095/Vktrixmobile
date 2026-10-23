@@ -44,6 +44,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
   void dispose() { _scroll.dispose(); super.dispose(); }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() { _error = null; _data = null; _pdf = null; });
     try {
       final raw = widget.testData ?? await Api.get('/receipts/${widget.type}/${widget.id}');
@@ -84,15 +85,13 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
       final result = await PdfActions.sharePdf(_pdf!, _fileName, whatsapp: whatsapp, caption: _caption);
       if (!mounted) return;
       if (result == 'whatsapp_not_installed') {
-        final fallback = await showDialog<bool>(context: context, builder: (d) => AlertDialog(
-          title: const Text('WhatsApp is not available'),
-          content: const Text('Would you like to share the PDF using another app?'),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
-            FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Share PDF')),
-          ],
-        ));
-        if (fallback == true) {
+        final fallback = await showConfirmDialog(context,
+          title: 'WhatsApp is not available',
+          message: 'Would you like to share the PDF using another app?',
+          confirmLabel: 'Share PDF',
+          cancelLabel: 'Cancel',
+          icon: Icons.share_outlined);
+        if (fallback) {
           await PdfActions.sharePdf(_pdf!, _fileName, whatsapp: false, caption: _caption);
         }
       }
