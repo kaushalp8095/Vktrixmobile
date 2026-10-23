@@ -199,6 +199,7 @@ Future<bool> showGlassFormDialog(
   required WidgetBuilder body,
   String? message,
   String? note,
+  String? identity,
   String confirmLabel = 'Save',
   String cancelLabel = 'Cancel',
   bool destructive = false,
@@ -206,7 +207,7 @@ Future<bool> showGlassFormDialog(
 }) async {
   final ok = await showGlassDialog<bool>(
     context,
-    title: title, icon: icon, message: message, note: note, destructive: destructive,
+    title: title, icon: icon, message: message, note: note, identity: identity, destructive: destructive,
     child: Builder(builder: body),
     footer: (ctx) => GlassDialogActions(
       cancelLabel: cancelLabel, confirmLabel: confirmLabel, destructive: destructive,
