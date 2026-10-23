@@ -29,6 +29,10 @@ class UpdateChecker {
       final latestVersionCode = int.tryParse('${decoded['versionCode']}');
       final latestVersionName = decoded['versionName'];
       final downloadUrl = decoded['downloadUrl'];
+      // Release APK ka SHA-256 (auto-release workflow likhta hai). Purane
+      // version.json me nahi hota — tab verification skip, warna installer se
+      // pehle file ka hash match hona zaroori hai.
+      final sha = decoded['sha256'] is String ? decoded['sha256'] as String : null;
       final releaseNotes = decoded['releaseNotes'];
       final forceUpdate = decoded['forceUpdate'] == true;
       if (latestVersionCode == null ||
@@ -46,6 +50,7 @@ class UpdateChecker {
           versionName: latestVersionName,
           releaseNotes: releaseNotes,
           downloadUrl: downloadUrl,
+          sha256: sha,
           forceUpdate: forceUpdate,
         );
       }
@@ -60,6 +65,7 @@ class UpdateChecker {
     required String releaseNotes,
     required String downloadUrl,
     required bool forceUpdate,
+    String? sha256,
   }) {
     final motion = Motion.of(context);
     _dialogOpen = true;
@@ -87,6 +93,7 @@ class UpdateChecker {
               versionName: versionName,
               releaseNotes: releaseNotes,
               downloadUrl: downloadUrl,
+              sha256: sha256,
               forceUpdate: forceUpdate,
             ),
           ),
@@ -118,6 +125,8 @@ class UpdateDialog extends StatefulWidget {
   final String versionName;
   final String releaseNotes;
   final String downloadUrl;
+  /// Expected SHA-256 of the APK (hex) — null jab release ne hash nahi diya.
+  final String? sha256;
   final bool forceUpdate;
   final ApkUpdater? updater; // test hook; defaults to the app-wide updater
 
@@ -127,6 +136,7 @@ class UpdateDialog extends StatefulWidget {
     required this.releaseNotes,
     required this.downloadUrl,
     required this.forceUpdate,
+    this.sha256,
     this.updater,
   });
 
@@ -145,12 +155,12 @@ class _UpdateDialogState extends State<UpdateDialog> {
 
   Future<void> _update() async {
     if (!_u.platform.supported) return _openInBrowser();
-    await _u.start(url: widget.downloadUrl, versionName: widget.versionName);
+    await _u.start(url: widget.downloadUrl, versionName: widget.versionName, sha256: widget.sha256);
   }
 
   Future<void> _openInBrowser() async {
     final uri = Uri.tryParse(widget.downloadUrl);
-    if (uri == null || (uri.scheme != 'https' && uri.scheme != 'http')) {
+    if (uri == null || uri.scheme != 'https') {
       setState(() => _browserMessage = 'The update link is invalid. Please try again later.');
       return;
     }

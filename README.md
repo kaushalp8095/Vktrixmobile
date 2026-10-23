@@ -272,20 +272,30 @@ flutter pub get
 <uses-permission android:name="android.permission.INTERNET"/>
 <uses-permission android:name="android.permission.CAMERA"/>
 ```
-(Agar server `http://` hai, bina SSL, to `<application>` tag me `android:usesCleartextTraffic="true"` bhi daalein.)
+App **sirf HTTPS** par baat karti hai: manifest me `usesCleartextTraffic="false"` aur `network_security_config.xml` me cleartext band hai. Server ko HTTPS par hi chalayein (`http://` address app accept nahi karegi).
 
 `android/app/build.gradle` me `minSdkVersion 21` (scanner ke liye).
 
-APK banana:
+APK banana (release ke liye signing key zaroori hai):
 ```bash
+# ek hi baar: apni keystore banayein aur repo root ke keystore/ folder me rakhein
+keytool -genkeypair -v -keystore keystore/release.jks -keyalg RSA -keysize 4096 \
+        -validity 10000 -alias vktrix
+# keystore/key.properties (git me kabhi commit na karein):
+#   storeFile=../keystore/release.jks
+#   storePassword=…
+#   keyAlias=vktrix
+#   keyPassword=…
+
 flutter build apk --release
 # file: build/app/outputs/flutter-apk/app-release.apk  → shops ko de dein
 ```
+Keystore na hone par release build **fail** hoti hai (debug key se sign karke ship nahi karti), kyunki debug-signed APK kisi bhi purane install par update nahi ho sakti.
 
 ## App update (in-app, bina browser)
 `app/version.json` me nayi `versionCode` aate hi app me **Update available** popup khulta hai. **Update now** dabane par:
 1. APK app ke andar hi download hota hai. Popup me live % progress bar, MB, speed aur time-left dikhte hain. **Hide** dabane par download chalta rehta hai.
-2. Download ke baad file check hoti hai (poori size + valid APK). Phir Android ka **Install** popup apne aap khulta hai.
+2. Download ke baad file check hoti hai: poori size, valid APK, aur `version.json` me diya **SHA-256 hash**. Hash match na ho to file delete ho jaati hai aur install nahi hota. Phir Android ka **Install** popup apne aap khulta hai.
 3. Pehli baar Android *"Install unknown apps"* permission maangta hai. Settings me *Allow from this source* on karke wapas aate hi install apne aap aage badhta hai.
 4. Fail hone par **Retry** milta hai, aur fallback ke liye *Download in browser instead* bhi hai.
 
@@ -326,3 +336,18 @@ Note: download app ke process me chalta hai. App ko kuch der ke liye minimize ka
 | GET | /api/reports/daily?from=&to= | Roz ka report |
 
 Super admin `?shop_id=` sirf **chalu support session** ke saath laga sakta hai (read-only) — warna shop APIs 403 deti hain. Detail: *"Super Admin: manage karein, data sirf support session me"* section aur `docs/D6_SUPPORT_ACCESS.md`.
+
+## Security (Oct 2026 audit)
+
+Poora audit — routes, DB access, Android config, updater, CI aur dependencies — `docs/SECURITY_AUDIT_2026-10.md` me hai. Jo cheezein deploy karte waqt dhyan me rakhein:
+
+| Cheez | Matlab |
+|---|---|
+| `JWT_SECRET`, `SUPERADMIN_PASSWORD` | Production (`NODE_ENV=production`) me set na hon to server **start hi nahi** hota. |
+| `CORS_ORIGINS` | Khaali = koi browser origin allowed nahi (mobile app `Origin` nahi bhejti, usse farak nahi padta). Web client chahiye to exact origin likhein. |
+| `TRUST_PROXY_HOPS` | Render par `1`. Iske bina rate limit proxy ke IP par lagta hai (sab users ek bucket me). |
+| `DB_SSL_CA` | Managed Postgres ka CA (PEM). Diya to DB certificate verify hota hai; na diya to encrypted-but-unverified (warning log me). |
+| Rate limits | Login: 10 galat try / 15 min per username, 100 per IP. Change-password: 10 / 15 min. Poore API par 1000 req/min per IP. Sab env se badle ja sakte hain (`AUTH_LOGIN_MAX`, `AUTH_IP_MAX`, `AUTH_PASSWORD_MAX`, `RATE_LIMIT_MAX` …). |
+| Body size | 128 KB se bada JSON sirf photo wale routes (buy/sell/phone edit/shop create) par allowed hai; baaki jagah `413 body_too_large`. |
+| Passwords | Naye password minimum **8 characters** (purane chalte rahenge). |
+| App | Sirf HTTPS; backup/device-transfer band; APK update `version.json` ke **SHA-256** se verify hota hai. |

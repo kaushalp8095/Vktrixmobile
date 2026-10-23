@@ -15,13 +15,15 @@ const sign = u => jwt.sign({
   role: u.role,
   shop_id: u.shop_id,
   tv: Number(u.token_version || 0),
-}, SECRET(), { expiresIn: '30d' });
+}, SECRET(), { expiresIn: '30d', algorithm: 'HS256' });
 
 async function requireAuth(req, res, next) {
   try {
     const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
     if (!token) return res.status(401).json({ error: 'Login required' });
-    const p = jwt.verify(token, SECRET());
+    // Algorithm pin zaroori hai: bina iske library jo bhi `alg` token me likha ho
+    // try karti hai (`none`/RSA confusion). Server sirf HS256 tokens bhejta hai.
+    const p = jwt.verify(token, SECRET(), { algorithms: ['HS256'] });
     const user = await db('users').where({ id: p.id, active: true }).first();
     if (!user) return res.status(401).json({ error: 'User inactive' });
     // Older, pre-version tokens have no `tv`; treat them as version zero. The

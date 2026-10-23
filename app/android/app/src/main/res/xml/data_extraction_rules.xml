@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+ (API 31+) backup/device-transfer rules. allowBackup="false"
+     pehle hi sab rok deta hai; ye file us decision ko explicit rakhti hai taaki
+     koi OEM/OS update use waapas on na kar de. Login token aur shop ka data
+     (SharedPreferences) kabhi backup me na jaaye. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="external" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="external" path="." />
+    </device-transfer>
+</data-extraction-rules>

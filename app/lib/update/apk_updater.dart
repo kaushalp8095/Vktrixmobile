@@ -4,6 +4,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart' as crypto;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -37,6 +38,15 @@ class _Cancelled implements Exception {
   const _Cancelled();
 }
 
+/// `sha256.startChunkedConversion` ek Sink<Digest> maangta hai.
+class _DigestSink implements Sink<crypto.Digest> {
+  crypto.Digest? value;
+  @override
+  void add(crypto.Digest data) => value = data;
+  @override
+  void close() {}
+}
+
 class ApkUpdater extends ChangeNotifier with WidgetsBindingObserver {
   ApkUpdater({
     UpdatePlatform? platform,
@@ -59,6 +69,9 @@ class ApkUpdater extends ChangeNotifier with WidgetsBindingObserver {
   double bytesPerSecond = 0;
   String? error;
   String? apkPath;
+  /// version.json ka SHA-256 (agar release ne diya ho) — installer khulne se
+  /// pehle file ka hash isse match hona chahiye.
+  String? expectedSha256;
 
   http.Client? _client;
   StreamSubscription<List<int>>? _sub;
@@ -85,8 +98,24 @@ class ApkUpdater extends ChangeNotifier with WidgetsBindingObserver {
     return Duration(seconds: ((t - received) / bytesPerSecond).ceil().clamp(0, 359999).toInt());
   }
 
+  /// SHA-256 hex, ya null jab release ne hash nahi diya.
+  static String? _normalizeSha(String? value) {
+    final v = (value ?? '').trim().toLowerCase();
+    return RegExp(r'^[0-9a-f]{64}$').hasMatch(v) ? v : null;
+  }
+
+  /// File ka hash stream karke nikalta hai (20 MB APK bhi memory me nahi aata).
+  static Future<String> _fileSha256(File file) async {
+    final out = _DigestSink();
+    final hasher = crypto.sha256.startChunkedConversion(out);
+    await for (final chunk in file.openRead()) { hasher.add(chunk); }
+    hasher.close();
+    return '${out.value}';
+  }
+
   /// Starts (or resumes showing) the update for [versionName]. Safe to call repeatedly.
-  Future<void> start({required String url, required String versionName}) async {
+  /// [sha256] optional hai: diya ho to download ke baad file verify hoti hai.
+  Future<void> start({required String url, required String versionName, String? sha256}) async {
     if (phase == UpdatePhase.downloading || phase == UpdatePhase.installing) {
       if (this.versionName == versionName) return;
       await cancel();
@@ -98,6 +127,7 @@ class ApkUpdater extends ChangeNotifier with WidgetsBindingObserver {
     bytesPerSecond = 0;
     error = null;
     apkPath = null;
+    expectedSha256 = _normalizeSha(sha256);
 
     final uri = Uri.tryParse(url);
     if (uri == null || uri.scheme != 'https') {
@@ -117,12 +147,17 @@ class ApkUpdater extends ChangeNotifier with WidgetsBindingObserver {
         }
       }
       if (await target.exists() && await _looksLikeApk(target)) {
-        received = await target.length();
-        total = received;
-        apkPath = target.path;
-        _set(UpdatePhase.ready);
-        await install();
-        return;
+        // Pichhli baar adhoora/corrupt file bachi ho to hash se pakad lete hain.
+        final ok = expectedSha256 == null || await _fileSha256(target) == expectedSha256;
+        if (ok) {
+          received = await target.length();
+          total = received;
+          apkPath = target.path;
+          _set(UpdatePhase.ready);
+          await install();
+          return;
+        }
+        try { await target.delete(); } catch (_) {}
       }
 
       final part = File('${target.path}.part');
@@ -134,6 +169,8 @@ class ApkUpdater extends ChangeNotifier with WidgetsBindingObserver {
       total = res.contentLength;
 
       final sink = _sink = part.openWrite();
+      final digest = _DigestSink();
+      final hasher = expectedSha256 == null ? null : crypto.sha256.startChunkedConversion(digest);
       final done = _done = Completer<void>();
       _speedAt = DateTime.now();
       _speedBytes = 0;
@@ -142,6 +179,7 @@ class ApkUpdater extends ChangeNotifier with WidgetsBindingObserver {
       _sub = res.stream.listen(
         (chunk) {
           sink.add(chunk);
+          hasher?.add(chunk);
           received += chunk.length;
           _armStall();
           _tick();
@@ -159,6 +197,13 @@ class ApkUpdater extends ChangeNotifier with WidgetsBindingObserver {
       final t = total;
       if (t != null && received != t) throw const _UpdateError('Download was incomplete. Please retry.');
       if (!await _looksLikeApk(part)) throw const _UpdateError('The downloaded file is not a valid app package.');
+      if (expectedSha256 != null) {
+        hasher?.close();
+        final actual = '${digest.value}';
+        if (actual != expectedSha256) {
+          throw const _UpdateError('The update file failed its integrity check. Please try again later.');
+        }
+      }
       await part.rename(target.path);
       _part = null;
       apkPath = target.path;
