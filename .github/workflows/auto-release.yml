@@ -100,13 +100,31 @@ jobs:
           EOF
           
       - name: Commit version.json
+        shell: bash
         run: |
+          set -euo pipefail
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add app/version.json
-          # Only commit if there are changes
-          git diff-index --quiet HEAD || git commit -m "chore: auto-update version.json to v${{ steps.version.outputs.version_name }}"
-          git push
+          if git diff-index --quiet HEAD; then
+            echo "version.json already up to date."
+            exit 0
+          fi
+          git commit -m "chore: auto-update version.json to v${{ steps.version.outputs.version_name }}"
+          # Build ke 9 minute me doosra workflow (goldens bot) main par push kar
+          # sakta hai — seedha `git push` non-fast-forward se fail hota hai aur
+          # APK release hi nahi banti (Oct 26 ko yahi hua tha). Rebase karke retry.
+          for attempt in 1 2 3; do
+            git rebase --abort 2>/dev/null || true
+            if git pull --rebase origin "${GITHUB_REF_NAME:-main}" && git push; then
+              echo "version.json pushed (attempt $attempt)."
+              exit 0
+            fi
+            echo "::warning::push attempt $attempt failed — retrying after a short wait."
+            sleep 10
+          done
+          echo "::error::Could not push version.json after 3 attempts. Release not published."
+          exit 1
           
       - name: Create Release
         uses: softprops/action-gh-release@v2
