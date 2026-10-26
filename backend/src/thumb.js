@@ -15,9 +15,10 @@ const jpeg = require('jpeg-js');
 // List ke 44x44 box ke liye 96px kaafi hai (2x density par bhi sharp).
 const THUMB_MAX_SIDE = 96;
 const THUMB_QUALITY = 72;
-// Decode se pehle hi ruk jaate hain — 20 MP se bada logo koi shop upload nahi
-// karti, aur bahut bada JPEG decode karna CPU/RAM dono khaata hai.
-const MAX_SOURCE_PIXELS = 20 * 1000 * 1000;
+// Decode se pehle hi ruk jaate hain. App har logo 1200x1200 (1.4 MP) tak hi
+// bhejti hai, isliye 8 MP se bada kuch aaye to use decode hi nahi karte —
+// 8000x8000 solid JPEG 768 KB ke andar aa jata hai par decode 250 MB RAM leta hai.
+const MAX_SOURCE_PIXELS = 8 * 1000 * 1000;
 const MAX_SOURCE_BYTES = 768 * 1024; // = validation.SHOP_LOGO_MAX_BYTES
 // Validation ki imageDataUrl limit ke andar rehna zaroori hai.
 const MAX_THUMB_CHARS = 33 * 1024;
@@ -45,7 +46,7 @@ function downscale(src, sw, sh, dw, dh) {
     for (let x = 0; x < dw; x++) {
       const x0 = Math.floor((x * sw) / dw);
       const x1 = Math.min(sw, Math.max(x0 + 1, Math.floor(((x + 1) * sw) / dw)));
-      let r = 0, g = 0, b = 0, a = 0, n = 0;
+      let r = 0, g = 0, b = 0, n = 0;
       for (let sy = y0; sy < y1; sy++) {
         for (let sx = x0; sx < x1; sx++) {
           const i = (sy * sw + sx) * 4;
@@ -54,15 +55,14 @@ function downscale(src, sw, sh, dw, dh) {
           r += src[i] * alpha + 255 * (1 - alpha);
           g += src[i + 1] * alpha + 255 * (1 - alpha);
           b += src[i + 2] * alpha + 255 * (1 - alpha);
-          a += 255; n++;
+          n++;
         }
       }
       const o = (y * dw + x) * 4;
       out[o] = Math.round(r / n);
       out[o + 1] = Math.round(g / n);
       out[o + 2] = Math.round(b / n);
-      out[o + 3] = 255;
-      if (a && n) { /* alpha already flattened */ }
+      out[o + 3] = 255; // JPEG me alpha nahi hota; sab safed par flatten ho chuka
     }
   }
   return out;
@@ -75,7 +75,7 @@ function shopThumb(dataUrl, { maxSide = THUMB_MAX_SIDE, quality = THUMB_QUALITY 
   if (!buf) return null;
   let decoded;
   try {
-    decoded = jpeg.decode(buf, { useTArray: true, formatAsRGBA: true, maxMemoryUsageInMB: 256 });
+    decoded = jpeg.decode(buf, { useTArray: true, formatAsRGBA: true, maxMemoryUsageInMB: 128 });
   } catch {
     return null;
   }
