@@ -9,7 +9,7 @@
 | Login security | JWT token + bcrypt password hashing | |
 
 ## Features
-- **Super Admin**: shops banana, har shop ko alag login dena, shop band/chalu karna, password reset, delete, **Edit details me shop ka bill logo preview** (jo logo upload hua hai wo wahin dikhta hai — Add/Change/Remove wahin se), TAC (IMEI model) CSV import + **do free TAC catalog sync**: Osmocom community list aur **extended India-models list** (Redmi/Realme/Poco/Vivo ke naye variants + internal model code, koi API key/paisa nahi). **Shop ka business data (stock, IMEI, sales, profit, payment ledger, customer/ID proof) usse default me nahi dikhta** — uske liye reason ke saath *temporary, read-only support access* lena padta hai (neeche section dekhein).
+- **Super Admin**: shops banana, har shop ko alag login dena, shop band/chalu karna, password reset, delete, **Edit details me shop ka bill logo preview** (jo logo upload hua hai wo wahin dikhta hai — Add/Change/Remove wahin se) aur **shop list ke har row me us shop ka chhota logo**, TAC (IMEI model) CSV import + **do free TAC catalog sync**: Osmocom community list aur **extended India-models list** (Redmi/Realme/Poco/Vivo ke naye variants + internal model code, koi API key/paisa nahi). **Shop ka business data (stock, IMEI, sales, profit, payment ledger, customer/ID proof) usse default me nahi dikhta** — uske liye reason ke saath *temporary, read-only support access* lena padta hai (neeche section dekhein).
 - **Shop Login**: sirf apni shop ka data dikhega (dusri shop ka nahi)
 - **Buy Form**: IMEI likhte hi/scan karte hi **Brand + Model free me apne aap** bhar jata hai (local TAC catalog, koi external API/paisa nahi), RAM/Storage/Color ke liye **dropdown** (app ke apne purane data se), IMEI valid hai ya nahi (Luhn check), duplicate check, pehle kab aaya tha wo history (**catalog miss ho to wahi entry sab fields auto-fill karti hai**), **Serial number (optional)**, Customer details + ID proof (**photo upload: camera ya gallery**)
 - **Save karte hi stock me add** → Stock list me "BECHO" button → Sell form (profit/loss live dikhega)
@@ -309,7 +309,8 @@ Note: download app ke process me chalta hai. App ko kuch der ke liye minimize ka
 | POST | /api/auth/login | Login |
 | POST | /api/auth/change-password | Password badlo |
 | GET | /api/admin/dashboard | Super admin summary (sirf operational counts: shops/active/support open) |
-| GET/POST | /api/admin/shops | Shops list (masked contact, koi business data nahi) / nayi shop + login |
+| GET/POST | /api/admin/shops | Shops list (masked contact + `has_logo`/`logo_thumb`, koi business data nahi) / nayi shop + login |
+| GET | /api/admin/shops/:id/logo | Ek shop ka poora bill logo (Edit dialog ka preview) |
 | PUT/DELETE | /api/admin/shops/:id | Edit, band/chalu / delete |
 | POST | /api/admin/shops/:id/reset-password | Password reset |
 | POST | /api/admin/shops/:id/support-access | Temporary support session (`reason` + `minutes`; 201 / 409) |
