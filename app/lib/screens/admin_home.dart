@@ -12,6 +12,7 @@ import '../api.dart';
 import '../design/components/components.dart';
 import '../design/design.dart';
 import '../documents/document_photo.dart';
+import 'bill_logo_field.dart';
 import 'common.dart';
 import 'login.dart';
 import 'shop_home.dart';
@@ -106,79 +107,86 @@ class _AdminHomeState extends State<AdminHome> {
     String? logoData;
     bool logoChanged = false;
     Uint8List? logoBytes;
+    // Edit me: server par logo hai to uska asli preview fetch karte hain, warna
+    // admin ko pata hi nahi chalta ki kaunsa logo laga hua hai.
+    final hasUploadedLogo = shop != null && shop['has_logo'] == true;
+    var logoLoading = hasUploadedLogo;
+    var logoFetchStarted = false;
     final key = GlobalKey<FormState>();
     final ok = await showGlassFormDialog(context,
       title: shop == null ? 'New shop' : 'Edit shop',
       icon: shop == null ? Icons.add_business_outlined : Icons.edit_outlined,
       confirmLabel: shop == null ? 'Create shop' : 'Save',
       validate: () => key.currentState?.validate() ?? false,
-      body: (ctx) => StatefulBuilder(builder: (ctx, setDialogState) => Form(key: key,
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-        TextFormField(controller: name, decoration: const InputDecoration(labelText: 'Shop name *'), validator: (v) => (v ?? '').trim().isEmpty ? 'Required' : null),
-        const SizedBox(height: 8),
-        TextFormField(controller: owner, decoration: const InputDecoration(labelText: 'Owner name')),
-        const SizedBox(height: 8),
-        TextFormField(controller: phone, keyboardType: TextInputType.phone,
-          decoration: InputDecoration(labelText: shop == null ? 'Mobile' : 'Mobile (new number, optional)',
-            hintText: shop == null ? null : 'current: ${masked.isEmpty ? '—' : masked}',
-            helperText: shop == null ? null : 'Leave blank to keep the current number.')),
-        const SizedBox(height: 8),
-        TextFormField(controller: addr, decoration: const InputDecoration(labelText: 'Address')),
-        const SizedBox(height: 8),
-        TextFormField(controller: gst, decoration: const InputDecoration(labelText: 'GST no (optional)')),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(Space.x12),
-          decoration: BoxDecoration(color: ctx.colors.textPrimary.withValues(alpha: .04),
-            borderRadius: Shapes.md, border: Border.all(color: ctx.colors.textPrimary.withValues(alpha: .10))),
-          child: Row(children: [
-            Container(width: 54, height: 54,
-              decoration: BoxDecoration(color: ctx.scheme.primary.withValues(alpha: .10), borderRadius: Shapes.md),
-              clipBehavior: Clip.antiAlias,
-              child: logoBytes == null
-                ? Icon(Icons.storefront_outlined, color: ctx.colors.brandInk)
-                : Image.memory(logoBytes!, fit: BoxFit.contain)),
-            const SizedBox(width: Space.x12),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Bill logo', style: ctx.type.titleSmall),
-              Text('PDF bill par shop logo', style: ctx.type.bodySmall?.copyWith(color: ctx.colors.textSecondary)),
-            ])),
-            TextButton(
-              onPressed: () async {
-                try {
-                  final picked = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1200,
-                    maxHeight: 1200, imageQuality: 100, requestFullMetadata: false);
-                  if (picked == null) return;
-                  final prepared = await prepareDocumentPhoto(await picked.readAsBytes());
-                  if (!ctx.mounted) return;
-                  setDialogState(() {
-                    logoBytes = prepared;
-                    logoChanged = true;
-                    logoData = 'data:image/jpeg;base64,${base64Encode(prepared)}';
-                  });
-                } catch (_) {
-                  if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Could not process the logo. Please try again.')));
-                }
-              },
-              child: Text(logoBytes == null ? 'Add' : 'Change'),
-            ),
-            if (logoBytes != null)
-              IconButton(tooltip: 'Remove logo', icon: const Icon(Icons.close), onPressed: () => setDialogState(() {
-                logoBytes = null; logoData = null; logoChanged = true;
-              })),
-          ]),
-        ),
-        if (shop == null) ...[
-          const SizedBox(height: 16),
-          Align(alignment: Alignment.centerLeft, child: Text('Shop login', style: ctx.type.titleSmall)),
+      body: (ctx) => StatefulBuilder(builder: (ctx, setDialogState) {
+        // Purana logo ek baar, pehle frame ke baad (build ke andar setState nahi).
+        if (hasUploadedLogo && !logoFetchStarted) {
+          logoFetchStarted = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) async {
+            if (!ctx.mounted) return;
+            Uint8List? bytes;
+            try { bytes = await _fetchShopLogo(shop['id'] as int); } catch (_) {}
+            if (!ctx.mounted) return;
+            setDialogState(() {
+              logoLoading = false;
+              // Preview na aaye to bhi admin ko pata rahe ki logo upload hai —
+              // widget "preview unavailable" dikhata hai.
+              if (bytes != null && !logoChanged) logoBytes = bytes;
+            });
+          });
+        }
+        return Form(key: key,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+          TextFormField(controller: name, decoration: const InputDecoration(labelText: 'Shop name *'), validator: (v) => (v ?? '').trim().isEmpty ? 'Required' : null),
           const SizedBox(height: 8),
-          TextFormField(controller: user, decoration: const InputDecoration(labelText: 'Username *'),
-              validator: (v) => (v ?? '').trim().length >= 3 ? null : 'Min 3 characters'),
+          TextFormField(controller: owner, decoration: const InputDecoration(labelText: 'Owner name')),
           const SizedBox(height: 8),
-          TextFormField(controller: pass, obscureText: true, decoration: const InputDecoration(labelText: 'Password *'),
-              validator: (v) => (v ?? '').length >= 8 ? null : 'Min 8 characters'),
-        ],
-      ]))),
+          TextFormField(controller: phone, keyboardType: TextInputType.phone,
+            decoration: InputDecoration(labelText: shop == null ? 'Mobile' : 'Mobile (new number, optional)',
+              hintText: shop == null ? null : 'current: ${masked.isEmpty ? '—' : masked}',
+              helperText: shop == null ? null : 'Leave blank to keep the current number.')),
+          const SizedBox(height: 8),
+          TextFormField(controller: addr, decoration: const InputDecoration(labelText: 'Address')),
+          const SizedBox(height: 8),
+          TextFormField(controller: gst, decoration: const InputDecoration(labelText: 'GST no (optional)')),
+          const SizedBox(height: 12),
+          BillLogoField(
+            bytes: logoBytes,
+            loading: logoLoading,
+            uploaded: hasUploadedLogo,
+            changed: logoChanged,
+            onPick: () async {
+              try {
+                final picked = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1200,
+                  maxHeight: 1200, imageQuality: 100, requestFullMetadata: false);
+                if (picked == null) return;
+                final prepared = await prepareDocumentPhoto(await picked.readAsBytes());
+                if (!ctx.mounted) return;
+                setDialogState(() {
+                  logoBytes = prepared;
+                  logoChanged = true;
+                  logoData = 'data:image/jpeg;base64,${base64Encode(prepared)}';
+                });
+              } catch (_) {
+                if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Could not process the logo. Please try again.')));
+              }
+            },
+            onRemove: () => setDialogState(() {
+              logoBytes = null; logoData = null; logoChanged = true;
+            }),
+          ),
+          if (shop == null) ...[
+            const SizedBox(height: 16),
+            Align(alignment: Alignment.centerLeft, child: Text('Shop login', style: ctx.type.titleSmall)),
+            const SizedBox(height: 8),
+            TextFormField(controller: user, decoration: const InputDecoration(labelText: 'Username *'),
+                validator: (v) => (v ?? '').trim().length >= 3 ? null : 'Min 3 characters'),
+            const SizedBox(height: 8),
+            TextFormField(controller: pass, obscureText: true, decoration: const InputDecoration(labelText: 'Password *'),
+                validator: (v) => (v ?? '').length >= 8 ? null : 'Min 8 characters'),
+          ],
+          ]));
+        }),
     );
     // Dialog band hone se pehle values padh lete hain, phir controllers dispose
     // (pehle saat controllers leak hote the).
@@ -201,6 +209,17 @@ class _AdminHomeState extends State<AdminHome> {
       }
       _load();
     } catch (e) { if (mounted) toast(context, '$e', err: true); }
+  }
+
+  /// Ek shop ka bill logo (base64 data URL) → bytes. Sirf Edit dialog ke preview
+  /// ke liye — list me logo jaan-boojh kar nahi aata (bhaari hota hai).
+  Future<Uint8List?> _fetchShopLogo(int shopId) async {
+    final r = await Api.get('/admin/shops/$shopId/logo');
+    final data = r is Map ? r['logo_data'] : null;
+    if (data is! String || data.isEmpty) return null;
+    final comma = data.indexOf(',');
+    if (comma < 0) return null;
+    return base64Decode(data.substring(comma + 1));
   }
 
   Future<void> _resetPass(Map shop) async {
@@ -524,6 +543,8 @@ class _ShopSheet extends StatelessWidget {
       if ('${shop['owner_name'] ?? ''}'.isNotEmpty) ('Owner', '${shop['owner_name']}'),
       if ('${shop['address'] ?? ''}'.isNotEmpty) ('Address', '${shop['address']}'),
       if ('${shop['gst_no'] ?? ''}'.isNotEmpty) ('GST', '${shop['gst_no']}'),
+      // Bill logo upload hua hai ya nahi — "Edit details" me preview milta hai.
+      ('Bill logo', shop['has_logo'] == true ? 'Uploaded' : 'Not uploaded'),
       ('Shop since', dateOnly(shop['created_at'])),
       ('Support sessions', '${shop['support_sessions'] ?? 0}'),
     ];
