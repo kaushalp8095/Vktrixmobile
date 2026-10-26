@@ -38,6 +38,10 @@ function safeShop(shop, access, history) {
     // Delete sirf khaali shop par. Counts jaan-boojh kar nahi bhejte (business
     // data), sirf permission — history ho to sirf deactivate hota hai.
     can_delete: history === null,
+    // Bill logo hai ya nahi. Logo khud (base64) list me nahi jaata — wo bhaari
+    // hai — par Edit dialog isi flag se `GET /shops/:id/logo` se preview laata
+    // hai, taaki admin ko dikhe ki kaunsa logo upload hua hai.
+    has_logo: Boolean(Number(shop.has_logo)),
   };
 }
 
@@ -79,7 +83,13 @@ r.get('/dashboard', wrap(async (req, res) => {
 }));
 
 r.get('/shops', wrap(async (req, res) => {
-  const shops = await db('shops').orderBy('id', 'desc');
+  // Pehle poora row (base64 `logo_data` ke saath) padha jaata tha aur response me
+  // se hata diya jaata tha — har shop ka logo bina zaroorat DB se aata tha.
+  // Ab sirf wahi columns jo list dikhati hai, aur ek `has_logo` flag.
+  const shops = await db('shops')
+    .select('id', 'name', 'owner_name', 'address', 'gst_no', 'active', 'created_at', 'phone')
+    .select(db.raw("case when logo_data is null or logo_data = '' then 0 else 1 end as has_logo"))
+    .orderBy('id', 'desc');
   const access = await support.summaryByShop();
   // Ek query sab logins ke liye (pehle har shop par alag query chalti thi).
   const logins = await db('users').where({ role: 'shop_admin' }).select('id', 'shop_id', 'username', 'active');
@@ -116,6 +126,16 @@ r.put('/shops/:id', wrap(async (req, res) => {
   const changed = await db('shops').where({ id }).update(data);
   if (!changed) return res.status(404).json({ error: 'Shop nahi mila' });
   res.json({ ok: true });
+}));
+
+// Edit dialog ka bill-logo preview. List me logo nahi jaata (bhaari base64),
+// isliye admin jab ek shop ka "Edit details" kholta hai tab sirf usi ka logo
+// maangta hai — "kaunsa logo upload hua hai" ka jawab.
+r.get('/shops/:id/logo', wrap(async (req, res) => {
+  const id = V.id(req.params.id, 'shop id');
+  const shop = await db('shops').where({ id }).first('id', 'logo_data');
+  if (!shop) return res.status(404).json({ error: 'Shop nahi mila' });
+  res.json({ shop_id: shop.id, logo_data: shop.logo_data || null });
 }));
 
 r.post('/shops/:id/reset-password', wrap(async (req, res) => {
