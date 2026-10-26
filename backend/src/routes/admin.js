@@ -15,6 +15,7 @@ const { wrap } = require('../util');
 const V = require('../validation');
 const TAC = require('../tac');
 const support = require('../support');
+const { shopThumb } = require('../thumb');
 r.use(requireAuth, requireRole('superadmin'));
 
 // Shop row ka public (admin-app safe) roop: business data ke bina.
@@ -42,6 +43,8 @@ function safeShop(shop, access, history) {
     // hai — par Edit dialog isi flag se `GET /shops/:id/logo` se preview laata
     // hai, taaki admin ko dikhe ki kaunsa logo upload hua hai.
     has_logo: Boolean(Number(shop.has_logo)),
+    // List ke row me chhota logo (96px, ~2 KB). Poora logo kabhi list me nahi.
+    logo_thumb: shop.logo_thumb || null,
   };
 }
 
@@ -87,7 +90,7 @@ r.get('/shops', wrap(async (req, res) => {
   // se hata diya jaata tha — har shop ka logo bina zaroorat DB se aata tha.
   // Ab sirf wahi columns jo list dikhati hai, aur ek `has_logo` flag.
   const shops = await db('shops')
-    .select('id', 'name', 'owner_name', 'address', 'gst_no', 'active', 'created_at', 'phone')
+    .select('id', 'name', 'owner_name', 'address', 'gst_no', 'active', 'created_at', 'phone', 'logo_thumb')
     .select(db.raw("case when logo_data is null or logo_data = '' then 0 else 1 end as has_logo"))
     .orderBy('id', 'desc');
   const access = await support.summaryByShop();
@@ -105,6 +108,9 @@ r.get('/shops', wrap(async (req, res) => {
 r.post('/shops', wrap(async (req, res) => {
   const b = V.body(req);
   const data = V.shopData(b);
+  // Naya logo aaya to uska list-thumbnail saath me bana kar rakhte hain, warna
+  // shop list ko har baar poora base64 logo bhejna padta.
+  if (Object.hasOwn(data, 'logo_data')) data.logo_thumb = shopThumb(data.logo_data);
   const username = V.text(b.username, 'username', { required: true, max: 64 });
   if (!/^[A-Za-z0-9._-]{3,64}$/.test(username))
     return res.status(400).json({ error: 'username must be 3-64 letters, numbers, dot, underscore or hyphen' });
@@ -123,6 +129,9 @@ r.post('/shops', wrap(async (req, res) => {
 r.put('/shops/:id', wrap(async (req, res) => {
   const id = V.id(req.params.id, 'shop id');
   const data = V.shopData(V.body(req), true);
+  // logo_data aaya (naya ya khaali = hataya) to thumbnail bhi saath update —
+  // warna list me purana logo dikhta rehta.
+  if (Object.hasOwn(data, 'logo_data')) data.logo_thumb = shopThumb(data.logo_data);
   const changed = await db('shops').where({ id }).update(data);
   if (!changed) return res.status(404).json({ error: 'Shop nahi mila' });
   res.json({ ok: true });

@@ -166,6 +166,26 @@ async function migrate() {
   if (!(await db.schema.hasColumn('shops', 'logo_data'))) {
     await db.schema.alterTable('shops', t => t.text('logo_data'));
   }
+  // Shop list ke rows me chhota logo dikhane ke liye (poora base64 list me nahi
+  // jaata). Naya logo aane par admin route ise bana deta hai; ye column purane
+  // logos ke liye hai.
+  if (!(await db.schema.hasColumn('shops', 'logo_thumb'))) {
+    await db.schema.alterTable('shops', t => t.text('logo_thumb'));
+  }
+  // Ek baar purane logos ka thumbnail bana dete hain, warna list me un shops ka
+  // icon hi dikhta rahega. Thumb na ban paaye to khaali string likh dete hain —
+  // warna har restart par wahi fail hote rehta hai. (Limit 500: ek boot me
+  // hazaron images decode karna deploy ko slow kar dega.)
+  {
+    const pending = await db('shops').whereNotNull('logo_data').andWhere('logo_data', '!=', '')
+      .whereNull('logo_thumb').select('id', 'logo_data').limit(500);
+    for (const row of pending) {
+      let thumb = null;
+      try { thumb = require('./thumb').shopThumb(row.logo_data); } catch { thumb = null; }
+      try { await db('shops').where({ id: row.id }).update({ logo_thumb: thumb || '' }); } catch { /* column race; next boot */ }
+    }
+    if (pending.length) console.log(`Shop logo thumbnails ready: ${pending.length}`);
+  }
   // On the one deployment where the ledger table is first introduced, preserve
   // old behaviour by marking non-credit historical sales as fully collected.
   // This runs only when the table was created, so a new unpaid sale can never be

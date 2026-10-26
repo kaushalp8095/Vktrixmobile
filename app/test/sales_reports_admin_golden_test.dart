@@ -6,6 +6,7 @@ import 'package:mobile_shop/screens/admin_home.dart';
 import 'package:mobile_shop/screens/reports.dart';
 import 'package:mobile_shop/screens/sales.dart';
 import 'package:mobile_shop/screens/ledger.dart';
+import 'fixtures/logo.dart';
 import 'showcase_golden_test.dart' show loadFonts;
 
 final _sales = [
@@ -57,6 +58,8 @@ const _dash = {'shops': 3, 'active_shops': 2, 'inactive_shops': 1, 'support_acti
 final _shops = [
   {'id': 1, 'name': 'Krishna Mobiles', 'owner_name': 'Krishna Patel', 'login': {'username': 'krishna'}, 'active': 1,
    'phone_masked': '98•••••210', 'has_phone': true, 'created_at': '2025-04-12',
+   // List row me asli logo ka 96px thumbnail (poora logo kabhi list me nahi jaata).
+   'has_logo': true, 'logo_thumb': kTestLogoDataUrl,
    'support': {'reason': 'Shop owner called: sale entry stuck in ledger', 'expires_in_ms': 12 * 60 * 1000}, 'support_sessions': 2},
   {'id': 2, 'name': 'Shree Ganesh Mobile', 'login': {'username': 'ganesh22'}, 'active': 1,
    'phone_masked': '99•••••451', 'has_phone': true, 'created_at': '2025-06-02', 'support': null, 'support_sessions': 0},

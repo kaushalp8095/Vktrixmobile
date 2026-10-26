@@ -12,8 +12,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_shop/design/design.dart';
 import 'package:mobile_shop/screens/bill_logo_field.dart';
 
-final Uint8List _png = base64Decode(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
+import 'fixtures/logo.dart';
+
+final Uint8List _logoBytes = base64Decode(kTestLogoJpegBase64);
 
 Widget _app(BillLogoField field) => MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -58,7 +59,7 @@ void main() {
     expect(find.text('Add'), findsNothing, reason: 'logo hai to "Change" hi sahi hai');
 
     // Fetch khatam: server se aaya logo preview me.
-    await tester.pumpWidget(_app(_field(bytes: _png, uploaded: true)));
+    await tester.pumpWidget(_app(_field(bytes: _logoBytes, uploaded: true)));
     await tester.pump(const Duration(milliseconds: 50));
 
     expect(find.byType(CircularProgressIndicator), findsNothing);
@@ -80,7 +81,7 @@ void main() {
   });
 
   testWidgets('naya logo chunne par "Save" ki yaad dilati hai', (tester) async {
-    await tester.pumpWidget(_app(_field(bytes: _png, uploaded: true, changed: true)));
+    await tester.pumpWidget(_app(_field(bytes: _logoBytes, uploaded: true, changed: true)));
     await tester.pump(const Duration(milliseconds: 50));
 
     expect(find.text('New logo · tap Save to apply'), findsOneWidget);
@@ -105,7 +106,7 @@ void main() {
     expect(find.byTooltip('Remove logo'), findsNothing, reason: 'kuch hatane ko nahi hai');
 
     await tester.pumpWidget(_app(_field(
-        bytes: _png, uploaded: true, onPick: () => picked++, onRemove: () => removed++)));
+        bytes: _logoBytes, uploaded: true, onPick: () => picked++, onRemove: () => removed++)));
     await tester.tap(find.text('Change'));
     await tester.tap(find.byTooltip('Remove logo'));
     expect(picked, 2);

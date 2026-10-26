@@ -16,6 +16,7 @@ import 'bill_logo_field.dart';
 import 'common.dart';
 import 'login.dart';
 import 'shop_home.dart';
+import 'shop_logo.dart';
 import 'support_access.dart';
 import 'tac_catalog.dart';
 import 'update_checker.dart';
@@ -493,9 +494,9 @@ class _ShopRow extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(Space.x16, Space.x12, Space.x12, Space.x12),
           child: Row(children: [
-            Container(width: 44, height: 44,
-              decoration: BoxDecoration(color: (active ? c.brandInk : c.textSecondary).withValues(alpha: .12), borderRadius: BorderRadius.circular(Radii.md)),
-              child: Icon(Icons.store_outlined, color: active ? c.brandInk : c.textSecondary, size: 22)),
+            // Asli logo ka chhota thumbnail (server `logo_thumb` bhejta hai);
+            // na ho to pehle jaisa store icon.
+            ShopLogoAvatar(thumb: s['logo_thumb'] as String?, active: active),
             const SizedBox(width: Space.x12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
