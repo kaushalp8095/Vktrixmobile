@@ -125,7 +125,7 @@ class _AdminHomeState extends State<AdminHome> {
           WidgetsBinding.instance.addPostFrameCallback((_) async {
             if (!ctx.mounted) return;
             Uint8List? bytes;
-            try { bytes = await _fetchShopLogo(shop!['id'] as int); } catch (_) {}
+            try { bytes = await _fetchShopLogo(shop['id'] as int); } catch (_) {}
             if (!ctx.mounted) return;
             setDialogState(() {
               logoLoading = false;
