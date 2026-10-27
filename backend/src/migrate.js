@@ -172,19 +172,32 @@ async function migrate() {
   if (!(await db.schema.hasColumn('shops', 'logo_thumb'))) {
     await db.schema.alterTable('shops', t => t.text('logo_thumb'));
   }
-  // Ek baar purane logos ka thumbnail bana dete hain, warna list me un shops ka
-  // icon hi dikhta rahega. Thumb na ban paaye to khaali string likh dete hain —
-  // warna har restart par wahi fail hote rehta hai. (Limit 500: ek boot me
-  // hazaron images decode karna deploy ko slow kar dega.)
+  // Purane logos ko bhi naye "auto-adjust" roop me laate hain: 512px square tile
+  // (margin trim + centre) + 128px list thumbnail. Warna already-uploaded logo
+  // PDF/Profile me chhota floating dikhta rehta aur list me thumbnail hi na hota.
+  // Pehle se normalized (512x512) hai to sirf header padh kar chhod dete hain.
   {
-    const pending = await db('shops').whereNotNull('logo_data').andWhere('logo_data', '!=', '')
-      .whereNull('logo_thumb').select('id', 'logo_data').limit(500);
-    for (const row of pending) {
-      let thumb = null;
-      try { thumb = require('./thumb').shopThumb(row.logo_data); } catch { thumb = null; }
-      try { await db('shops').where({ id: row.id }).update({ logo_thumb: thumb || '' }); } catch { /* column race; next boot */ }
+    const thumb = require('./thumb');
+    const rows = await db('shops').whereNotNull('logo_data').andWhere('logo_data', '!=', '')
+      .select('id', 'logo_data', 'logo_thumb').limit(300);
+    let changed = 0;
+    for (const row of rows) {
+      const size = thumb.jpegSize(thumb.jpegBytes(row.logo_data));
+      const normalized = size && size.width === thumb.LOGO_SIZE && size.height === thumb.LOGO_SIZE;
+      if (normalized && row.logo_thumb) continue;   // pehle se theek
+      let tiles = null;
+      try { tiles = thumb.shopLogoTiles(row.logo_data); } catch { tiles = null; }
+      if (!tiles && row.logo_thumb) continue;
+      try {
+        await db('shops').where({ id: row.id }).update(tiles
+          ? { logo_data: tiles.logo, logo_thumb: tiles.thumb }
+          // Auto-adjust na ho (PNG/WebP) to khaali string — warna har boot par
+          // wahi fail hota rahega.
+          : { logo_thumb: row.logo_thumb || '' });
+        changed++;
+      } catch { /* column/again next boot */ }
     }
-    if (pending.length) console.log(`Shop logo thumbnails ready: ${pending.length}`);
+    if (changed) console.log(`Shop logos auto-adjusted: ${changed}`);
   }
   // On the one deployment where the ledger table is first introduced, preserve
   // old behaviour by marking non-credit historical sales as fully collected.

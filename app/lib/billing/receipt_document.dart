@@ -148,9 +148,11 @@ class ReceiptDocument {
 
   static pw.Widget _logo(pw.MemoryImage? image, dynamic shopName) {
     if (image != null) {
-      return pw.Container(width: 58, height: 58, padding: const pw.EdgeInsets.all(4),
-        decoration: pw.BoxDecoration(borderRadius: pw.BorderRadius.circular(10), border: pw.Border.all(color: _line)),
-        child: pw.Image(image, fit: pw.BoxFit.contain));
+      // Server logo ko square tile bana kar rakhta hai (margin trim + centre),
+      // isliye bill par bhi wahi "set" logo aata hai — chhota floating nahi.
+      return pw.Container(width: 58, height: 58, padding: const pw.EdgeInsets.all(2),
+        decoration: pw.BoxDecoration(borderRadius: pw.BorderRadius.circular(14), border: pw.Border.all(color: _line)),
+        child: pw.Image(image, fit: pw.BoxFit.cover));
     }
     // `substring(0, 1)` emoji (surrogate pair) shop name ko tod deta tha; runes
     // poora code point dete hain.

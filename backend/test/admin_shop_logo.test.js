@@ -1,6 +1,8 @@
 // Shop ka bill logo:
-//   * list me sirf `has_logo` + chhota `logo_thumb` jaata hai (poora base64 kabhi nahi)
-//   * `GET /admin/shops/:id/logo` poora logo deta hai (Edit dialog ka preview)
+//   * upload par **auto-adjust** — margin trim + centre + 512px square tile, taaki
+//     logo PDF/Profile/list teeno me ek jaisa "set" dikhe (koi bhi shape ho)
+//   * list me sirf `has_logo` + 128px square `logo_thumb` jaata hai (poora base64 kabhi nahi)
+//   * `GET /admin/shops/:id/logo` poora (auto-adjusted) logo deta hai
 //   * logo badalne/hatane par thumbnail bhi turant update hota hai
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -56,11 +58,26 @@ async function request(method, route, data, token) {
   return { status: response.status, body: await response.json() };
 }
 
-const thumbBytes = thumb => Buffer.from(String(thumb).split(',')[1], 'base64');
-const thumbDims = thumb => {
-  const d = jpeg.decode(thumbBytes(thumb), { useTArray: true });
-  return { width: d.width, height: d.height };
-};
+const decodeDataUrl = url => jpeg.decode(Buffer.from(String(url).split(',')[1], 'base64'), { useTArray: true });
+const dimsOf = url => { const d = decodeDataUrl(url); return { width: d.width, height: d.height }; };
+const pixel = (d, x, y) => { const i = (y * d.width + x) * 4; return [d.data[i], d.data[i + 1], d.data[i + 2]]; };
+const white = ([r, g, b]) => r > 240 && g > 240 && b > 240;
+/// Tile me non-white content ka bounding box — auto-adjust ne kitni jagah bhari,
+/// ye batata hai (16px inset chhod kar, kyunki edge par JPEG ringing ho sakti hai).
+function contentBox(url) {
+  const d = decodeDataUrl(url);
+  let minX = d.width, minY = d.height, maxX = -1, maxY = -1;
+  for (let y = 16; y < d.height - 16; y++) {
+    for (let x = 16; x < d.width - 16; x++) {
+      if (white(pixel(d, x, y))) continue;
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+    }
+  }
+  return maxX < 0 ? null : { width: maxX - minX + 1, height: maxY - minY + 1, size: d.width };
+}
 
 test('bill logo: list sirf thumbnail bhejti hai, preview endpoint poora logo deta hai', async t => {
   server = createApp().listen(0, '127.0.0.1');
@@ -109,27 +126,41 @@ test('bill logo: list sirf thumbnail bhejti hai, preview endpoint poora logo det
   assert.equal(withLogo.has_logo, true, 'Edit dialog ko pata hona chahiye ki logo hai');
   assert.equal('logo_data' in withLogo, false, 'list halki rehni chahiye');
 
-  // Thumbnail: chhota, JPEG, 96px box ke andar (list me bhejne layak).
+  // Thumbnail: JPEG, square 128 (list me 44-56dp box ke liye), chhota.
   assert.match(String(withLogo.logo_thumb), /^data:image\/jpeg;base64,/);
-  assert.ok(withLogo.logo_thumb.length < 6 * 1024, `thumb too big: ${withLogo.logo_thumb.length}`);
-  assert.ok(withLogo.logo_thumb.length < LOGO.length / 5, 'thumb source logo se kaafi chhota ho');
-  const dims = thumbDims(withLogo.logo_thumb);
-  assert.equal(Math.max(dims.width, dims.height), 96);
-  assert.equal(Math.round(dims.width / dims.height), 2, 'aspect ratio bacha rahe (480x240 → 96x48)');
+  assert.ok(withLogo.logo_thumb.length < 33 * 1024, `thumb too big: ${withLogo.logo_thumb.length}`);
+  assert.deepEqual(dimsOf(withLogo.logo_thumb), { width: 128, height: 128 });
 
-  // Preview endpoint poora (original) logo deta hai, thumbnail nahi.
+  // ---- Auto-adjust: 480x240 (wide) image bhi 512x512 square tile ----
   const preview = await logoFor();
   assert.equal(preview.status, 200);
-  assert.equal(preview.body.logo_data, LOGO, 'wahi logo wapas milna chahiye jo upload hua');
+  const savedLogo = preview.body.logo_data;
+  assert.notEqual(savedLogo, LOGO, 'server logo ko auto-adjust karta hai');
+  const logo = decodeDataUrl(savedLogo);
+  assert.deepEqual({ width: logo.width, height: logo.height }, { width: 512, height: 512 });
+  // Jo content tha wo tile ke bahut bade hisse me phaila ho (chhota floating nahi).
+  // Wide logo square tile me letterbox hoga — isliye lambi side 85%+ bhare aur
+  // aspect ratio wahi rahe (480x240 → ~2:1).
+  const box = contentBox(savedLogo);
+  assert.ok(box, 'content mile');
+  assert.ok(Math.max(box.width, box.height) >= 512 * 0.85, `content chhota reh gaya: ${box.width}x${box.height}`);
+  const ratio = box.width / box.height;
+  assert.ok(ratio > 1.7 && ratio < 2.3, `aspect ratio bigda: ${ratio.toFixed(2)}`);
+  // Kinare safed (padding) — tile har theme me saaf dikhe
+  assert.ok(white(pixel(logo, 3, 3)), 'top-left corner safed');
+  assert.ok(white(pixel(logo, 508, 508)), 'bottom-right corner safed');
+
+  // ---- Wahi logo dobara bhejna (idempotent): dobara recompress nahi ----
+  await request('PUT', `/admin/shops/${shopId}`, { logo_data: savedLogo }, admin);
+  assert.equal((await logoFor()).body.logo_data, savedLogo, 'normalized logo dobara nahi badalta');
 
   // ---- Badla hua logo: thumbnail bhi naya ----
   const firstThumb = withLogo.logo_thumb;
   await request('PUT', `/admin/shops/${shopId}`, { logo_data: LOGO2 }, admin);
   const swapped = await rowFor();
-  assert.equal((await logoFor()).body.logo_data, LOGO2);
+  assert.notEqual((await logoFor()).body.logo_data, savedLogo, 'naya logo save hua');
   assert.notEqual(swapped.logo_thumb, firstThumb, 'purana thumbnail nahi dikhna chahiye');
-  const square = thumbDims(swapped.logo_thumb);
-  assert.deepEqual([square.width, square.height], [96, 96]);
+  assert.deepEqual(dimsOf(swapped.logo_thumb), { width: 128, height: 128 });
 
   // ---- Baaki fields edit karna thumbnail ko chhedta nahi ----
   await request('PUT', `/admin/shops/${shopId}`, { address: 'MG Road' }, admin);
@@ -149,11 +180,14 @@ test('bill logo: list sirf thumbnail bhejti hai, preview endpoint poora logo det
   assert.equal(png.logo_thumb, null, 'PNG ka thumb nahi — list icon dikhayegi');
   assert.equal((await logoFor()).body.logo_data, PNG);
 
-  // ---- Purane logos ka backfill (migration) ----
+  // ---- Purane (pre-auto-adjust) logos ka backfill (migration) ----
   await db('shops').where({ id: shopId }).update({ logo_data: LOGO, logo_thumb: null });
   await migrate();
-  const backfilled = await db('shops').where({ id: shopId }).first('logo_thumb');
+  const backfilled = await db('shops').where({ id: shopId }).first('logo_data', 'logo_thumb');
   assert.match(String(backfilled.logo_thumb), /^data:image\/jpeg;base64,/);
+  assert.deepEqual(dimsOf(backfilled.logo_thumb), { width: 128, height: 128 });
+  assert.deepEqual(dimsOf(backfilled.logo_data), { width: 512, height: 512 },
+    'purana logo bhi naye auto-adjusted tile me aa jata hai');
 
   // ---- Sirf super admin ----
   const shopLogin = await request('POST', '/auth/login', { username: 'logomobile', password: 'Logo@12345' });

@@ -15,7 +15,7 @@ const { wrap } = require('../util');
 const V = require('../validation');
 const TAC = require('../tac');
 const support = require('../support');
-const { shopThumb } = require('../thumb');
+const thumb = require('../thumb');
 r.use(requireAuth, requireRole('superadmin'));
 
 // Shop row ka public (admin-app safe) roop: business data ke bina.
@@ -46,6 +46,17 @@ function safeShop(shop, access, history) {
     // List ke row me chhota logo (96px, ~2 KB). Poora logo kabhi list me nahi.
     logo_thumb: shop.logo_thumb || null,
   };
+}
+
+/// Shop logo ko auto-adjust karke `{ logo_data, logo_thumb }` deta hai.
+/// Auto-adjust na ho (purana PNG/WebP, corrupt file) to logo jaisa hai waisa hi
+/// rehta hai aur thumbnail khaali — list me icon dikhti hai, kuch toota nahi.
+function normalizedLogo(logoData) {
+  if (!logoData) return { logo_data: logoData === '' ? null : logoData, logo_thumb: null };
+  let tiles = null;
+  try { tiles = thumb.shopLogoTiles(logoData); } catch { tiles = null; }
+  return tiles ? { logo_data: tiles.logo, logo_thumb: tiles.thumb }
+    : { logo_data: logoData, logo_thumb: null };
 }
 
 // Wo tables jinme shop ka itihaas rehta hai — inme ek bhi row ho to shop delete
@@ -108,9 +119,10 @@ r.get('/shops', wrap(async (req, res) => {
 r.post('/shops', wrap(async (req, res) => {
   const b = V.body(req);
   const data = V.shopData(b);
-  // Naya logo aaya to uska list-thumbnail saath me bana kar rakhte hain, warna
-  // shop list ko har baar poora base64 logo bhejna padta.
-  if (Object.hasOwn(data, 'logo_data')) data.logo_thumb = shopThumb(data.logo_data);
+  // Naya logo aaya to use yahin auto-adjust kar dete hain: 512px square tile
+  // (margin trim + centre) + 128px list thumbnail. Isse PDF, Profile aur list —
+  // teeno me logo ek hi tarah "set" dikhta hai, chahe image kisi bhi shape ki ho.
+  if (Object.hasOwn(data, 'logo_data')) Object.assign(data, normalizedLogo(data.logo_data));
   const username = V.text(b.username, 'username', { required: true, max: 64 });
   if (!/^[A-Za-z0-9._-]{3,64}$/.test(username))
     return res.status(400).json({ error: 'username must be 3-64 letters, numbers, dot, underscore or hyphen' });
@@ -129,9 +141,9 @@ r.post('/shops', wrap(async (req, res) => {
 r.put('/shops/:id', wrap(async (req, res) => {
   const id = V.id(req.params.id, 'shop id');
   const data = V.shopData(V.body(req), true);
-  // logo_data aaya (naya ya khaali = hataya) to thumbnail bhi saath update —
-  // warna list me purana logo dikhta rehta.
-  if (Object.hasOwn(data, 'logo_data')) data.logo_thumb = shopThumb(data.logo_data);
+  // logo_data aaya (naya ya khaali = hataya) to auto-adjust + thumbnail saath —
+  // warna list/PDF me purana logo dikhta rehta.
+  if (Object.hasOwn(data, 'logo_data')) Object.assign(data, normalizedLogo(data.logo_data));
   const changed = await db('shops').where({ id }).update(data);
   if (!changed) return res.status(404).json({ error: 'Shop nahi mila' });
   res.json({ ok: true });
