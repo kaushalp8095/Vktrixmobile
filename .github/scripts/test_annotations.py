@@ -21,7 +21,10 @@ def escape(value: str) -> str:
 
 
 def main(path: str) -> int:
-    text = pathlib.Path(path).read_text(errors="replace")
+    # `flutter test` (compact reporter) progress lines are separated by \r, not
+    # \n — dono par split karna zaroori hai, warna failing test line ek hi
+    # bade string me chhup jati hai.
+    text = pathlib.Path(path).read_text(errors="replace").replace("\r", "\n")
     blocks, current = [], None
     for raw in text.splitlines():
         line = raw.rstrip()
@@ -43,7 +46,10 @@ def main(path: str) -> int:
         blocks.append(current)
 
     if not blocks:
-        print("::error::flutter test failed but no [E] block was found in the output")
+        # Format badal jaye to bhi PR par kuch to dikhe: log ka aakhiri hissa.
+        tail = text.strip().splitlines()[-60:]
+        print("::error::flutter test failed (no [E] block) — log tail:%0A"
+              + escape("\n".join(tail))[-6000:])
         return 0
 
     print(f"::error::{len(blocks)} failing test(s)")
