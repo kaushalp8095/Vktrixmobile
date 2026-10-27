@@ -494,9 +494,11 @@ class _ShopRow extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(Space.x16, Space.x12, Space.x12, Space.x12),
           child: Row(children: [
-            // Asli logo ka chhota thumbnail (server `logo_thumb` bhejta hai);
-            // na ho to pehle jaisa store icon.
-            ShopLogoAvatar(thumb: s['logo_thumb'] as String?, active: active),
+            // Asli logo ka chhota thumbnail (server `logo_thumb` bhejta hai,
+            // upload par auto-adjusted). Na ho to shop ke naam ka pehla akshar
+            // — 20 rows me har jagah ek jaisa store icon repetitive lagta tha.
+            ShopLogoAvatar(thumb: s['logo_thumb'] as String?, active: active,
+                fallbackLetter: '${s['name'] ?? ''}'),
             const SizedBox(width: Space.x12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
@@ -556,7 +558,14 @@ class _ShopSheet extends StatelessWidget {
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: c.textPrimary.withValues(alpha: .20), borderRadius: BorderRadius.circular(2)))),
           const SizedBox(height: Space.x16),
-          Semantics(header: true, child: Text('${shop['name']}', style: t.headlineSmall, maxLines: 2, overflow: TextOverflow.ellipsis)),
+          // Shop ka logo naam ke saath — "kaunsa shop" turant pata chalta hai.
+          Row(children: [
+            ShopLogoAvatar(thumb: shop['logo_thumb'] as String?, active: active, size: 44,
+                fallbackLetter: '${shop['name'] ?? ''}'),
+            const SizedBox(width: Space.x12),
+            Expanded(child: Semantics(header: true, child: Text('${shop['name']}',
+                style: t.headlineSmall, maxLines: 2, overflow: TextOverflow.ellipsis))),
+          ]),
           const SizedBox(height: Space.x4),
           Wrap(spacing: Space.x8, runSpacing: Space.x4, children: [
             StatusChip(label: active ? 'Active' : 'Deactivated', tone: active ? ChipTone.success : ChipTone.neutral),

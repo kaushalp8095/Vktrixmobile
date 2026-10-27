@@ -6,6 +6,7 @@ import '../design/components/components.dart';
 import '../design/design.dart';
 import 'profile.dart';
 import 'receipt.dart';
+import 'shop_logo.dart';
 
 class ActivityItem {
   final bool isSale;
@@ -28,8 +29,13 @@ class Dashboard extends StatefulWidget {
   final Map<String, dynamic>? testDues;
   final List<ActivityItem>? testRecent;
   final String? greeting;
+  /// Shop ka auto-adjusted logo thumbnail (`logo_thumb`). Na do to login
+  /// response se (`Api.user['shop']['logo_thumb']`) aata hai — top bar me shop
+  /// name ke aage wahi dikhta hai.
+  final String? logoThumb;
   const Dashboard({super.key, required this.onGo, required this.shopName, this.onOpenLedger,
-      this.isAdminView = false, this.testSummary, this.testDues, this.greeting, this.testRecent});
+      this.isAdminView = false, this.testSummary, this.testDues, this.greeting, this.testRecent,
+      this.logoThumb});
   /// "Recent activity" rows — sale aur purchase dono ek hi timeline par, newest
   /// first. Pehle sale ko `1000000 + id` banakar sort kiya jata tha, isliye har
   /// sale har purchase ke upar aa jati thi aur aaj ki kharidi purani sale ke neeche
@@ -216,7 +222,19 @@ class _DashboardState extends State<Dashboard> {
       ),
       Positioned(top: 0, left: 0, right: 0, child: GlassTopBar(
         title: widget.shopName, scroll: _scroll,
-        leading: widget.isAdminView ? const BackButton() : const SizedBox(width: Space.x12),
+        // Shop ka logo naam se pehle, aur usi row ke aakhir me profile icon.
+        leading: Row(mainAxisSize: MainAxisSize.min, children: [
+          if (widget.isAdminView) const BackButton()
+          else ...[
+            const SizedBox(width: Space.x4),
+            ShopLogoAvatar(
+              thumb: widget.logoThumb ?? (Api.user?['shop']?['logo_thumb'] as String?),
+              fallbackLetter: widget.shopName,
+              active: true, size: 32,
+            ),
+            const SizedBox(width: Space.x8),
+          ],
+        ]),
         actions: [
           GlassIconButton(icon: Icons.refresh, semanticLabel: 'Refresh dashboard', onPressed: _load),
           if (!widget.isAdminView)

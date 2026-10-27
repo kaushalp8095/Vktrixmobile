@@ -10,6 +10,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import '../design/design.dart';
+import 'shop_logo.dart';
 
 class BillLogoField extends StatelessWidget {
   /// Preview: server se aaya uploaded logo ya abhi chuna hua naya logo.
@@ -67,8 +68,11 @@ class BillLogoField extends StatelessWidget {
             width: 54,
             height: 54,
             decoration: BoxDecoration(
-              color: scheme.primary.withValues(alpha: .10),
-              borderRadius: Shapes.md,
+              // Server save par logo ko square tile bana deta hai; preview bhi
+              // wahi shape dikhaye (rounded square, poora bhara hua).
+              color: bytes != null ? Colors.white : scheme.primary.withValues(alpha: .10),
+              borderRadius: BorderRadius.circular(logoRadius(54)),
+              border: bytes != null ? Border.all(color: c.textPrimary.withValues(alpha: .12)) : null,
             ),
             clipBehavior: Clip.antiAlias,
             child: _preview(c),
@@ -93,7 +97,7 @@ class BillLogoField extends StatelessWidget {
 
   Widget _preview(AppColors c) {
     final bytes = this.bytes;
-    if (bytes != null) return Image.memory(bytes, fit: BoxFit.contain);
+    if (bytes != null) return Image.memory(bytes, fit: BoxFit.cover);
     if (loading) {
       return const Center(
         child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),

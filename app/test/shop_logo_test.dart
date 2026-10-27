@@ -74,4 +74,57 @@ void main() {
       expect(box.height, 22);
     });
   });
+
+  group('shape (Oct 2026 rounded-square)', () {
+    test('radius size ka ~26% hota hai (app-icon squircle ratio)', () {
+      expect(logoRadius(44), closeTo(11.44, .01));
+      expect(logoRadius(56), closeTo(14.56, .01));
+      // 16dp radius (purana Radii.md) 44dp tile par bahut gol lagta tha.
+      expect(logoRadius(44), lessThan(Radii.md));
+    });
+
+    testWidgets('default rounded square hai, circle nahi', (tester) async {
+      await tester.pumpWidget(_app(const ShopLogoAvatar(thumb: kTestLogoDataUrl, active: true, size: 44)));
+      await tester.pump(const Duration(milliseconds: 50));
+
+      final container = tester.widget<Container>(find.descendant(
+          of: find.byType(ShopLogoAvatar), matching: find.byType(Container)).first);
+      final radius = (container.decoration as BoxDecoration).borderRadius as BorderRadius;
+      expect(radius.topLeft.x, closeTo(logoRadius(44), .01));
+      expect(radius.topLeft.x, isNot(Radii.full));
+    });
+
+    testWidgets('circle: true par purana gola shape milta hai', (tester) async {
+      await tester.pumpWidget(_app(
+          const ShopLogoAvatar(thumb: kTestLogoDataUrl, active: true, size: 44, circle: true)));
+      await tester.pump(const Duration(milliseconds: 50));
+
+      final container = tester.widget<Container>(find.descendant(
+          of: find.byType(ShopLogoAvatar), matching: find.byType(Container)).first);
+      final radius = (container.decoration as BoxDecoration).borderRadius as BorderRadius;
+      expect(radius.topLeft.x, 44);
+    });
+
+    testWidgets('image poora box bharta hai (cover), chhota floating nahi', (tester) async {
+      await tester.pumpWidget(_app(const ShopLogoAvatar(thumb: kTestLogoDataUrl, active: true)));
+      await tester.pump(const Duration(milliseconds: 50));
+
+      final image = tester.widget<Image>(find.byType(Image));
+      expect(image.fit, BoxFit.cover);
+    });
+
+    testWidgets('logo na ho to shop ke naam ka pehla akshar dikhta hai', (tester) async {
+      await tester.pumpWidget(_app(
+          const ShopLogoAvatar(thumb: null, active: true, fallbackLetter: 'Patidar Mobile Shop')));
+
+      expect(find.text('P'), findsOneWidget);
+      expect(find.byIcon(Icons.store_outlined), findsNothing);
+    });
+
+    testWidgets('letter bhi na ho to store icon (kabhi khaali box nahi)', (tester) async {
+      await tester.pumpWidget(_app(const ShopLogoAvatar(thumb: null, active: true, fallbackLetter: '   ')));
+
+      expect(find.byIcon(Icons.store_outlined), findsOneWidget);
+    });
+  });
 }

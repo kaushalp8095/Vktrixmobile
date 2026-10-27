@@ -1,6 +1,4 @@
 // PROFILE & SETTINGS: shop card → theme → account (change password, logout) → app info.
-import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../api.dart';
@@ -9,6 +7,7 @@ import '../design/design.dart';
 import '../main.dart' show themeMode;
 import 'common.dart';
 import 'login.dart';
+import 'shop_logo.dart';
 import 'support_access.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -131,14 +130,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Uint8List? _shopLogo(dynamic value) {
-    try {
-      final raw = '${value ?? ''}';
-      final comma = raw.indexOf(',');
-      return comma < 0 ? null : base64Decode(raw.substring(comma + 1));
-    } catch (_) { return null; }
-  }
-
   Future<void> _logout() async {
     final u = Api.user ?? const {};
     final shop = (u['shop'] as Map?) ?? const {};
@@ -155,7 +146,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final c = context.colors, t = context.type;
     final u = Api.user ?? const {};
     final shop = (u['shop'] as Map?) ?? const {};
-    final logo = _shopLogo(shop['logo_data']);
+    final shopName = '${shop['name'] ?? u['name'] ?? 'My Shop'}';
     final top = MediaQuery.viewPaddingOf(context).top;
     return Scaffold(
       body: AuroraBackground(child: Stack(children: [
@@ -165,16 +156,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
           children: [
             // ---- Shop card ----
             GlassCard(child: Row(children: [
-              SizedBox.square(dimension: 56, child: GlassSurface(radius: Radii.full, blur: false,
-                  child: logo == null
-                    ? Center(child: Text(
-                        ('${shop['name'] ?? u['name'] ?? 'S'}').trim().characters.first.toUpperCase(),
-                        style: t.headlineSmall?.copyWith(color: c.brandInk)))
-                    : Padding(padding: const EdgeInsets.all(6), child: ClipOval(child: Image.memory(logo, fit: BoxFit.contain)))),
+              // Baaki app jaisa hi rounded-square logo (server par auto-adjusted).
+              ShopLogoAvatar(
+                thumb: (shop['logo_thumb'] as String?) ?? (shop['logo_data'] as String?),
+                fallbackLetter: shopName,
+                active: true, size: 56,
               ),
               const SizedBox(width: Space.x12),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('${shop['name'] ?? u['name'] ?? 'My Shop'}', style: t.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(shopName, style: t.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 2),
                 Text('@${u['username'] ?? ''} · ${u['role'] == 'superadmin' ? 'Super Admin' : 'Shop owner'}',
                     style: t.bodySmall?.copyWith(color: c.textSecondary)),

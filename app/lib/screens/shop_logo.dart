@@ -1,8 +1,14 @@
-// SHOP LOGO AVATAR — list/detail ke liye chhota logo.
+// SHOP LOGO AVATAR — app ke har jagah ek hi tarah ka logo (Oct 2026 style).
 //
-// Poora logo (base64, 100-700 KB) list me nahi jaata; server har logo ka 96px
-// thumbnail (`logo_thumb`, ~2 KB) bhejta hai. Wo na ho (purana PNG logo, upload
-// ke bina) to pehle jaisa store icon dikhta hai — kabhi crash nahi.
+// Kahin circle, kahin square, kahin contain me chhota floating — teen tarah ke
+// logo dikh rahe the. Ab har jagah ek hi shape: **rounded square** (modern app
+// icon / squircle ratio ~26%), aur andar wahi image jo server upload par
+// auto-adjust karke banti hai (margin trim + centre + square tile). Isliye 2:1
+// ya transparent logo bhi box ko poora bharta hai.
+//
+// Poora logo (base64, 100-700 KB) list me nahi jaata; server har logo ka 128px
+// thumbnail (`logo_thumb`, ~2-6 KB) bhejta hai. Wo na ho (purana PNG logo,
+// upload se pehle) to brand initial ya store icon dikhta hai — kabhi crash nahi.
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -20,33 +26,77 @@ Uint8List? decodeLogoThumb(dynamic value) {
   try { return base64Decode(data); } catch (_) { return null; }
 }
 
+/// Squircle radius — app-icon grids (iOS/Android 2026) 22–26% use karte hain.
+double logoRadius(double size) => size * .26;
+
 class ShopLogoAvatar extends StatelessWidget {
-  /// `logo_thumb` (data URL) — null/khaali/kharaab ho to icon.
+  /// `logo_thumb` (data URL) — null/khaali/kharaab ho to fallback.
   final String? thumb;
   final bool active;
   final double size;
-  /// Shop row 44, bottom sheet 56 — dono same design language.
-  const ShopLogoAvatar({super.key, this.thumb, required this.active, this.size = 44});
+  /// Logo na ho to jagah ek letter (shop/owner ke naam ka pehla akshar)
+  /// dikhana hai ya store ka icon.
+  final String? fallbackLetter;
+  /// Hero-style tile (Dashboard top bar, Profile card): brand tint background
+  /// aur halka border, taaki chhote size par bhi logo "set" lage.
+  final bool elevated;
+  final bool circle;
+
+  const ShopLogoAvatar({
+    super.key,
+    this.thumb,
+    required this.active,
+    this.size = 44,
+    this.fallbackLetter,
+    this.elevated = true,
+    this.circle = false,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final c = context.colors;
+    final c = context.colors, t = context.type;
     final bytes = decodeLogoThumb(thumb);
     final tone = active ? c.brandInk : c.textSecondary;
+    final radius = circle ? size : logoRadius(size);
+    final letter = (fallbackLetter ?? '').trim().characters.isEmpty
+        ? null
+        : (fallbackLetter ?? '').trim().characters.first.toUpperCase();
+
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
+        // Logo ho to safed canvas (server tile bhi safed hai) — dono theme me
+        // same, isliye image ke kinare tile ke kinare se mil jaate hain.
         color: bytes == null ? tone.withValues(alpha: .12) : Colors.white,
-        borderRadius: BorderRadius.circular(Radii.md),
-        border: bytes == null ? null : Border.all(color: c.textPrimary.withValues(alpha: .10)),
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(
+          color: c.textPrimary.withValues(alpha: bytes == null ? (elevated ? .10 : 0) : .12),
+        ),
       ),
       clipBehavior: Clip.antiAlias,
-      padding: EdgeInsets.all(bytes == null ? 0 : size * .06),
       child: bytes == null
-          ? Icon(Icons.store_outlined, color: tone, size: size * .5)
-          : Image.memory(bytes, fit: BoxFit.contain, gaplessPlayback: true,
-              errorBuilder: (_, __, ___) => Icon(Icons.store_outlined, color: c.textSecondary, size: size * .5)),
+          ? Center(
+              child: letter == null
+                  ? Icon(Icons.store_outlined, color: tone, size: size * .5)
+                  // 200% text scale par bhi letter box se bahar na jaye.
+                  : FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Padding(
+                        padding: EdgeInsets.all(size * .2),
+                        child: Text(letter, style: (size >= 40 ? t.titleMedium : t.titleSmall)
+                            ?.copyWith(color: tone, fontWeight: FontWeight.w600)),
+                      ),
+                    ),
+            )
+          : Image.memory(
+              bytes,
+              fit: BoxFit.cover,
+              gaplessPlayback: true,
+              errorBuilder: (_, __, ___) => Center(
+                child: Icon(Icons.store_outlined, color: c.textSecondary, size: size * .5),
+              ),
+            ),
     );
   }
 }

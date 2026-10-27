@@ -1,13 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile_shop/api.dart';
 import 'package:mobile_shop/design/design.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mobile_shop/screens/onboarding.dart';
 import 'package:mobile_shop/screens/profile.dart';
+import 'fixtures/logo.dart';
 import 'showcase_golden_test.dart' show loadFonts;
 
 void main() {
-  setUpAll(() => SharedPreferences.setMockInitialValues({}));
+  setUpAll(() {
+    SharedPreferences.setMockInitialValues({});
+    // Profile card ka asli roop: shop ka auto-adjusted logo.
+    Api.user = {
+      'id': 7, 'name': 'Krishna Patel', 'username': 'krishna', 'role': 'shop_admin',
+      'shop': {'id': 1, 'name': 'Krishna Mobiles', 'logo_thumb': kTestLogoDataUrl},
+    };
+  });
   final cases = <String, Widget Function(bool)>{
     'onboarding': (dark) => MaterialApp(debugShowCheckedModeBanner: false,
         theme: AppTheme.build(dark ? AppTheme.darkScheme : AppTheme.lightScheme),
