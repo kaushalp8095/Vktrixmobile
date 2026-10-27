@@ -49,7 +49,15 @@ jobs:
           status=${PIPESTATUS[0]}
           python3 ../.github/scripts/analyze_annotations.py "$RUNNER_TEMP/analyze.log" || true
           exit $status
-      - run: flutter test --no-pub
+      # Test failures ko annotations me bhi likhte hain (log blob kabhi-kabhi
+      # reachable nahi hota) — warna PR par sirf "4 failed" dikhta hai.
+      - name: Flutter tests
+        run: |
+          set +e
+          flutter test --no-pub 2>&1 | tee "$RUNNER_TEMP/test.log"
+          status=${PIPESTATUS[0]}
+          [ $status -eq 0 ] || python3 ../.github/scripts/test_annotations.py "$RUNNER_TEMP/test.log"
+          exit $status
       # Catches AndroidManifest/FileProvider and Kotlin MethodChannel errors that
       # widget tests cannot see (PDF save + WhatsApp attachment sharing).
       - run: flutter build apk --debug --no-pub
