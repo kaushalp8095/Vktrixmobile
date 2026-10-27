@@ -25,23 +25,24 @@ def main(path: str) -> int:
     # \n — dono par split karna zaroori hai, warna failing test line ek hi
     # bade string me chhup jati hai.
     text = pathlib.Path(path).read_text(errors="replace").replace("\r", "\n")
+    lines = text.splitlines()
     blocks, current = [], None
-    for raw in text.splitlines():
-        line = raw.rstrip()
-        if "[E]" in line:
+    for line in lines:
+        plain = line.replace("::group::", "").strip()
+        if "❌" in plain or "[E]" in plain:
             if current:
                 blocks.append(current)
-            current = [line]
+            current = [plain]
             continue
         if current is None:
             continue
-        # Test output lines are indented under the failing test; a new
-        # "00:12 +N" progress line means the failure block ended.
-        if line.strip() == "" or line[:2].isdigit() and " +" in line[:12]:
+        # Same group ke andar ka detail (Expected/Actual/timers) le lo; naya
+        # group ya khaali line aaye to block band.
+        if line.startswith("::group::") or plain == "":
             blocks.append(current)
             current = None
             continue
-        current.append(line)
+        current.append(plain)
     if current:
         blocks.append(current)
 
