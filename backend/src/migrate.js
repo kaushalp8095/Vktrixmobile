@@ -184,13 +184,17 @@ async function migrate() {
     for (const row of rows) {
       const size = thumb.jpegSize(thumb.jpegBytes(row.logo_data));
       const normalized = size && size.width === thumb.LOGO_SIZE && size.height === thumb.LOGO_SIZE;
-      if (normalized && row.logo_thumb) continue;   // pehle se theek
+      // Purana thumbnail JPEG tha (safed box) — naya transparent PNG hai.
+      // Warna app me purane logo ke aas-paas safed plate dikhta rehta.
+      const thumbPng = typeof row.logo_thumb === 'string' && row.logo_thumb.startsWith('data:image/png');
+      if (normalized && thumbPng) continue;   // pehle se theek
       let tiles = null;
       try { tiles = thumb.shopLogoTiles(row.logo_data); } catch { tiles = null; }
       if (!tiles && row.logo_thumb) continue;
       try {
+        // normalized + sirf thumb purana: logo_data chhedne ki zaroorat nahi.
         await db('shops').where({ id: row.id }).update(tiles
-          ? { logo_data: tiles.logo, logo_thumb: tiles.thumb }
+          ? { logo_data: normalized ? row.logo_data : tiles.logo, logo_thumb: tiles.thumb }
           // Auto-adjust na ho (PNG/WebP) to khaali string — warna har boot par
           // wahi fail hota rahega.
           : { logo_thumb: row.logo_thumb || '' });

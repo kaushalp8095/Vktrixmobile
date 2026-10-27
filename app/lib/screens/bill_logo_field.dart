@@ -69,8 +69,9 @@ class BillLogoField extends StatelessWidget {
             height: 54,
             decoration: BoxDecoration(
               // Server save par logo ko square tile bana deta hai; preview bhi
-              // wahi shape dikhaye (rounded square, poora bhara hua).
-              color: bytes != null ? Colors.white : scheme.primary.withValues(alpha: .10),
+              // wahi shape dikhaye (rounded square, poora bhara hua). Safed plate
+              // jaan-boojh kar nahi — transparent PNG logo ka box dikhta tha.
+              color: bytes != null ? c.textPrimary.withValues(alpha: .05) : scheme.primary.withValues(alpha: .10),
               borderRadius: BorderRadius.circular(logoRadius(54)),
               border: bytes != null ? Border.all(color: c.textPrimary.withValues(alpha: .12)) : null,
             ),

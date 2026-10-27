@@ -9,15 +9,23 @@
 //
 // Ab har logo ek hi tarah "set" hota hai (jaise app icon):
 //   1. border ka median colour nikaal kar **background margin auto-trim**,
-//   2. bacha hua logo **square 128x128 canvas** par bara karke centre me rakha
-//      jata hai (chhota 4% padding),
-//   3. background safed — light/dark dono theme me tile ek jaisa dikhta hai.
+//   2. bacha hua logo **square canvas** par bara karke centre me rakha jata hai
+//      (chhota 4% padding),
+//   3. list ka thumbnail **transparent PNG** hota hai — margin cut, isliye dark
+//      theme me logo ke aas-paas safed plate nahi dikhti (JPEG me alpha nahi
+//      hota, isliye pehle white box rehta tha),
+//   4. PDF/print ke liye stored 512px logo JPEG hi rehta hai (safed canvas) —
+//      wahan transparency ka matlab hi nahi.
+//   5. Agar border ka rang neutral nahi (brand ka full-bleed plate: indigo,
+//      green…), to tile ka background wahi plate colour ho jata hai — letterbox
+//      ki patti gayab, box poora bhara dikhta hai.
 //
 // App pehle hi har logo JPEG me convert karke bhejti hai (`document_photo`),
 // isliye decode ke liye pure-JS JPEG decoder kaafi hai — Render par sharp/gyp
 // ka jhanjhat nahi. PNG/WebP purane logo decode nahi ho paate: tab `null`
 // lauta kar list me icon dikha dete hain.
 const jpeg = require('jpeg-js');
+const { encodePng } = require('./png');
 
 /// Square tile side (44-56dp display ke liye 2-3x density par bhi sharp).
 const THUMB_SIZE = 128;
@@ -32,6 +40,7 @@ const THUMB_QUALITY = 82;
 const MAX_SOURCE_PIXELS = 8 * 1000 * 1000;
 const MAX_SOURCE_BYTES = 768 * 1024; // = validation.SHOP_LOGO_MAX_BYTES
 const MAX_THUMB_CHARS = 33 * 1024;
+const MAX_PNG_THUMB_CHARS = 48 * 1024; // transparent thumb (PNG) ka budget
 /// Background maanne ke liye per-channel tolerance (JPEG compression se bachne layak).
 const BG_TOLERANCE = 24;
 
@@ -90,6 +99,15 @@ function borderColor(src, w, h) {
   return { r: median(rs), g: median(gs), b: median(bs) };
 }
 
+/// Border ka colour "page/margin" hai ya logo ka hi plate?
+///   * neutral (safed, kaala, gray)  → margin hai: trim + transparent cut.
+///   * saturated (brand indigo/green) → design ka hissa hai (full-bleed plate):
+///     trim nahi, aur tile ka background wahi colour — plate chup-chaap tile bhar deta hai.
+function isNeutral(bg) {
+  const max = Math.max(bg.r, bg.g, bg.b), min = Math.min(bg.r, bg.g, bg.b);
+  return max - min <= 32;
+}
+
 const isBackground = (src, i, bg) =>
   Math.abs(src[i] - bg.r) <= BG_TOLERANCE
   && Math.abs(src[i + 1] - bg.g) <= BG_TOLERANCE
@@ -127,61 +145,115 @@ function trimBox(src, w, h, bg) {
 
 /// Box filter (area average). Downscale par har output pixel apne area ka
 /// average leta hai; small upscale par bhi same code (1-2 source pixels) chalta hai.
-function resample(src, sw, box, dw, dh) {
+function resample(src, sw, box, dw, dh, bg = null, feather = BG_TOLERANCE) {
   const out = Buffer.alloc(dw * dh * 4);
+  const cut = bg != null;
   for (let y = 0; y < dh; y++) {
     const y0 = box.y + Math.floor((y * box.height) / dh);
     const y1 = Math.max(y0 + 1, box.y + Math.floor(((y + 1) * box.height) / dh));
     for (let x = 0; x < dw; x++) {
       const x0 = box.x + Math.floor((x * box.width) / dw);
       const x1 = Math.max(x0 + 1, box.x + Math.floor(((x + 1) * box.width) / dw));
-      let r = 0, g = 0, b = 0, n = 0;
+      let r = 0, g = 0, b = 0, a = 0, n = 0;
       for (let sy = y0; sy < y1; sy++) {
         for (let sx = x0; sx < x1; sx++) {
           const i = (sy * sw + sx) * 4;
-          const a = src[i + 3] / 255;
-          r += src[i] * a + 255 * (1 - a);
-          g += src[i + 1] * a + 255 * (1 - a);
-          b += src[i + 2] * a + 255 * (1 - a);
+          // Source ka apna alpha (PNG) aur humara "background" mask — dono.
+          const srcA = src[i + 3] / 255;
+          const maskA = cut ? alphaFor([src[i], src[i + 1], src[i + 2]], bg, feather) / 255 : 1;
+          const px = srcA * maskA;
+          // Premultiplied average: edge par kaale/safed halo ke bina.
+          r += src[i] * px;
+          g += src[i + 1] * px;
+          b += src[i + 2] * px;
+          a += px;
           n++;
         }
       }
       const o = (y * dw + x) * 4;
-      out[o] = Math.round(r / n);
-      out[o + 1] = Math.round(g / n);
-      out[o + 2] = Math.round(b / n);
-      out[o + 3] = 255;
+      if (cut) {
+        out[o] = a > 0 ? Math.min(255, Math.round(r / a)) : 0;
+        out[o + 1] = a > 0 ? Math.min(255, Math.round(g / a)) : 0;
+        out[o + 2] = a > 0 ? Math.min(255, Math.round(b / a)) : 0;
+        out[o + 3] = Math.round((a / n) * 255);
+      } else {
+        // Opaque: safed par flatten (JPEG me alpha nahi hota).
+        out[o] = Math.round(r / n + 255 * (1 - a / n));
+        out[o + 1] = Math.round(g / n + 255 * (1 - a / n));
+        out[o + 2] = Math.round(b / n + 255 * (1 - a / n));
+        out[o + 3] = 255;
+      }
     }
   }
   return out;
 }
 
-/// Decoded RGBA → square safed tile par centre kiya hua logo.
-function squareTile(decoded, { size = THUMB_SIZE, pad = THUMB_PAD } = {}) {
+/// Decoded RGBA → square tile jisme logo centre me hota hai.
+///
+/// `transparent: true` par background ke pixels ka alpha 0 ho jata hai (PNG
+/// thumbnail — app ke glass tile par white box nahi dikhta). Alpha edge par
+/// soft rehta hai kyunki resample premultiplied hota hai. `transparent: false`
+/// par safed canvas (JPEG/PDF ke liye; alpha support nahi hota).
+function squareTile(decoded, { size = THUMB_SIZE, pad = THUMB_PAD, transparent = false, feather = BG_TOLERANCE } = {}) {
   const sw = decoded.width | 0, sh = decoded.height | 0;
   const src = decoded.data;
   const bg = borderColor(src, sw, sh);
-  const box = trimBox(src, sw, sh, bg);
+  const neutral = isNeutral(bg);
+  const box = neutral ? trimBox(src, sw, sh, bg) : { x: 0, y: 0, width: sw, height: sh, trimmed: false };
+  // Trim hi nahi hua = image ke kinare hi content hain (background nahi mila).
+  // Aise logo ko transparent karna galat hoga (white-on-white logo gayab ho jata).
+  const cut = transparent && neutral && box.trimmed;
   const avail = Math.max(1, size - pad * 2);
   const scale = Math.min(avail / box.width, avail / box.height);
   const dw = Math.max(1, Math.round(box.width * scale));
   const dh = Math.max(1, Math.round(box.height * scale));
-  const logo = resample(src, sw, box, dw, dh);
+  const logo = resample(src, sw, box, dw, dh, cut ? bg : null, feather);
 
-  const canvas = Buffer.alloc(size * size * 4);
-  canvas.fill(255); // safed background + opaque alpha
+  const canvas = Buffer.alloc(size * size * 4); // RGBA, sab 0 (transparent)
+  if (!cut) {
+    // Opaque canvas. Background = border ka colour: safed page par safed,
+    // brand plate par wahi brand colour (letterbox ki patti gayab).
+    const fill = neutral ? { r: 255, g: 255, b: 255 } : bg;
+    for (let i = 0; i < canvas.length; i += 4) {
+      canvas[i] = fill.r; canvas[i + 1] = fill.g; canvas[i + 2] = fill.b; canvas[i + 3] = 255;
+    }
+  }
   const ox = Math.floor((size - dw) / 2), oy = Math.floor((size - dh) / 2);
   for (let y = 0; y < dh; y++) {
     const to = ((oy + y) * size + ox) * 4;
     logo.copy(canvas, to, (y * dw) * 4, (y * dw + dw) * 4);
   }
-  return { data: canvas, width: size, height: size, trimmed: box.trimmed };
+  return { data: canvas, width: size, height: size, trimmed: box.trimmed, transparent: cut, border: bg, neutral };
+}
+
+/// Background se distance → alpha. Safed margin ke aas-paas ek patli soft edge
+/// (anti-alias) rehti hai, isliye PNG edge par jaggies nahi dikhte.
+function alphaFor(px, bg, feather) {
+  if (!bg) return 255;
+  const d = Math.max(Math.abs(px[0] - bg.r), Math.abs(px[1] - bg.g), Math.abs(px[2] - bg.b));
+  if (d <= feather * 0.5) return 0;
+  if (d >= feather * 1.5) return 255;
+  return Math.round(((d - feather * 0.5) / feather) * 255);
 }
 
 /// Ek decoded image → square tile (requested size), `null` on failure.
-function encodeTile(decoded, { size, pad, quality, maxChars }) {
+function encodeTile(decoded, { size, pad, quality, maxChars, transparent = false }) {
   let tile;
-  try { tile = squareTile(decoded, { size, pad }); } catch { return null; }
+  try { tile = squareTile(decoded, { size, pad, transparent }); } catch { return null; }
+
+  // Transparent tile sirf PNG me ho sakta hai (JPEG me alpha nahi hota).
+  // 128px ke liye PNG ~5-25 KB rehta hai — budget se bada ho to JPEG (safed)
+  // par gir jaate hain, taaki list ka response bhaari na ho.
+  if (tile.transparent) {
+    try {
+      const png = encodePng(tile.data, tile.width, tile.height);
+      const url = `data:image/png;base64,${png.toString('base64')}`;
+      // PNG JPEG se bada hota hai; transparent rakhna zaroori hai (safed box
+      // nahi), isliye iske liye alag, thoda udaar budget.
+      if (url.length <= Math.max(maxChars, MAX_PNG_THUMB_CHARS)) return url;
+    } catch { /* fall through to JPEG */ }
+  }
+
   // Chhota rakhne ke liye quality step-down (detail wale logo par bhi limit ke andar).
   for (const q of [quality, 70, 55, 45]) {
     let encoded;
@@ -196,12 +268,14 @@ function encodeTile(decoded, { size, pad, quality, maxChars }) {
   return null;
 }
 
-/// Shop logo (JPEG data URL) → chhota square JPEG (`128`, list ke liye), ya
-/// `null` jab banana possible na ho (PNG/WebP, corrupt, bahut bada).
+/// Shop logo (JPEG data URL) → chhota square **transparent PNG** (`128`, list
+/// ke liye), ya `null` jab banana possible na ho (PNG/WebP, corrupt, bahut bada).
 function shopThumb(dataUrl, { size = THUMB_SIZE, pad = THUMB_PAD, quality = THUMB_QUALITY } = {}) {
   const decoded = decode(dataUrl);
   if (!decoded) return null;
-  return encodeTile(decoded, { size, pad, quality, maxChars: MAX_THUMB_CHARS });
+  // List/Profile/Home ke liye **transparent** PNG: margin cut, isliye app ke
+  // glass tile par white box nahi dikhta. Thumb fail kare to JPEG (safed).
+  return encodeTile(decoded, { size, pad, quality, maxChars: MAX_THUMB_CHARS, transparent: true });
 }
 
 /// Upload par **ek hi baar** auto-adjust: poora logo 512px square tile ban jata
@@ -216,14 +290,14 @@ function shopLogoTiles(dataUrl) {
   // Pehle se normalized (512x512) — dobara encode karke quality kharab mat karo,
   // sirf list ka thumbnail bana lo. (Idempotent, warna har save par recompress.)
   if (decoded.width === LOGO_SIZE && decoded.height === LOGO_SIZE) {
-    const thumb = encodeTile(decoded, { size: THUMB_SIZE, pad: THUMB_PAD, quality: THUMB_QUALITY, maxChars: MAX_THUMB_CHARS });
+    const thumb = encodeTile(decoded, { size: THUMB_SIZE, pad: THUMB_PAD, quality: THUMB_QUALITY, maxChars: MAX_THUMB_CHARS, transparent: true });
     return thumb ? { logo: dataUrl, thumb } : null;
   }
   // 512px tile detail wale logo par bhi ~150 KB; cap 600 KB chars (validation
   // ki 768 KB binary limit ke andar rehne ke liye).
   const logo = encodeTile(decoded, { size: LOGO_SIZE, pad: 10, quality: 86, maxChars: 600 * 1024 });
   if (!logo) return null;
-  const thumb = encodeTile(decoded, { size: THUMB_SIZE, pad: THUMB_PAD, quality: THUMB_QUALITY, maxChars: MAX_THUMB_CHARS });
+  const thumb = encodeTile(decoded, { size: THUMB_SIZE, pad: THUMB_PAD, quality: THUMB_QUALITY, maxChars: MAX_THUMB_CHARS, transparent: true });
   return { logo, thumb };
 }
 
@@ -242,6 +316,6 @@ function decode(dataUrl) {
 }
 
 module.exports = {
-  shopThumb, shopLogoTiles, squareTile, trimBox, borderColor, resample, jpegBytes, jpegSize,
+  shopThumb, shopLogoTiles, squareTile, trimBox, borderColor, resample, jpegBytes, jpegSize, alphaFor, isNeutral,
   THUMB_SIZE, THUMB_PAD, LOGO_SIZE, MAX_THUMB_CHARS,
 };

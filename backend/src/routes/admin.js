@@ -154,9 +154,10 @@ r.put('/shops/:id', wrap(async (req, res) => {
 // maangta hai — "kaunsa logo upload hua hai" ka jawab.
 r.get('/shops/:id/logo', wrap(async (req, res) => {
   const id = V.id(req.params.id, 'shop id');
-  const shop = await db('shops').where({ id }).first('id', 'logo_data');
+  const shop = await db('shops').where({ id }).first('id', 'logo_data', 'logo_thumb');
   if (!shop) return res.status(404).json({ error: 'Shop nahi mila' });
-  res.json({ shop_id: shop.id, logo_data: shop.logo_data || null });
+  // logo_thumb (transparent PNG) preview ke liye — usme safed box nahi hota.
+  res.json({ shop_id: shop.id, logo_data: shop.logo_data || null, logo_thumb: shop.logo_thumb || null });
 }));
 
 r.post('/shops/:id/reset-password', wrap(async (req, res) => {

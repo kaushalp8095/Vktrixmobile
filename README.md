@@ -13,6 +13,7 @@
 - **Shop Login**: sirf apni shop ka data dikhega (dusri shop ka nahi)
 - **Buy Form**: IMEI likhte hi/scan karte hi **Brand + Model free me apne aap** bhar jata hai (local TAC catalog, koi external API/paisa nahi), RAM/Storage/Color ke liye **dropdown** (app ke apne purane data se), IMEI valid hai ya nahi (Luhn check), duplicate check, pehle kab aaya tha wo history (**catalog miss ho to wahi entry sab fields auto-fill karti hai**), **Serial number (optional)**, Customer details + ID proof (**photo upload: camera ya gallery**)
 - **Save karte hi stock me add** → Stock list me "BECHO" button → Sell form (profit/loss live dikhega)
+- **Stock brand-wise**: stock screen par har brand ka tile (brand logo + naam + kitne phone stock me) → tap karo aur sirf usi brand ke phones dikhte hain; search wahi ek list par chalta hai (offline-safe, koi extra API call nahi)
 - **PDF bill + attachment sharing**: Buy/Sell save ke baad branded PDF screen; purane purchase ke liye Stock detail aur purane sale ke liye Sales detail se dobara khol sakte hain. View, Android document picker se Save, WhatsApp par actual PDF attachment, aur other-app share available hai. Bill me shop logo/details, customer, IMEI, amount, date aur sale warranty aati hai; **profit, purchase cost, internal notes, ID number/photos kabhi customer PDF me nahi jaate**.
 - **Udhaar ledger**: sale par kitna mila aur kitna baki hai; 0/full/partial collection, har partial payment ki date/mode/note history, outstanding summary, paid/pending filters aur WhatsApp reminder. Payment kabhi sale total se zyada add nahi ho sakta.
 - **Sales**: list, payment-due status, detail se PDF/payment ledger, aur sale cancel (phone wapas stock me; linked payment history bhi remove hoti hai)
@@ -309,8 +310,8 @@ Note: download app ke process me chalta hai. App ko kuch der ke liye minimize ka
 | POST | /api/auth/login | Login |
 | POST | /api/auth/change-password | Password badlo |
 | GET | /api/admin/dashboard | Super admin summary (sirf operational counts: shops/active/support open) |
-| GET/POST | /api/admin/shops | Shops list (masked contact + `has_logo`/`logo_thumb`, koi business data nahi) / nayi shop + login |
-| GET | /api/admin/shops/:id/logo | Ek shop ka poora bill logo (Edit dialog ka preview) |
+| GET/POST | /api/admin/shops | Shops list (masked contact + `has_logo`/`logo_thumb` — 128px transparent PNG, koi business data nahi) / nayi shop + login |
+| GET | /api/admin/shops/:id/logo | Ek shop ka bill logo (`logo_data` + transparent `logo_thumb` — Edit dialog ka preview) |
 | PUT/DELETE | /api/admin/shops/:id | Edit, band/chalu / delete |
 | POST | /api/admin/shops/:id/reset-password | Password reset |
 | POST | /api/admin/shops/:id/support-access | Temporary support session (`reason` + `minutes`; 201 / 409) |
@@ -323,7 +324,7 @@ Note: download app ke process me chalta hai. App ko kuch der ke liye minimize ka
 | POST | /api/admin/tac/sync | Free TAC catalog sync shuru (202; pehle se chal raha ho to 409) |
 | GET | /api/imei/:imei | IMEI se phone ki info + RAM/storage/color ke dropdown `options` |
 | POST | /api/buy | Phone kharido (stock me add) |
-| GET | /api/stock?search= | Stock list |
+| GET | /api/stock?search= | Stock list (app isi ek response ko brand-wise group karta hai — brand tiles par tap = us brand ke phones) |
 | GET/PUT/DELETE | /api/phones/:id | Phone detail/edit/delete |
 | POST | /api/sell | Phone becho (`amount_received` full/partial/0) |
 | GET | /api/sales?from=&to= | Sales list + paid amount/balance/status |
