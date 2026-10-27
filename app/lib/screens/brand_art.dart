@@ -11,18 +11,14 @@ import 'package:flutter/material.dart';
 
 import '../design/design.dart';
 
-/// Glyph ke peeche ka silhouette (brand logo ka andaaz).
-enum BrandShape { tile, circle, ellipse, dots }
-
 /// Brand ka canonical roop. `Redmi`, `redmi`, `Mi`, `Xiaomi` — alag-alag
 /// spelling hone par bhi stock me ek hi brand banta hai.
 class BrandInfo {
   final String name;   // display name
   final Color color;   // brand ka rang
   final String mark;   // tile par glyph (1–2 akshar)
-  final BrandShape shape;
 
-  const BrandInfo(this.name, this.color, this.mark, {this.shape = BrandShape.tile});
+  const BrandInfo(this.name, this.color, this.mark);
 
   /// Grouping/filter key.
   String get key => name.toLowerCase();
@@ -30,17 +26,17 @@ class BrandInfo {
 
 // Brand tones — official-ish (Oct 2026), dark theme par bhi padhne layak.
 const _brands = <String, BrandInfo>{
-  'apple': BrandInfo('Apple', Color(0xFF3A3A3C), 'A', shape: BrandShape.circle),
-  'samsung': BrandInfo('Samsung', Color(0xFF1428A0), 'S', shape: BrandShape.ellipse),
+  'apple': BrandInfo('Apple', Color(0xFF3A3A3C), 'A'),
+  'samsung': BrandInfo('Samsung', Color(0xFF1428A0), 'S'),
   'vivo': BrandInfo('Vivo', Color(0xFF415FFF), 'V'),
-  'oppo': BrandInfo('Oppo', Color(0xFF1D7A46), 'O', shape: BrandShape.circle),
+  'oppo': BrandInfo('Oppo', Color(0xFF1D7A46), 'O'),
   'oneplus': BrandInfo('OnePlus', Color(0xFFEB0028), '1+'),
   'xiaomi': BrandInfo('Xiaomi', Color(0xFFFF6900), 'MI'),
   'redmi': BrandInfo('Redmi', Color(0xFFE01B24), 'R'),
   'poco': BrandInfo('POCO', Color(0xFFB8860B), 'P'),
   'realme': BrandInfo('Realme', Color(0xFFB58A00), 'R'),
-  'google': BrandInfo('Google', Color(0xFF4285F4), 'G', shape: BrandShape.circle),
-  'nothing': BrandInfo('Nothing', Color(0xFF4B4B4D), 'N', shape: BrandShape.dots),
+  'google': BrandInfo('Google', Color(0xFF4285F4), 'G'),
+  'nothing': BrandInfo('Nothing', Color(0xFF4B4B4D), 'N'),
   'nokia': BrandInfo('Nokia', Color(0xFF124191), 'N'),
   'motorola': BrandInfo('Motorola', Color(0xFF5C6BC0), 'M'),
   'iqoo': BrandInfo('iQOO', Color(0xFFD98A00), 'iQ'),
@@ -84,7 +80,7 @@ const _fallbackColors = [
   Color(0xFF15803D), Color(0xFF9F1239), Color(0xFF0369A1), Color(0xFF6D28D9),
 ];
 
-/// Kisi bhi brand string → canonical brand (naam, rang, mark, shape).
+/// Kisi bhi brand string → canonical brand (naam, rang, mark).
 BrandInfo brandInfo(String? raw) {
   final clean = (raw ?? '').trim();
   final key = clean.toLowerCase();
@@ -156,7 +152,7 @@ class BrandLogo extends StatelessWidget {
           border: Border.all(color: colour.withValues(alpha: muted ? .16 : .28)),
         ),
         clipBehavior: Clip.antiAlias,
-        child: CustomPaint(painter: _MarkPainter(info.mark, colour, info.shape)),
+        child: CustomPaint(painter: _MarkPainter(info.mark, colour)),
       ),
     );
   }
@@ -165,56 +161,37 @@ class BrandLogo extends StatelessWidget {
 class _MarkPainter extends CustomPainter {
   final String mark;
   final Color colour;
-  final BrandShape shape;
-  _MarkPainter(this.mark, this.colour, this.shape);
+  _MarkPainter(this.mark, this.colour);
 
   @override
   void paint(Canvas canvas, Size size) {
     final s = size.shortestSide;
-    final centre = Offset(size.width / 2, size.height / 2);
-
-    switch (shape) {
-      case BrandShape.circle:
-        canvas.drawCircle(centre, s * .31,
-            Paint()..color = colour.withValues(alpha: .55)..style = PaintingStyle.stroke..strokeWidth = s * .055);
-        break;
-      case BrandShape.ellipse:
-        canvas.drawOval(Rect.fromCenter(center: centre, width: s * .74, height: s * .46),
-            Paint()..color = colour.withValues(alpha: .55)..style = PaintingStyle.stroke..strokeWidth = s * .055);
-        break;
-      case BrandShape.dots:
-        for (var i = 0; i < 3; i++) {
-          for (var j = 0; j < 3; j++) {
-            if (i == 1 && j == 1) continue;
-            canvas.drawCircle(Offset(size.width * (.32 + i * .18), size.height * (.32 + j * .18)),
-                s * .045, Paint()..color = colour.withValues(alpha: .55));
-          }
-        }
-        break;
-      case BrandShape.tile:
-        break;
-    }
-
-    final tp = TextPainter(
+    // Monogram tile: brand ka rang + brand ka glyph (Apple → A, Samsung → S,
+    // OnePlus → 1+, Xiaomi → MI). Font family app ka hi — warna test/golden me
+    // glyph ki jagah box (Ahem) banta hai.
+    final painter = TextPainter(
       text: TextSpan(
         text: mark,
         style: TextStyle(
+          fontFamily: AppType.family,
           color: colour,
-          fontSize: s * (mark.length > 1 ? .34 : .42),
+          fontSize: s * (mark.length > 1 ? .36 : .46),
           fontWeight: FontWeight.w800,
-          letterSpacing: -.4,
+          letterSpacing: mark.length > 1 ? -.6 : -.4,
           height: 1,
         ),
       ),
       textDirection: TextDirection.ltr,
       textAlign: TextAlign.center,
-    )..layout(maxWidth: size.width);
-    tp.paint(canvas, Offset((size.width - tp.width) / 2, (size.height - tp.height) / 2));
+      maxLines: 1,
+    )..layout(maxWidth: size.width * .92);
+    // Optically centre (baseline ke saath exact centre thoda neeche lagta hai).
+    painter.paint(canvas,
+        Offset((size.width - painter.width) / 2, (size.height - painter.height) / 2));
   }
 
   @override
-  bool shouldRepaint(_MarkPainter old) =>
-      old.mark != mark || old.colour != colour || old.shape != shape;
+  bool shouldRepaint(_MarkPainter old) => old.mark != mark || old.colour != colour;
 }
 
 /// Stock screen ke upar brand tile: logo + naam + kitne phone stock me hain.
