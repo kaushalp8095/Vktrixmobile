@@ -216,7 +216,11 @@ class _AdminHomeState extends State<AdminHome> {
   /// ke liye — list me logo jaan-boojh kar nahi aata (bhaari hota hai).
   Future<Uint8List?> _fetchShopLogo(int shopId) async {
     final r = await Api.get('/admin/shops/$shopId/logo');
-    final data = r is Map ? r['logo_data'] : null;
+    if (r is! Map) return null;
+    // Preview ke liye transparent PNG thumbnail behtar hai — usme logo ke
+    // aas-paas safed box nahi hota. Warna poora 512px logo.
+    final thumb = r['logo_thumb'];
+    final data = (thumb is String && logoIsTransparent(thumb)) ? thumb : r['logo_data'];
     if (data is! String || data.isEmpty) return null;
     final comma = data.indexOf(',');
     if (comma < 0) return null;

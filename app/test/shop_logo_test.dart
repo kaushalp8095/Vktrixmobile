@@ -127,4 +127,38 @@ void main() {
       expect(find.byIcon(Icons.store_outlined), findsOneWidget);
     });
   });
+
+  group('logo ka safed box (transparent thumb)', () {
+    test('PNG/WebP thumb transparent hota hai, purana JPEG nahi', () {
+      expect(logoIsTransparent(kTestLogoPngDataUrl), isTrue);
+      expect(logoIsTransparent(kTestLogoDataUrl), isFalse);
+      expect(logoIsTransparent(null), isFalse);
+      expect(logoIsTransparent(''), isFalse);
+    });
+
+    testWidgets('transparent logo ke peeche white plate nahi lagti', (tester) async {
+      await tester.pumpWidget(_app(
+          const ShopLogoAvatar(thumb: kTestLogoPngDataUrl, active: true, size: 44)));
+      await tester.pump(const Duration(milliseconds: 50));
+
+      final plate = tester.widget<Container>(find
+          .descendant(of: find.byType(ShopLogoAvatar), matching: find.byType(Container))
+          .first);
+      final colour = (plate.decoration as BoxDecoration).color!;
+      expect(colour, isNot(Colors.white), reason: 'safed box dark theme me alag dikhta hai');
+      expect(colour.a, lessThan(.20), reason: 'halka glass tint hi hona chahiye');
+      expect(find.byType(Image), findsOneWidget);
+    });
+
+    testWidgets('purana opaque (JPEG) thumb white plate par hi dikhta hai', (tester) async {
+      await tester.pumpWidget(_app(
+          const ShopLogoAvatar(thumb: kTestLogoDataUrl, active: true, size: 44)));
+      await tester.pump(const Duration(milliseconds: 50));
+
+      final plate = tester.widget<Container>(find
+          .descendant(of: find.byType(ShopLogoAvatar), matching: find.byType(Container))
+          .first);
+      expect((plate.decoration as BoxDecoration).color, Colors.white);
+    });
+  });
 }

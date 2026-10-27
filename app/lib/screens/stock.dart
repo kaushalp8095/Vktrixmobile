@@ -1,8 +1,10 @@
-// STOCK: search + in-stock phone rows → glass detail sheet → Sell flow.
+// STOCK: brand-wise (brand tiles → us brand ka stock) + search → phone rows →
+// glass detail sheet → Sell flow.
 import 'package:flutter/material.dart';
 import '../api.dart';
 import '../design/components/components.dart';
 import '../design/design.dart';
+import 'brand_art.dart';
 import 'common.dart';
 import 'receipt.dart';
 import 'sell_form.dart';
@@ -21,6 +23,9 @@ class _StockScreenState extends State<StockScreen> {
   Object? _error;
   final _search = TextEditingController();
   final _scroll = ScrollController();
+  /// Selected brand ka group key (null = saare brands). Server se alag call
+  /// nahi — ek hi /stock response par client-side filter (turant, offline-safe).
+  String? _brand;
 
   @override
   void initState() {
@@ -64,6 +69,23 @@ class _StockScreenState extends State<StockScreen> {
     }
   }
 
+  /// items se brand-wise groups: (brand ka asli naam, key, kitne phone).
+  /// Zyada stock wale brand pehle, phir naam se — list stable rehti hai.
+  List<({String name, String key, int count})> _brandGroups(List list) {
+    final map = <String, ({String name, int count})>{};
+    for (final p in list) {
+      final info = brandInfo('${p['brand'] ?? ''}');
+      final prev = map[info.key];
+      map[info.key] = (name: info.name, count: (prev?.count ?? 0) + 1);
+    }
+    final groups = [for (final e in map.entries) (name: e.value.name, key: e.key, count: e.value.count)];
+    groups.sort((a, b) {
+      final byCount = b.count.compareTo(a.count);
+      return byCount != 0 ? byCount : a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
+    return groups;
+  }
+
   String _age(String? iso) {
     final d = DateTime.tryParse('${iso ?? ''}');
     if (d == null) return '';
@@ -73,8 +95,14 @@ class _StockScreenState extends State<StockScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.colors;
+    final c = context.colors, t = context.type;
     final top = MediaQuery.viewPaddingOf(context).top;
+    final groups = _brandGroups(items);
+    // Brand chunne ke baad search/refresh se wo brand gayab ho jaye to filter
+    // apne aap hat jata hai (khaali list par atke nahi rehte).
+    final selected = groups.any((g) => g.key == _brand) ? _brand : null;
+    final shown = selected == null ? items : [for (final p in items) if (brandKey('${p['brand'] ?? ''}') == selected) p];
+    final selectedName = selected == null ? null : groups.firstWhere((g) => g.key == selected).name;
     return Stack(children: [
       RefreshIndicator(
         onRefresh: _load,
@@ -90,17 +118,56 @@ class _StockScreenState extends State<StockScreen> {
               GlassCard(blur: false, child: Shimmer(child: Column(children: List.generate(5, (_) => const SkeletonListTile()))))
             else if (_error != null)
               ErrorState(title: "Couldn't load stock", message: 'Check your internet and pull to retry.', onRetry: _load)
-            else if (items.isEmpty)
-              GlassCard(blur: false, child: EmptyState(icon: Icons.inventory_2_outlined, title: 'No phones in stock',
-                  message: _search.text.isEmpty ? 'Buy a phone and it will appear here, ready to sell.' : 'No matches for “${_search.text}”.',
-                  actionLabel: 'Buy phone', onAction: widget.onBuy))
-            else
-              GlassCard(blur: false, padding: EdgeInsets.zero, child: Column(children: [
-                for (var i = 0; i < items.length; i++) ...[
-                  if (i > 0) Divider(height: 1, indent: 68, color: c.textPrimary.withValues(alpha: .08)),
-                  _StockRow(p: items[i], age: _age(items[i]['buy_date']), onTap: () => _details(items[i])),
-                ],
-              ])),
+            else ...[
+              if (groups.length > 1) ...[
+                _BrandSection(groups: groups, selected: selected, onSelect: (key) {
+                  Haptics.tap();
+                  setState(() => _brand = selected == key ? null : key);
+                  if (_scroll.hasClients) {
+                    // Filter badalne par list ke top se dikhna shuru kare.
+                    _scroll.animateTo(0,
+                        duration: Durations2.enter, curve: Curves.easeOutCubic);
+                  }
+                }),
+                const SizedBox(height: Space.x16),
+              ],
+              if (items.isEmpty)
+                GlassCard(blur: false, child: EmptyState(icon: Icons.inventory_2_outlined, title: 'No phones in stock',
+                    message: _search.text.isEmpty ? 'Buy a phone and it will appear here, ready to sell.' : 'No matches for “${_search.text}”.',
+                    actionLabel: 'Buy phone', onAction: widget.onBuy))
+              else ...[
+                if (selectedName != null)
+                  Padding(
+                    padding: const EdgeInsets.only(left: Space.x4, bottom: Space.x8),
+                    child: Row(children: [
+                      BrandLogo(brand: selectedName, size: 26),
+                      const SizedBox(width: Space.x8),
+                      Expanded(child: Text('$selectedName · ${shown.length} in stock',
+                          style: t.titleSmall, maxLines: 1, overflow: TextOverflow.ellipsis)),
+                      // Filter hatane ka seedha rasta.
+                      Semantics(button: true, label: 'Show all brands',
+                          child: InkWell(
+                            onTap: () { Haptics.tap(); setState(() => _brand = null); },
+                            borderRadius: Shapes.sm,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: Space.x8, vertical: 4),
+                              child: Text('All brands', style: t.labelLarge?.copyWith(color: c.brandInk)),
+                            ),
+                          )),
+                    ]),
+                  ),
+                if (shown.isEmpty)
+                  GlassCard(blur: false, child: EmptyState(icon: Icons.inventory_2_outlined, title: 'No $selectedName in stock',
+                      message: 'This brand has no phones in stock right now.', actionLabel: 'Buy phone', onAction: widget.onBuy))
+                else
+                  GlassCard(blur: false, padding: EdgeInsets.zero, child: Column(children: [
+                    for (var i = 0; i < shown.length; i++) ...[
+                      if (i > 0) Divider(height: 1, indent: 68, color: c.textPrimary.withValues(alpha: .08)),
+                      _StockRow(p: shown[i], age: _age(shown[i]['buy_date']), onTap: () => _details(shown[i])),
+                    ],
+                  ])),
+              ],
+            ],
           ],
         ),
       ),
@@ -111,12 +178,51 @@ class _StockScreenState extends State<StockScreen> {
   }
 }
 
+/// Stock ke upar brand tiles — har brand logo + naam + count, tap par filter.
+class _BrandSection extends StatelessWidget {
+  final List<({String name, String key, int count})> groups;
+  final String? selected;
+  final ValueChanged<String> onSelect;
+  const _BrandSection({required this.groups, required this.selected, required this.onSelect});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors, t = context.type;
+    return GlassCard(
+      blur: false,
+      padding: const EdgeInsets.fromLTRB(Space.x12, Space.x12, Space.x12, Space.x8),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Padding(
+          padding: const EdgeInsets.only(left: Space.x4, bottom: Space.x8),
+          child: Row(children: [
+            Text('Brands', style: t.titleSmall),
+            const SizedBox(width: Space.x8),
+            // 200% text scale par bhi row overflow na kare.
+            Expanded(child: Semantics(header: true,
+                child: Text('${groups.length} brands · ${groups.fold<int>(0, (a, g) => a + g.count)} in stock',
+                    style: t.labelSmall?.copyWith(color: c.textSecondary),
+                    maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.end))),
+          ]),
+        ),
+        Wrap(
+          spacing: Space.x8,
+          runSpacing: Space.x12,
+          children: [
+            for (final g in groups)
+              BrandTile(brand: g.name, count: g.count, selected: selected == g.key, onTap: () => onSelect(g.key)),
+          ],
+        ),
+      ]),
+    );
+  }
+}
+
 class _StockRow extends StatelessWidget {
   final Map p; final String age; final VoidCallback onTap;
   const _StockRow({required this.p, required this.age, required this.onTap});
   @override
   Widget build(BuildContext context) {
-    final c = context.colors, t = context.type, s = context.scheme;
+    final c = context.colors, t = context.type;
     final spec = [p['ram'], p['storage']].where((e) => e != null && '$e'.isNotEmpty).join(' · ');
     return Semantics(
       button: true, label: '${p['brand']} ${p['model']}, bought for ${rs(p['buy_price'])}',
@@ -125,9 +231,7 @@ class _StockRow extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: Space.x16, vertical: Space.x12),
           child: Row(children: [
-            Container(width: 44, height: 44,
-              decoration: BoxDecoration(color: s.primary.withValues(alpha: .12), borderRadius: BorderRadius.circular(Radii.md)),
-              child: Icon(Icons.smartphone_outlined, color: s.primary, size: 22)),
+            BrandLogo(brand: '${p['brand'] ?? ''}', size: 44),
             const SizedBox(width: Space.x12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('${p['brand']} ${p['model']}', style: t.titleSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
@@ -175,7 +279,12 @@ class _PhoneDetailSheet extends StatelessWidget {
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: c.textPrimary.withValues(alpha: .20), borderRadius: BorderRadius.circular(2)))),
             const SizedBox(height: Space.x16),
-            Semantics(header: true, child: Text('${p['brand']} ${p['model']}', style: t.headlineSmall)),
+            Row(children: [
+              BrandLogo(brand: '${p['brand'] ?? ''}', size: 36),
+              const SizedBox(width: Space.x12),
+              Expanded(child: Semantics(header: true,
+                  child: Text('${p['brand']} ${p['model']}', style: t.headlineSmall))),
+            ]),
             const SizedBox(height: Space.x4),
             Wrap(spacing: Space.x8, children: [
               StatusChip(label: 'In stock', tone: ChipTone.success),

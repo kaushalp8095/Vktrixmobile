@@ -6,6 +6,11 @@
 // auto-adjust karke banti hai (margin trim + centre + square tile). Isliye 2:1
 // ya transparent logo bhi box ko poora bharta hai.
 //
+// Server ka thumbnail ab **transparent PNG** hai: logo ke aas-paas ka margin
+// kat jaata hai, isliye dark theme me logo ke chaaron taraf safed box nahi
+// dikhta (wo plate pehle JPEG tile me baked thi). Purane JPEG thumb aayein to
+// safed plate ke saath waisa hi dikhta hai — kabhi crash nahi.
+//
 // Poora logo (base64, 100-700 KB) list me nahi jaata; server har logo ka 128px
 // thumbnail (`logo_thumb`, ~2-6 KB) bhejta hai. Wo na ho (purana PNG logo,
 // upload se pehle) to brand initial ya store icon dikhta hai — kabhi crash nahi.
@@ -28,6 +33,13 @@ Uint8List? decodeLogoThumb(dynamic value) {
 
 /// Squircle radius — app-icon grids (iOS/Android 2026) 22–26% use karte hain.
 double logoRadius(double size) => size * .26;
+
+/// Thumbnail transparent hai (PNG)? Uske liye tile ke peeche safed plate
+/// **nahi** lagani chahiye — glass ka apna rang dikhe.
+bool logoIsTransparent(String? thumb) {
+  final raw = '${thumb ?? ''}'.trim().toLowerCase();
+  return raw.startsWith('data:image/png') || raw.startsWith('data:image/webp');
+}
 
 class ShopLogoAvatar extends StatelessWidget {
   /// `logo_thumb` (data URL) — null/khaali/kharaab ho to fallback.
@@ -56,6 +68,7 @@ class ShopLogoAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors, t = context.type;
     final bytes = decodeLogoThumb(thumb);
+    final transparent = bytes != null && logoIsTransparent(thumb);
     final tone = active ? c.brandInk : c.textSecondary;
     final radius = circle ? size : logoRadius(size);
     final letter = (fallbackLetter ?? '').trim().characters.isEmpty
@@ -66,12 +79,18 @@ class ShopLogoAvatar extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        // Logo ho to safed canvas (server tile bhi safed hai) — dono theme me
-        // same, isliye image ke kinare tile ke kinare se mil jaate hain.
-        color: bytes == null ? tone.withValues(alpha: .12) : Colors.white,
+        // Transparent PNG: tile ke peeche halka glass — logo ke kinare isi me
+        // ghul jate hain, safed box nazar nahi aata. Opaque (purana JPEG) logo
+        // par safed canvas hi sahi hai, warna image ke kinare tile se milte hain.
+        color: bytes == null
+            ? tone.withValues(alpha: .12)
+            : transparent
+                ? c.textPrimary.withValues(alpha: elevated ? .06 : .04)
+                : Colors.white,
         borderRadius: BorderRadius.circular(radius),
         border: Border.all(
-          color: c.textPrimary.withValues(alpha: bytes == null ? (elevated ? .10 : 0) : .12),
+          color: c.textPrimary.withValues(
+              alpha: bytes == null ? (elevated ? .10 : 0) : (transparent ? .10 : .12)),
         ),
       ),
       clipBehavior: Clip.antiAlias,
@@ -91,6 +110,7 @@ class ShopLogoAvatar extends StatelessWidget {
             )
           : Image.memory(
               bytes,
+              // Square thumb: cover = box poora bhara (contain se koi patti nahi).
               fit: BoxFit.cover,
               gaplessPlayback: true,
               errorBuilder: (_, __, ___) => Center(
