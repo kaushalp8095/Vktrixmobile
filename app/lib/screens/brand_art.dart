@@ -240,9 +240,15 @@ class BrandTile extends StatelessWidget {
     final c = context.colors, t = context.type;
     final info = brandInfo(brand);
     return Semantics(
+      // Ek hi saaf node: "Vivo, 3 in stock, button". Warna andar ka logo label
+      // aur text labels merge hokar TalkBack par bakwaas padhta hai (aur tests me
+      // exact label match nahi hota).
+      container: true,
+      excludeSemantics: true,
       button: true,
       selected: selected,
       label: '${info.name}, $count in stock',
+      onTap: onTap,
       child: InkWell(
         onTap: onTap,
         borderRadius: Shapes.md,
