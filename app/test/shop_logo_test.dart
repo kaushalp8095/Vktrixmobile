@@ -155,14 +155,19 @@ void main() {
       expect(tester.getSize(find.byType(Image)), const Size(44, 44));
       expect(tester.getSize(find.byType(ShopLogoAvatar)), const Size(44, 44));
 
-      // Hairline border image ke upar (IgnorePointer) draw hota hai.
-      final overlay = find.descendant(
-          of: find.byType(IgnorePointer), matching: find.byType(DecoratedBox));
-      expect(overlay, findsWidgets);
-      final decoration = tester.widget<DecoratedBox>(overlay.first).decoration as BoxDecoration;
-      final border = decoration.border! as Border;
+      // Hairline border image ke upar draw hota hai (kotdi ke andar, IgnorePointer
+      // ke saath) — isliye image ke kinare aur box ke kinare me koi gap nahi.
+      final decorations = tester
+          .widgetList<DecoratedBox>(find.descendant(
+              of: find.byType(ShopLogoAvatar), matching: find.byType(DecoratedBox)))
+          .map((w) => w.decoration)
+          .whereType<BoxDecoration>()
+          .where((d) => d.border != null)
+          .toList();
+      expect(decorations, isNotEmpty, reason: 'image ke upar hairline border hona chahiye');
+      final border = decorations.first.border! as Border;
       expect(border.top.color.a, lessThan(.30), reason: 'patli hairline, moti frame nahi');
-      expect((decoration.borderRadius as BorderRadius).topLeft.x,
+      expect((decorations.first.borderRadius as BorderRadius).topLeft.x,
           closeTo(logoRadius(44), .01), reason: 'border wahi radius jo box ka hai');
     });
 
