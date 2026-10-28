@@ -310,8 +310,8 @@ Note: download app ke process me chalta hai. App ko kuch der ke liye minimize ka
 | POST | /api/auth/login | Login |
 | POST | /api/auth/change-password | Password badlo |
 | GET | /api/admin/dashboard | Super admin summary (sirf operational counts: shops/active/support open) |
-| GET/POST | /api/admin/shops | Shops list (masked contact + `has_logo`/`logo_thumb` — 128px transparent PNG, koi business data nahi) / nayi shop + login |
-| GET | /api/admin/shops/:id/logo | Ek shop ka bill logo (`logo_data` + transparent `logo_thumb` — Edit dialog ka preview) |
+| GET/POST | /api/admin/shops | Shops list (masked contact + `has_logo`/`logo_thumb` — 128px full-bleed tile, koi business data nahi) / nayi shop + login |
+| GET | /api/admin/shops/:id/logo | Ek shop ka bill logo (`logo_data` 512px full-bleed tile + 128px `logo_thumb` — Edit dialog ka preview) |
 | PUT/DELETE | /api/admin/shops/:id | Edit, band/chalu / delete |
 | POST | /api/admin/shops/:id/reset-password | Password reset |
 | POST | /api/admin/shops/:id/support-access | Temporary support session (`reason` + `minutes`; 201 / 409) |

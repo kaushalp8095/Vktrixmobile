@@ -7,7 +7,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const zlib = require('node:zlib');
 const os = require('node:os');
 const path = require('node:path');
 const jpeg = require('jpeg-js');
@@ -64,50 +63,9 @@ async function request(method, route, data, token) {
 
 const decodeDataUrl = url => jpeg.decode(Buffer.from(String(url).split(',')[1], 'base64'), { useTArray: true });
 
-/// Chhota PNG (RGBA) decoder — thumbnails ab transparent PNG hain.
-function decodePngUrl(url) {
-  const buf = Buffer.from(String(url).split(',')[1], 'base64');
-  assert.equal(buf.subarray(0, 8).toString('hex'), '89504e470d0a1a0a', 'PNG signature');
-  let off = 8, width = 0, height = 0;
-  const idat = [];
-  while (off + 8 <= buf.length) {
-    const len = buf.readUInt32BE(off);
-    const type = buf.subarray(off + 4, off + 8).toString('ascii');
-    const data = buf.subarray(off + 8, off + 8 + len);
-    if (type === 'IHDR') { width = data.readUInt32BE(0); height = data.readUInt32BE(4); }
-    else if (type === 'IDAT') idat.push(data);
-    else if (type === 'IEND') break;
-    off += 12 + len;
-  }
-  const raw = zlib.inflateSync(Buffer.concat(idat));
-  const stride = width * 4;
-  const out = Buffer.alloc(width * height * 4);
-  for (let y = 0; y < height; y++) {
-    const f = raw[y * (stride + 1)];
-    const src = raw.subarray(y * (stride + 1) + 1, (y + 1) * (stride + 1));
-    for (let i = 0; i < stride; i++) {
-      const a = i >= 4 ? out[y * stride + i - 4] : 0;
-      const b = y > 0 ? out[(y - 1) * stride + i] : 0;
-      const c = i >= 4 && y > 0 ? out[(y - 1) * stride + i - 4] : 0;
-      let v = src[i];
-      if (f === 1) v += a;
-      else if (f === 2) v += b;
-      else if (f === 3) v += (a + b) >> 1;
-      else if (f === 4) {
-        const p = a + b - c;
-        const pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c);
-        v += pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
-      } else assert.equal(f, 0, 'unknown filter');
-      out[y * stride + i] = v & 0xff;
-    }
-  }
-  return { width, height, data: out, alpha: true };
-}
-const isPng = url => String(url).startsWith('data:image/png');
-const decodeAny = url => (isPng(url) ? decodePngUrl(url) : decodeDataUrl(url));
-const dimsOf = url => { const d = decodeAny(url); return { width: d.width, height: d.height }; };
 const pixel = (d, x, y) => { const i = (y * d.width + x) * 4; return [d.data[i], d.data[i + 1], d.data[i + 2]]; };
 const white = ([r, g, b]) => r > 240 && g > 240 && b > 240;
+const dimsOf = url => { const d = decodeDataUrl(url); return { width: d.width, height: d.height }; };
 /// Tile me non-white content ka bounding box — auto-adjust ne kitni jagah bhari,
 /// ye batata hai (16px inset chhod kar, kyunki edge par JPEG ringing ho sakti hai).
 function contentBox(url) {
@@ -172,9 +130,9 @@ test('bill logo: list sirf thumbnail bhejti hai, preview endpoint poora logo det
   assert.equal(withLogo.has_logo, true, 'Edit dialog ko pata hona chahiye ki logo hai');
   assert.equal('logo_data' in withLogo, false, 'list halki rehni chahiye');
 
-  // Thumbnail: **transparent PNG**, square 128 (list me 44-56dp box ke liye),
-  // chhota — safed plate ke bina, isliye dark theme me white box nahi dikhta.
-  assert.match(String(withLogo.logo_thumb), /^data:image\/png;base64,/);
+  // Thumbnail: **full-bleed** square JPEG 128 (list me 44-56dp box ke liye),
+  // chhota — tile me koi padding/patti nahi, isliye box poora bhara dikhta hai.
+  assert.match(String(withLogo.logo_thumb), /^data:image\/jpeg;base64,/);
   assert.ok(withLogo.logo_thumb.length < 33 * 1024, `thumb too big: ${withLogo.logo_thumb.length}`);
   assert.deepEqual(dimsOf(withLogo.logo_thumb), { width: 128, height: 128 });
 
@@ -185,17 +143,18 @@ test('bill logo: list sirf thumbnail bhejti hai, preview endpoint poora logo det
   assert.notEqual(savedLogo, LOGO, 'server logo ko auto-adjust karta hai');
   const logo = decodeDataUrl(savedLogo);
   assert.deepEqual({ width: logo.width, height: logo.height }, { width: 512, height: 512 });
-  // Jo content tha wo tile ke bahut bade hisse me phaila ho (chhota floating nahi).
-  // Wide logo square tile me letterbox hoga — isliye lambi side 85%+ bhare aur
-  // aspect ratio wahi rahe (480x240 → ~2:1).
+  // Full-bleed: tile ka **poora** area content hai — na upar/neeche patti, na
+  // kinare par safed padding. (Purane "fit" tile me wide logo ke saath safed
+  // letterbox hota tha, wahi box me khaali jagah jaisa dikhta tha.)
   const box = contentBox(savedLogo);
   assert.ok(box, 'content mile');
-  assert.ok(Math.max(box.width, box.height) >= 512 * 0.85, `content chhota reh gaya: ${box.width}x${box.height}`);
-  const ratio = box.width / box.height;
-  assert.ok(ratio > 1.7 && ratio < 2.3, `aspect ratio bigda: ${ratio.toFixed(2)}`);
-  // Kinare safed (padding) — tile har theme me saaf dikhe
-  assert.ok(white(pixel(logo, 3, 3)), 'top-left corner safed');
-  assert.ok(white(pixel(logo, 508, 508)), 'bottom-right corner safed');
+  // contentBox 16px inset chhod kar naapta hai (JPEG ringing), isliye poora
+  // bharne ka matlab hai 512 − 2×16 tak pahunchna.
+  assert.ok(Math.max(box.width, box.height) >= 512 - 2 * 16,
+    `content poora tile bhare: ${box.width}x${box.height}`);
+  for (const [x, y] of [[2, 2], [509, 2], [2, 509], [509, 509]]) {
+    assert.equal(white(pixel(logo, x, y)), false, `corner ${x},${y} par content ho (patti nahi)`);
+  }
 
   // ---- Wahi logo dobara bhejna (idempotent): dobara recompress nahi ----
   await request('PUT', `/admin/shops/${shopId}`, { logo_data: savedLogo }, admin);
@@ -228,24 +187,31 @@ test('bill logo: list sirf thumbnail bhejti hai, preview endpoint poora logo det
   assert.equal((await logoFor()).body.logo_data, PNG);
 
   // ---- Purane (pre-auto-adjust) logos ka backfill (migration) ----
+  // One-time backfill meta flag se chalta hai; test me flag hata kar dobara
+  // chalate hain (asli deployment par ye sirf ek baar hota hai).
   await db('shops').where({ id: shopId }).update({ logo_data: LOGO, logo_thumb: null });
+  await db('meta').where({ key: 'logo_full_bleed_v1' }).del();
   await migrate();
   const backfilled = await db('shops').where({ id: shopId }).first('logo_data', 'logo_thumb');
-  assert.match(String(backfilled.logo_thumb), /^data:image\/png;base64,/);
+  assert.match(String(backfilled.logo_thumb), /^data:image\/jpeg;base64,/);
   assert.deepEqual(dimsOf(backfilled.logo_thumb), { width: 128, height: 128 });
   assert.deepEqual(dimsOf(backfilled.logo_data), { width: 512, height: 512 },
-    'purana logo bhi naye auto-adjusted tile me aa jata hai');
+    'purana logo bhi naye full-bleed tile me aa jata hai');
 
-  // Purana JPEG thumbnail (safed plate wala) boot par PNG me upgrade hota hai.
-  // logo_data pehle se normalized hai — use dobara recompress nahi karna.
-  await db('shops').where({ id: shopId }).update({
-    logo_data: backfilled.logo_data,
-    logo_thumb: 'data:image/jpeg;base64,/9j/4AAQSkZJRg==',
-  });
+  // Purana letterbox thumbnail/crop boot par ek hi baar force-crop hota hai.
+  const staleThumb = 'data:image/jpeg;base64,/9j/4AAQSkZJRg==';
+  await db('shops').where({ id: shopId }).update({ logo_thumb: staleThumb });
+  await db('meta').where({ key: 'logo_full_bleed_v1' }).del();
   await migrate();
   const upgraded = await db('shops').where({ id: shopId }).first('logo_data', 'logo_thumb');
-  assert.match(String(upgraded.logo_thumb), /^data:image\/png;base64,/, 'purana JPEG thumb PNG ban jata hai');
-  assert.equal(upgraded.logo_data, backfilled.logo_data, 'normalized logo_data chheda nahi jata');
+  assert.notEqual(upgraded.logo_thumb, staleThumb, 'purana thumbnail upgrade hua');
+  assert.deepEqual(dimsOf(upgraded.logo_thumb), { width: 128, height: 128 });
+
+  // Flag lagne ke baad har boot par dobara process nahi hota.
+  const before = await db('shops').where({ id: shopId }).first('logo_data', 'logo_thumb');
+  await migrate();
+  const after = await db('shops').where({ id: shopId }).first('logo_data', 'logo_thumb');
+  assert.deepEqual(after, before, 'backfill ek hi baar chalta hai');
 
   // ---- Sirf super admin ----
   const shopLogin = await request('POST', '/auth/login', { username: 'logomobile', password: 'Logo@12345' });

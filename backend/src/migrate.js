@@ -13,6 +13,14 @@ async function migrate() {
       t.timestamp('created_at').defaultTo(db.fn.now());
     });
   }
+  // Chhota key/value table: one-time backfills (jaise logo crop) ek hi baar
+  // chalne chahiye, har boot par nahi.
+  if (!(await db.schema.hasTable('meta'))) {
+    await db.schema.createTable('meta', t => {
+      t.string('key').notNullable().primary();
+      t.text('value');
+    });
+  }
   if (!(await db.schema.hasTable('users'))) {
     await db.schema.createTable('users', t => {
       t.increments('id');
@@ -172,36 +180,39 @@ async function migrate() {
   if (!(await db.schema.hasColumn('shops', 'logo_thumb'))) {
     await db.schema.alterTable('shops', t => t.text('logo_thumb'));
   }
-  // Purane logos ko bhi naye "auto-adjust" roop me laate hain: 512px square tile
-  // (margin trim + centre) + 128px list thumbnail. Warna already-uploaded logo
-  // PDF/Profile me chhota floating dikhta rehta aur list me thumbnail hi na hota.
-  // Pehle se normalized (512x512) hai to sirf header padh kar chhod dete hain.
+  // Purane logos ko bhi naye "auto-adjust" roop me laate hain: 512px **full-bleed**
+  // square tile (margin trim + centre square crop) + 128px list thumbnail. Warna
+  // already-uploaded logo box me patti ke saath / chhota floating dikhta rehta.
+  //
+  // Ek hi baar chalta hai (meta flag): crop badalne par dobara chalana padta hai,
+  // par uske baad har boot par 300 logos decode karna fizool hai.
   {
     const thumb = require('./thumb');
-    const rows = await db('shops').whereNotNull('logo_data').andWhere('logo_data', '!=', '')
-      .select('id', 'logo_data', 'logo_thumb').limit(300);
-    let changed = 0;
-    for (const row of rows) {
-      const size = thumb.jpegSize(thumb.jpegBytes(row.logo_data));
-      const normalized = size && size.width === thumb.LOGO_SIZE && size.height === thumb.LOGO_SIZE;
-      // Purana thumbnail JPEG tha (safed box) — naya transparent PNG hai.
-      // Warna app me purane logo ke aas-paas safed plate dikhta rehta.
-      const thumbPng = typeof row.logo_thumb === 'string' && row.logo_thumb.startsWith('data:image/png');
-      if (normalized && thumbPng) continue;   // pehle se theek
-      let tiles = null;
-      try { tiles = thumb.shopLogoTiles(row.logo_data); } catch { tiles = null; }
-      if (!tiles && row.logo_thumb) continue;
-      try {
-        // normalized + sirf thumb purana: logo_data chhedne ki zaroorat nahi.
-        await db('shops').where({ id: row.id }).update(tiles
-          ? { logo_data: normalized ? row.logo_data : tiles.logo, logo_thumb: tiles.thumb }
-          // Auto-adjust na ho (PNG/WebP) to khaali string — warna har boot par
+    const FLAG = 'logo_full_bleed_v1';
+    const done = await db('meta').where({ key: FLAG }).first().catch(() => null);
+    if (!done) {
+      const rows = await db('shops').whereNotNull('logo_data').andWhere('logo_data', '!=', '')
+        .select('id', 'logo_data', 'logo_thumb').limit(300);
+      let changed = 0;
+      for (const row of rows) {
+        let tiles = null;
+        try { tiles = thumb.shopLogoTiles(row.logo_data, { force: true }); } catch { tiles = null; }
+        const next = tiles
+          ? { logo_data: tiles.logo, logo_thumb: tiles.thumb }
+          // Auto-adjust na ho (PNG/WebP) to thumbnail khaali — warna har boot par
           // wahi fail hota rahega.
-          : { logo_thumb: row.logo_thumb || '' });
-        changed++;
-      } catch { /* column/again next boot */ }
+          : { logo_thumb: '' };
+        if (next.logo_data === row.logo_data && next.logo_thumb === row.logo_thumb) continue;
+        try {
+          await db('shops').where({ id: row.id }).update(next);
+          changed++;
+        } catch { /* column/again next boot */ }
+      }
+      try {
+        await db('meta').insert({ key: FLAG, value: String(Date.now()) });
+      } catch { /* doosra instance pehle likh gaya */ }
+      if (changed) console.log(`Shop logos full-bleed: ${changed}`);
     }
-    if (changed) console.log(`Shop logos auto-adjusted: ${changed}`);
   }
   // On the one deployment where the ledger table is first introduced, preserve
   // old behaviour by marking non-credit historical sales as fully collected.

@@ -128,29 +128,8 @@ void main() {
     });
   });
 
-  group('logo ka safed box (transparent thumb)', () {
-    test('PNG/WebP thumb transparent hota hai, purana JPEG nahi', () {
-      expect(logoIsTransparent(kTestLogoPngDataUrl), isTrue);
-      expect(logoIsTransparent(kTestLogoDataUrl), isFalse);
-      expect(logoIsTransparent(null), isFalse);
-      expect(logoIsTransparent(''), isFalse);
-    });
-
-    testWidgets('transparent logo ke peeche white plate nahi lagti', (tester) async {
-      await tester.pumpWidget(_app(
-          const ShopLogoAvatar(thumb: kTestLogoPngDataUrl, active: true, size: 44)));
-      await tester.pump(const Duration(milliseconds: 50));
-
-      final plate = tester.widget<Container>(find
-          .descendant(of: find.byType(ShopLogoAvatar), matching: find.byType(Container))
-          .first);
-      final colour = (plate.decoration as BoxDecoration).color!;
-      expect(colour, isNot(Colors.white), reason: 'safed box dark theme me alag dikhta hai');
-      expect(colour.a, lessThan(.20), reason: 'halka glass tint hi hona chahiye');
-      expect(find.byType(Image), findsOneWidget);
-    });
-
-    testWidgets('purana opaque (JPEG) thumb white plate par hi dikhta hai', (tester) async {
+  group('box me logo poora set (full-bleed, koi plate/frame nahi)', () {
+    testWidgets('logo ho to peeche koi plate nahi (na safed, na tinted)', (tester) async {
       await tester.pumpWidget(_app(
           const ShopLogoAvatar(thumb: kTestLogoDataUrl, active: true, size: 44)));
       await tester.pump(const Duration(milliseconds: 50));
@@ -158,7 +137,43 @@ void main() {
       final plate = tester.widget<Container>(find
           .descendant(of: find.byType(ShopLogoAvatar), matching: find.byType(Container))
           .first);
-      expect((plate.decoration as BoxDecoration).color, Colors.white);
+      final decoration = plate.decoration as BoxDecoration;
+      expect(decoration.color, isNull, reason: 'plate ki jagah image hi box bhare');
+      expect(decoration.border, isNull, reason: 'border container ka nahi, image ke upar');
+      expect(plate.clipBehavior, Clip.antiAlias, reason: 'corners box ke radius par cut');
+      expect(find.byType(Image), findsOneWidget);
+    });
+
+    testWidgets('image box ko poora bharta hai aur border image ke upar hota hai', (tester) async {
+      await tester.pumpWidget(_app(
+          const ShopLogoAvatar(thumb: kTestLogoDataUrl, active: true, size: 44)));
+      await tester.pump(const Duration(milliseconds: 50));
+
+      final image = tester.widget<Image>(find.byType(Image));
+      expect(image.fit, BoxFit.cover, reason: 'contain se patti bachti hai');
+      // Image aur box ka size exactly same — koi inset/padding nahi.
+      expect(tester.getSize(find.byType(Image)), const Size(44, 44));
+      expect(tester.getSize(find.byType(ShopLogoAvatar)), const Size(44, 44));
+
+      // Hairline border image ke upar (IgnorePointer) draw hota hai.
+      final overlay = find.descendant(
+          of: find.byType(IgnorePointer), matching: find.byType(DecoratedBox));
+      expect(overlay, findsWidgets);
+      final decoration = tester.widget<DecoratedBox>(overlay.first).decoration as BoxDecoration;
+      final border = decoration.border! as Border;
+      expect(border.top.color.a, lessThan(.30), reason: 'patli hairline, moti frame nahi');
+      expect((decoration.borderRadius as BorderRadius).topLeft.x,
+          closeTo(logoRadius(44), .01), reason: 'border wahi radius jo box ka hai');
+    });
+
+    testWidgets('logo na ho to hi tinted plate + border (fallback box)', (tester) async {
+      await tester.pumpWidget(_app(const ShopLogoAvatar(thumb: null, active: true, fallbackLetter: 'K')));
+      final plate = tester.widget<Container>(find
+          .descendant(of: find.byType(ShopLogoAvatar), matching: find.byType(Container))
+          .first);
+      final decoration = plate.decoration as BoxDecoration;
+      expect(decoration.color, isNotNull);
+      expect(decoration.border, isNotNull);
     });
   });
 }
