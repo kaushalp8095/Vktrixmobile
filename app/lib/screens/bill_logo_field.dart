@@ -68,15 +68,14 @@ class BillLogoField extends StatelessWidget {
             width: 54,
             height: 54,
             decoration: BoxDecoration(
-              // Server save par logo ko square tile bana deta hai; preview bhi
-              // wahi shape dikhaye (rounded square, poora bhara hua). Safed plate
-              // jaan-boojh kar nahi — transparent PNG logo ka box dikhta tha.
-              color: bytes != null ? c.textPrimary.withValues(alpha: .05) : scheme.primary.withValues(alpha: .10),
+              // Server save par logo full-bleed square tile banta hai; preview
+              // bhi wahi shape dikhaye (rounded square, poora bhara hua) — koi
+              // alag plate/border nahi, warna logo ke andar frame dikhta hai.
+              color: bytes != null ? null : scheme.primary.withValues(alpha: .10),
               borderRadius: BorderRadius.circular(logoRadius(54)),
-              border: bytes != null ? Border.all(color: c.textPrimary.withValues(alpha: .12)) : null,
             ),
             clipBehavior: Clip.antiAlias,
-            child: _preview(c),
+            child: _preview(c, BorderRadius.circular(logoRadius(54))),
           ),
         ),
         const SizedBox(width: Space.x12),
@@ -96,9 +95,19 @@ class BillLogoField extends StatelessWidget {
     );
   }
 
-  Widget _preview(AppColors c) {
+  Widget _preview(AppColors c, BorderRadius radius) {
     final bytes = this.bytes;
-    if (bytes != null) return Image.memory(bytes, fit: BoxFit.cover);
+    if (bytes != null) {
+      // Har jagah jaisa: image box ko poora bhare, border image ke *upar* ek
+      // patli line (warna logo ke andar ek alag frame jaisa gap dikhta hai).
+      return Stack(fit: StackFit.expand, children: [
+        Image.memory(bytes, fit: BoxFit.cover),
+        IgnorePointer(child: DecoratedBox(decoration: BoxDecoration(
+          borderRadius: radius,
+          border: Border.all(color: c.textPrimary.withValues(alpha: .12)),
+        ))),
+      ]);
+    }
     if (loading) {
       return const Center(
         child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),

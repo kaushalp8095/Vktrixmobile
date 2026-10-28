@@ -156,7 +156,8 @@ r.get('/shops/:id/logo', wrap(async (req, res) => {
   const id = V.id(req.params.id, 'shop id');
   const shop = await db('shops').where({ id }).first('id', 'logo_data', 'logo_thumb');
   if (!shop) return res.status(404).json({ error: 'Shop nahi mila' });
-  // logo_thumb (transparent PNG) preview ke liye — usme safed box nahi hota.
+  // logo_thumb (128px full-bleed tile) preview ke liye — wahi roop jo list/Home
+  // me dikhta hai (box poora bhara, koi patti nahi).
   res.json({ shop_id: shop.id, logo_data: shop.logo_data || null, logo_thumb: shop.logo_thumb || null });
 }));
 

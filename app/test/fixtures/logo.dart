@@ -41,13 +41,6 @@ const String kTestLogoJpegBase64 =
     'QAUAFAHrHxZ+G+qWuvXGq6Nb3OpWl/M8rpDGXkhkYliCqjlSc4OOOh7FvHy/MKcqap1HyuP3Nf1/XberSad0eT17BgFABQAU'
     'AFABQAUAFABQAUAesfCb4b6pda9b6rrNvc6baWEySok0ZSSaRSGACsOFBxk456DuV8fMMwpxpunTfM5fcl/X9d96VJt3Z//Z';
 
-/// `data:image/jpeg;base64,...` — jaisa server `logo_data` me bhejta hai
-/// (`logo_thumb` ab transparent PNG hota hai, niche wala fixture).
+/// `data:image/jpeg;base64,...` — jaisa server `logo_data`/`logo_thumb`
+/// (full-bleed square tile) me bhejta hai.
 const String kTestLogoDataUrl = 'data:image/jpeg;base64,$kTestLogoJpegBase64';
-
-// 16x16 transparent PNG (indigo block, kinare alpha 0) — server ka naya
-// `logo_thumb` aisa hi hota hai. Isse pata chalta hai ki app white plate
-// nahi lagati jab logo transparent ho.
-const String kTestLogoPngBase64 =
-    'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAJ0lEQVR42mNgGAWM6AL2gVv/49NwcL03ih4mSl0wasBgMGAUMDAAANKxBBBhyZPeAAAAAElFTkSuQmCC';
-const String kTestLogoPngDataUrl = 'data:image/png;base64,$kTestLogoPngBase64';
