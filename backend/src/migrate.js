@@ -146,6 +146,73 @@ async function migrate() {
     });
   }
 
+  // ---------- REPAIR JOBS (customer device service) ----------
+  // Stock se alag rakha gaya hai jaan-boojh kar: customer ka phone shop ki
+  // property nahi hai, isliye wo `phones` me nahi jaata. Warna stock value,
+  // duplicate-IMEI check aur profit — teeno galat ho jate.
+  //
+  // `phone_id` tab bharta hai jab ye job shop ke **apne** stock phone ka ho
+  // (faulty khareeda → repair → bechna) ya customer ka phone shop ne khareed
+  // liya ho — us case me delivery par repair cost us phone ke cost me judta hai.
+  if (!(await db.schema.hasTable('repairs'))) {
+    await db.schema.createTable('repairs', t => {
+      t.increments('id');
+      t.integer('shop_id').notNullable().references('shops.id').onDelete('CASCADE');
+      // RPR-<shop>-<id> — customer ko batane layak.
+      t.string('job_no', 32);
+      t.string('customer_name').notNullable();
+      t.string('customer_phone');
+      t.string('customer_address');
+      // Device — IMEI optional (Tutela/feature phone me nahi hota), diya to Luhn valid.
+      t.string('brand'); t.string('model');
+      t.string('imei', 15); t.string('imei2', 15); t.string('serial_number', 64);
+      t.string('color'); t.string('accessories');
+      t.text('complaint').notNullable();
+      t.text('diagnosis');
+      t.text('notes');
+      // Device lock (PIN/pattern) — sirf chhota note, PDF me kabhi nahi.
+      t.string('device_lock_note', 255);
+      // Paisa. estimate/charge 0 ho sakta hai (free checkup), parts internal.
+      t.decimal('estimate', 12, 2).notNullable().defaultTo(0);
+      t.decimal('service_charge', 12, 2).notNullable().defaultTo(0);
+      t.decimal('parts_cost', 12, 2).notNullable().defaultTo(0);
+      t.string('parts_note', 500);
+      // received → repairing → ready → hold → delivered | cancelled
+      t.string('status', 24).notNullable().defaultTo('received');
+      t.date('received_at').notNullable();
+      t.date('promised_date');
+      t.date('delivered_at');
+      t.integer('warranty_days');
+      // Shop ke apne stock ka phone (case B), ya "convert to stock" par.
+      t.integer('phone_id').references('phones.id').onDelete('SET NULL');
+      t.integer('created_by').references('users.id').onDelete('SET NULL');
+      t.timestamp('created_at').defaultTo(db.fn.now());
+      t.timestamp('updated_at').defaultTo(db.fn.now());
+      t.index(['shop_id', 'status']);
+      t.index(['shop_id', 'promised_date']);
+      t.index(['shop_id', 'imei']);
+      t.index(['shop_id', 'customer_phone']);
+    });
+  }
+  // Har receipt ki tarah repair me bhi zero ya zyada collections: advance alag
+  // row, delivery par baaki alag. Balance kabhi silently overwrite nahi hota.
+  if (!(await db.schema.hasTable('repair_payments'))) {
+    await db.schema.createTable('repair_payments', t => {
+      t.increments('id');
+      t.integer('shop_id').notNullable().references('shops.id').onDelete('CASCADE');
+      t.integer('repair_id').notNullable().references('repairs.id').onDelete('CASCADE');
+      t.decimal('amount', 12, 2).notNullable();
+      t.date('payment_date').notNullable();
+      t.string('payment_mode', 24).notNullable().defaultTo('cash');
+      t.string('note', 500);
+      t.string('kind', 16).notNullable().defaultTo('payment'); // advance | payment | refund
+      t.integer('created_by').references('users.id').onDelete('SET NULL');
+      t.timestamp('created_at').defaultTo(db.fn.now());
+      t.index(['shop_id', 'repair_id']);
+      t.index(['shop_id', 'payment_date']);
+    });
+  }
+
   // Additive, idempotent migrations for existing deployments.
   if (!(await db.schema.hasColumn('users', 'token_version'))) {
     await db.schema.alterTable('users', t => t.integer('token_version').notNullable().defaultTo(0));
@@ -170,6 +237,11 @@ async function migrate() {
   }
   if (!(await db.schema.hasColumn('sales', 'customer_id_photo_back'))) {
     await db.schema.alterTable('sales', t => t.text('customer_id_photo_back'));
+  }
+  // Repair cost jo shop ne apne stock phone par lagaya (parts + labour). Sale
+  // par ye cost `buy_price` ke upar judta hai, warna profit zyada dikhta hai.
+  if (!(await db.schema.hasColumn('phones', 'repair_cost'))) {
+    await db.schema.alterTable('phones', t => t.decimal('repair_cost', 12, 2).notNullable().defaultTo(0));
   }
   if (!(await db.schema.hasColumn('shops', 'logo_data'))) {
     await db.schema.alterTable('shops', t => t.text('logo_data'));

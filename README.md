@@ -104,6 +104,33 @@ Koi external API call nahi hoti, koi IMEI server se bahar nahi jata, aur iska ko
 - **Home ka "Credit / pending payments" card all-time dues dikhata hai** (`/api/ledger/summary`), bilkul wahi hisaab jo ledger screen dikhata hai. Pehle wo `/api/reports/summary` ka `receivables` use karta tha, jo period scoped hai — bina `from`/`to` bheje backend sirf **aaj** leta hai, isliye kal ka udhaar ledger me pending dikhta tha par card par "All payments are clear". Reports ka `receivables` period-report ke liye hai, dues ke liye use na karein.
 - Existing deployment par migration purane non-credit sales ko fully paid opening entry banati hai; old `credit` rows unpaid rehti hain. Pehle updated backend deploy karein, phir APK.
 
+### Mobile repair (workshop) — stock se alag
+
+Dukaan ke do kaam alag hain: **phone kharidna/bechna** aur **customer ka phone repair karna**. Repair ka device customer ka hai, isliye wo kabhi stock me nahi jaata — warna stock value, "in stock" count, duplicate-IMEI check aur profit sab galat ho jate.
+
+| Kya | Kahan |
+|---|---|
+| Naya repair job | **Home → Repairs card → New repair job** (5 tabs wahi rehte hain) |
+| Khuli jobs | Home card: `Repairs · N open · M ready · ₹X due` |
+| Job detail | Row par tap → status, payments, PDF, edit, delete |
+| Customer PDFs | **Repair JOB SHEET** (phone jama karte waqt) aur **REPAIR DELIVERY RECEIPT** (delivery par) — save/WhatsApp |
+
+**Teen case, teeno supported**
+
+1. **Customer device (A)** — job `repairs` table me, stock se bilkul alag. IMEI optional hai (Tutela/feature phone me nahi hota), diya to Luhn check hota hai.
+2. **Shop ka apna faulty phone (B)** — form me "Repairing my own stock phone?" se phone link karein. Delivery par `service_charge + parts_cost` us phone ke `repair_cost` me jud jaata hai, isliye sale ka profit sahi rehta hai.
+3. **Customer ne phone bech diya (C)** — job detail → **Buy this device into stock** → price/date/condition → device `in_stock` ho jata hai, customer details purchase row me chali jaati hain, aur job `cancelled` ho jati hai (note me link).
+
+**Status flow**: `received → repairing → ready → delivered`, plus `hold` (parts ka intezaar) aur `cancelled` (refund/reopen). `delivered` aur `cancelled` terminal hain. Balance ho to deliver karne par pehle confirm poochha jaata hai — due ledger me zinda rehta hai.
+
+**Paisa**: `service_charge` bill hai; `estimate` sirf customer ko bataya gaya andaaza; `parts_cost` + `parts_note` **internal** hain. Advance aur baaki har collection `repair_payments` me alag append-only row hai (sale payments jaisa hi pattern) — balance kabhi overwrite nahi hota. Refund `kind='refund'` se, negative amount row bankar.
+
+**Kya kabhi customer ko nahi jaata**: `parts_cost`, `parts_note`, `diagnosis`, `device_lock_note`, internal `notes` — job sheet/delivery receipt layout inhe padhta hi nahi, aur list endpoint bhi nahi bhejta.
+
+**Reports**: `/api/reports/summary` me ek **additive** `repairs` block hai (`delivered_count`, `billed`, `collected`, `open_count`, `ready_count`, `open_value`). Purane purchases/sales/stock/receivables numbers bilkul wahi rehte hain — repair ki kamai sale ke profit me mix nahi hoti. All-time repair dues ke liye `/api/ledger/repairs`.
+
+**Super Admin**: repair routes bhi support-mode guard ke andar hain — bina reason-logged session 403, aur session me sirf **GET** (read-only).
+
 ### Super Admin: manage karein, data sirf support session me
 
 Shop ke liye ye sabse bada security sawal hai: *"admin mera stock, IMEI, sale, profit aur customer ka ID proof dekhta rehta hai?"* Isliye Super Admin ko ab **default me kuch nahi** dikhta.
@@ -336,6 +363,13 @@ Note: download app ke process me chalta hai. App ko kuch der ke liye minimize ka
 | GET/POST | /api/sales/:id/payments | Partial-payment history / naya collection |
 | GET | /api/reports/summary?from=&to= | Report + period receivables (dues ke liye `/api/ledger/summary`) |
 | GET | /api/reports/daily?from=&to= | Roz ka report |
+| GET/POST | /api/repairs?status=open\|ready\|delivered\|all&search=&due=1 | Repair jobs list / naya job (advance optional) |
+| GET/PUT/DELETE | /api/repairs/:id | Job detail (payments + linked phone) / edit / delete (sirf received+cancelled, bina payment) |
+| POST | /api/repairs/:id/status | `received/repairing/ready/hold/delivered/cancelled`; delivered par balance ho to `confirm_due: true` |
+| POST | /api/repairs/:id/payments | Advance / partial / refund (`kind`) — append-only |
+| GET | /api/repairs/:id/job-sheet | Customer-safe job sheet / delivery receipt payload |
+| POST | /api/repairs/:id/convert-to-stock | Customer ka device khareed kar stock me daalein |
+| GET | /api/ledger/repairs | All-time repair dues + workshop counts |
 
 Super admin `?shop_id=` sirf **chalu support session** ke saath laga sakta hai (read-only) — warna shop APIs 403 deti hain. Detail: *"Super Admin: manage karein, data sirf support session me"* section aur `docs/D6_SUPPORT_ACCESS.md`.
 
