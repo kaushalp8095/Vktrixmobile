@@ -17,6 +17,7 @@ import 'buy_form.dart';
 import 'stock.dart';
 import 'sales.dart';
 import 'reports.dart';
+import 'repairs.dart';
 import 'ledger.dart';
 import 'update_checker.dart';
 
@@ -144,7 +145,10 @@ class _ShopHomeState extends State<ShopHome> {
                 onPageChanged: (i) => setState(() => tab = i),
                 children: [
                   Dashboard(key: _keys[0], onGo: go, shopName: _name, isAdminView: _adminView,
-                    onOpenLedger: () => SharedAxisRoute.push(context, (_) => const LedgerScreen())),
+                    onOpenLedger: () => SharedAxisRoute.push(context, (_) => const LedgerScreen()),
+                    // Workshop apni screen par khulta hai (5 tabs wahi rehte hain) —
+                    // 6th tab 411dp + 200% text scale par overflow karta hai.
+                    onOpenRepairs: () => SharedAxisRoute.push(context, (_) => const RepairsScreen())),
                   KeyedSubtree(key: _keys[1],
                     child: _readOnly
                       ? _SupportBlocked(action: 'Buy', onHome: () => go(0))

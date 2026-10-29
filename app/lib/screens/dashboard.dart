@@ -20,6 +20,8 @@ class ActivityItem {
 class Dashboard extends StatefulWidget {
   final void Function(int) onGo;
   final VoidCallback? onOpenLedger;
+  /// Workshop (repair jobs) ka entry point — Home tab par card.
+  final VoidCallback? onOpenRepairs;
   final String shopName;
   final bool isAdminView;
 
@@ -27,6 +29,8 @@ class Dashboard extends StatefulWidget {
   final Map<String, dynamic>? testSummary;
   /// All-time pending dues (`/ledger/summary`). Test hook, network path ke liye.
   final Map<String, dynamic>? testDues;
+  /// Repair workshop ka summary (`/ledger/repairs`). Test hook.
+  final Map<String, dynamic>? testRepairs;
   final List<ActivityItem>? testRecent;
   final String? greeting;
   /// Shop ka auto-adjusted logo thumbnail (`logo_thumb`). Na do to login
@@ -34,8 +38,8 @@ class Dashboard extends StatefulWidget {
   /// name ke aage wahi dikhta hai.
   final String? logoThumb;
   const Dashboard({super.key, required this.onGo, required this.shopName, this.onOpenLedger,
-      this.isAdminView = false, this.testSummary, this.testDues, this.greeting, this.testRecent,
-      this.logoThumb});
+      this.onOpenRepairs, this.isAdminView = false, this.testSummary, this.testDues, this.testRepairs,
+      this.greeting, this.testRecent, this.logoThumb});
   /// "Recent activity" rows — sale aur purchase dono ek hi timeline par, newest
   /// first. Pehle sale ko `1000000 + id` banakar sort kiya jata tha, isliye har
   /// sale har purchase ke upar aa jati thi aur aaj ki kharidi purani sale ke neeche
@@ -74,6 +78,8 @@ class _DashboardState extends State<Dashboard> {
   Map<String, dynamic>? _s;
   /// All-time pending dues — ledger screen ka hi source (`/ledger/summary`).
   Map<String, dynamic>? _dues;
+  /// Workshop ka summary — same source jo Repairs screen ke top par dikhta hai.
+  Map<String, dynamic>? _repairs;
   List<ActivityItem>? _recent;
   Object? _error;
 
@@ -83,6 +89,7 @@ class _DashboardState extends State<Dashboard> {
     if (widget.testSummary != null) {
       _s = widget.testSummary;
       _dues = widget.testDues;
+      _repairs = widget.testRepairs;
       _recent = widget.testRecent ?? [];
     } else {
       _load();
@@ -102,15 +109,22 @@ class _DashboardState extends State<Dashboard> {
         // `receivables` period-scoped hai (bina from/to = sirf aaj ki sales),
         // isliye purani udhaar par card galti se "clear" dikhata tha.
         Api.get('/ledger/summary').catchError((Object _) => null),
+        // Repair workshop: open/ready jobs aur unka udhaar. Alag call hai taaki
+        // koi bhi ek endpoint fail ho to baaki dashboard na ruke.
+        widget.onOpenRepairs == null
+            ? Future<dynamic>.value(null)
+            : Api.get('/ledger/repairs').catchError((Object _) => null),
       ]);
       final stock = (results[1] as List).cast<Map>();
       final sales = (results[2] as List).cast<Map>();
       final items = Dashboard.recentActivity(stock, sales);
       if (!mounted) return;
       final dues = results[3];
+      final repairs = results.length > 4 ? results[4] : null;
       setState(() {
         _s = results[0] as Map<String, dynamic>;
         _dues = dues is Map ? dues.cast<String, dynamic>() : null;
+        _repairs = repairs is Map ? repairs.cast<String, dynamic>() : null;
         _recent = items.take(5).toList();
       });
     } catch (e) {
@@ -186,6 +200,10 @@ class _DashboardState extends State<Dashboard> {
                   count: int.tryParse('${_dues?['pending_count'] ?? _s!['receivables']?['pending_count'] ?? 0}') ?? 0,
                   onTap: widget.onOpenLedger!,
                 ),
+              ],
+              if (widget.onOpenRepairs != null) ...[
+                const SizedBox(height: Space.x12),
+                _RepairsAction(summary: _repairs, onTap: widget.onOpenRepairs!),
               ],
               const SizedBox(height: Space.section),
               // ---- Today ----
@@ -274,6 +292,49 @@ class _LedgerAction extends StatelessWidget {
               style: t.bodySmall?.copyWith(color: c.textSecondary)),
           ])),
           StatusChip(label: count > 0 ? 'OPEN' : 'CLEAR', tone: count > 0 ? ChipTone.warning : ChipTone.success),
+          const SizedBox(width: Space.x4),
+          Icon(Icons.chevron_right, color: c.textSecondary, size: 20),
+        ]),
+      ),
+    );
+  }
+}
+
+/// Workshop ka Home card: kitni jobs khuli hain, kitni deliver karne layak hain
+/// aur unka udhaar — ek nazar me. Repair ka paisa sale/profit me mix nahi hota,
+/// isliye ye card stock value ke bilkul alag dikhta hai.
+class _RepairsAction extends StatelessWidget {
+  final Map<String, dynamic>? summary;
+  final VoidCallback onTap;
+  const _RepairsAction({required this.summary, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors, t = context.type;
+    final open = int.tryParse('${summary?['open_count'] ?? 0}') ?? 0;
+    final ready = int.tryParse('${summary?['ready_count'] ?? 0}') ?? 0;
+    final due = num.tryParse('${summary?['outstanding'] ?? 0}') ?? 0;
+    return GlassCard(
+      blur: false,
+      padding: EdgeInsets.zero,
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.all(Space.x12),
+        child: Row(children: [
+          Container(width: 42, height: 42,
+            decoration: BoxDecoration(color: c.brandInk.withValues(alpha: .10), borderRadius: Shapes.md),
+            child: Icon(Icons.build_outlined, color: c.brandInk, size: 21)),
+          const SizedBox(width: Space.x12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Repairs', style: t.titleSmall),
+            Text(
+              open == 0 && ready == 0
+                ? 'No open repair jobs'
+                : '$open open${ready > 0 ? ' · $ready ready' : ''}${due > 0 ? ' · ${rs(due)} due' : ''}',
+              style: t.bodySmall?.copyWith(color: c.textSecondary)),
+          ])),
+          StatusChip(label: ready > 0 ? 'READY $ready' : open > 0 ? 'OPEN $open' : 'CLEAR',
+            tone: ready > 0 ? ChipTone.success : open > 0 ? ChipTone.brand : ChipTone.neutral),
           const SizedBox(width: Space.x4),
           Icon(Icons.chevron_right, color: c.textSecondary, size: 20),
         ]),

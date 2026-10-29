@@ -145,6 +145,83 @@ function paymentData(b) {
   };
   return out;
 }
+// ---------- REPAIRS ----------
+// Job ka status flow ek hi jagah: kaun se status se kahan ja sakte hain.
+// delivered aur cancelled terminal hain (delivery ke baad wapas nahi).
+const REPAIR_STATUSES = ['received', 'repairing', 'ready', 'hold', 'delivered', 'cancelled'];
+const REPAIR_FLOW = {
+  received: ['repairing', 'ready', 'hold', 'cancelled'],
+  repairing: ['ready', 'hold', 'cancelled'],
+  hold: ['repairing', 'ready', 'cancelled'],
+  ready: ['delivered', 'repairing', 'hold', 'cancelled'],
+  delivered: [],
+  cancelled: ['received'],
+};
+function repairStatus(value, field = 'status') {
+  const v = text(value, field, { required: true, max: 24 });
+  if (!REPAIR_STATUSES.includes(v)) fail(`${field} invalid`);
+  return v;
+}
+/// received/cancelled ko chhod kar baaki status "khula" hain (workshop me phone).
+const REPAIR_OPEN_STATUSES = ['received', 'repairing', 'ready', 'hold'];
+function repairData(b, partial = false) {
+  const out = {};
+  const textFields = {
+    customer_name: 255, customer_phone: 32, customer_address: 500,
+    brand: 120, model: 120, serial_number: 64, color: 64, accessories: 255,
+    complaint: 2000, diagnosis: 2000, notes: 5000, device_lock_note: 255, parts_note: 500,
+  };
+  for (const [k, max] of Object.entries(textFields)) {
+    if (partial && !Object.hasOwn(b, k)) continue;
+    const required = k === 'customer_name' || k === 'complaint';
+    if (k === 'customer_phone') out[k] = mobile(b[k], k);
+    else if (k === 'device_lock_note') out[k] = text(b[k], k, { max });
+    else out[k] = text(b[k], k, { required, max });
+  }
+  for (const k of ['imei', 'imei2']) {
+    if (partial && !Object.hasOwn(b, k)) continue;
+    out[k] = imei(b[k], k, false);        // optional — feature phone me IMEI nahi hota
+  }
+  for (const k of ['estimate', 'service_charge', 'parts_cost']) {
+    if (partial && !Object.hasOwn(b, k)) continue;
+    out[k] = moneyOrZero(b[k] ?? 0, k);   // 0 allowed: free checkup
+  }
+  if (!partial || Object.hasOwn(b, 'received_at')) out.received_at = date(b.received_at || today(), 'received_at');
+  if (!partial || Object.hasOwn(b, 'promised_date')) {
+    out.promised_date = b.promised_date ? date(b.promised_date, 'promised_date') : null;
+    if (out.promised_date && out.received_at && out.promised_date < out.received_at)
+      fail('promised_date cannot be before received_at');
+  }
+  if (!partial || Object.hasOwn(b, 'warranty_days')) {
+    if (b.warranty_days == null || b.warranty_days === '') out.warranty_days = null;
+    else {
+      const n = Number(b.warranty_days);
+      if (!Number.isInteger(n) || n < 0 || n > 3650) fail('warranty_days must be 0-3650');
+      out.warranty_days = n;
+    }
+  }
+  if (partial && !Object.hasOwn(b, 'phone_id')) { /* leave as is */ }
+  else if (b.phone_id != null && b.phone_id !== '') out.phone_id = id(b.phone_id, 'phone_id');
+  else if (Object.hasOwn(b, 'phone_id')) out.phone_id = null;
+  if (!partial) {
+    // Contact zaroori hai taaki deliver/reminder ho sake — siwaye shop ke apne
+    // stock phone ke (case B), jahan "customer" khud dukaan hai.
+    if (!out.customer_phone && !out.customer_address && !out.phone_id)
+      fail('Customer mobile or address is required to contact them later');
+    if (out.imei && out.imei === out.imei2) fail('imei2 must differ from imei');
+  }
+  if (partial && !Object.keys(out).length) fail('No editable fields supplied');
+  return out;
+}
+function repairPaymentData(b) {
+  return {
+    amount: money(b.amount, 'amount'),
+    payment_date: date(b.payment_date || today(), 'payment_date'),
+    payment_mode: choice(b.payment_mode, 'payment_mode', ['cash', 'upi', 'card', 'bank', 'other']) || 'cash',
+    note: text(b.note, 'note', { max: 500 }),
+    kind: choice(b.kind, 'kind', ['advance', 'payment', 'refund']) || 'payment',
+  };
+}
 function range(query, defaults = [today(), today()]) {
   const from = date(query.from ?? defaults[0], 'from'), to = date(query.to ?? defaults[1], 'to');
   if (from > to) fail('from must not be after to');
@@ -167,4 +244,5 @@ function shopData(b, partial = false) {
   return out;
 }
 module.exports = { fail, body, text, id, money, moneyOrZero, cents, date, imei, password, idPhoto, shopLogo,
-  ID_TYPES, ID_PHOTO_MAX_BYTES, SHOP_LOGO_MAX_BYTES, phoneData, saleData, paymentData, range, shopData, choice };
+  ID_TYPES, ID_PHOTO_MAX_BYTES, SHOP_LOGO_MAX_BYTES, phoneData, saleData, paymentData, range, shopData, choice,
+  REPAIR_STATUSES, REPAIR_OPEN_STATUSES, REPAIR_FLOW, repairStatus, repairData, repairPaymentData };

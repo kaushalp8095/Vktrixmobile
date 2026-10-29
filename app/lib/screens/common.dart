@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../api.dart';
 import '../design/components/components.dart';
+import '../design/design.dart';
 
 /// Keeps API timestamps compact in business screens without shifting a UTC
 /// calendar date into the previous/next local day.
@@ -30,6 +31,21 @@ void toast(BuildContext c, String m, {bool err = false}) {
       content: Text(message, style: TextStyle(color: err ? scheme.onError : null)),
       backgroundColor: err ? scheme.error : null,
     ));
+}
+
+/// Chhota icon + text pair — list rows me extra info bina jagah khaye dikhata hai.
+class IconLabel extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  const IconLabel({super.key, required this.icon, required this.label, required this.color});
+  @override
+  Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
+    Icon(icon, size: 14, color: color),
+    const SizedBox(width: 3),
+    Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
+      style: context.type.labelSmall?.copyWith(color: color))),
+  ]);
 }
 
 /// Support mode ka read-only guard. Screen se chhupane ke saath-saath likhne wale

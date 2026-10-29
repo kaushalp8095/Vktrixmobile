@@ -431,6 +431,14 @@ r.get('/reports/summary', wrap(async (req, res) => {
     .select('id', 'sell_price');
   const paidPeriodSales = await withPaymentTotals(periodSales);
   const saleV = +sale.v || 0, cost = +sale.cost || 0;
+  // Repair block **extra** hai: purane saare numbers jaisa ke taisa, kyunki
+  // repair ki kamai sale/profit me mix nahi hoti (stock ki value par asar nahi).
+  const repairPeriod = await db('repairs').where({ shop_id: sid, status: 'delivered' })
+    .whereBetween('delivered_at', [from, to]);
+  const repairCollected = await db('repair_payments').where({ shop_id: sid })
+    .whereBetween('payment_date', [from, to]).sum('amount as v').first();
+  const openRepairs = await db('repairs').where({ shop_id: sid })
+    .whereIn('status', ['received', 'repairing', 'ready', 'hold']).select('status', 'service_charge');
   res.json({
     from, to,
     purchases: { count: +buy.c, amount: +buy.v || 0 },
@@ -445,6 +453,43 @@ r.get('/reports/summary', wrap(async (req, res) => {
     },
     by_payment: byPay.map(x => ({ mode: x.payment_mode, total: +x.total, count: +x.count })),
     top_models: topModels.map(x => ({ ...x, count: +x.count })),
+    repairs: {
+      delivered_count: repairPeriod.length,
+      // Jo customer se repair ka paisa liya (advance + delivery), period ke andar.
+      collected: moneyNumber(repairCollected?.v),
+      billed: moneyNumber(repairPeriod.reduce((n, x) => n + moneyNumber(x.service_charge), 0)),
+      open_count: openRepairs.length,
+      ready_count: openRepairs.filter(x => x.status === 'ready').length,
+      // Workshop me padi khuli jobs ka billable amount (kamai nahi — sirf workload).
+      open_value: moneyNumber(openRepairs.reduce((n, x) => n + moneyNumber(x.service_charge), 0)),
+    },
+  });
+}));
+
+// Repair dues ka all-time hisaab (dashboard ka "Repairs" card isi se chalta hai).
+r.get('/ledger/repairs', wrap(async (req, res) => {
+  const sid = needShop(req, res); if (!sid) return;
+  const jobs = await db('repairs').where({ shop_id: sid })
+    .whereIn('status', ['received', 'repairing', 'ready', 'hold', 'delivered'])
+    .select('id', 'status', 'service_charge');
+  const sums = jobs.length ? await db('repair_payments').where({ shop_id: sid }).whereIn('repair_id', jobs.map(j => j.id))
+    .groupBy('repair_id').select('repair_id').sum('amount as paid') : [];
+  const byJob = new Map(sums.map(x => [Number(x.repair_id), moneyNumber(x.paid)]));
+  let outstanding = 0, received = 0, pending = 0;
+  for (const job of jobs) {
+    const paid = byJob.get(Number(job.id)) || 0;
+    const due = Math.max(0, moneyNumber(moneyNumber(job.service_charge) - paid));
+    outstanding += due; received += paid;
+    if (due > 0) pending += 1;
+  }
+  const open = jobs.filter(j => ['received', 'repairing', 'ready', 'hold'].includes(j.status));
+  res.json({
+    outstanding: moneyNumber(outstanding),
+    pending_count: pending,
+    received: moneyNumber(received),
+    jobs_total: moneyNumber(jobs.reduce((n, x) => n + moneyNumber(x.service_charge), 0)),
+    open_count: open.length,
+    ready_count: jobs.filter(j => j.status === 'ready').length,
   });
 }));
 
@@ -459,4 +504,8 @@ r.get('/reports/daily', wrap(async (req, res) => {
     .orderBy('s.sell_date');
   res.json(rows.map(x => ({ date: x.date, count: +x.count, sales: +x.sales, profit: +x.sales - +x.cost })));
 }));
+// Repair jobs: guard/`requireAuth` pehle hi lag chuke hain (upar), isliye ye
+// router bhi wahi rules follow karta hai — Super Admin read-only.
+r.use(require('./repairs'));
+
 module.exports = r;
