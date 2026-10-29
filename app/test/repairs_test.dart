@@ -149,7 +149,8 @@ void main() {
       expect(find.text('₹1,500 DUE'), findsOneWidget);       // chip
       expect(find.text('Internal — never printed'), findsOneWidget);
       expect(find.text('₹1,200'), findsOneWidget);           // parts cost
-      expect(find.text('₹1,600'), findsOneWidget);           // margin
+      // Margin do jagah dikhta hai: internal card ka header aur 'Margin' stat.
+      expect(find.text('₹1,600'), findsNWidgets(2));
       expect(find.textContaining('Display assembly faulty'), findsOneWidget);
       expect(find.textContaining('PIN 1234'), findsOneWidget);
       expect(find.text('Collect payment'), findsOneWidget);
