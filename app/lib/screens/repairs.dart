@@ -37,8 +37,6 @@ class _RepairsScreenState extends State<RepairsScreen> {
   RepairFilter filter = RepairFilter.open;
   Timer? _debounce;
 
-  static const _statuses = ['received', 'repairing', 'ready', 'hold', 'delivered', 'cancelled'];
-
   @override
   void initState() {
     super.initState();
@@ -106,24 +104,6 @@ class _RepairsScreenState extends State<RepairsScreen> {
     final changed = await SharedAxisRoute.push<bool>(context, (_) => RepairDetailScreen(id: int.parse('${row['id']}')));
     if (changed == true && mounted) _load();
   }
-
-  static ChipTone toneFor(String status) => switch (status) {
-        'ready' => ChipTone.success,
-        'hold' => ChipTone.warning,
-        'cancelled' => ChipTone.error,
-        'delivered' => ChipTone.neutral,
-        _ => ChipTone.brand,
-      };
-
-  static String labelFor(String status) => switch (status) {
-        'received' => 'Received',
-        'repairing' => 'Repairing',
-        'ready' => 'Ready',
-        'hold' => 'On hold',
-        'delivered' => 'Delivered',
-        'cancelled' => 'Cancelled',
-        _ => status,
-      };
 
   @override
   Widget build(BuildContext context) {
@@ -202,6 +182,26 @@ class _RepairsScreenState extends State<RepairsScreen> {
     );
   }
 }
+
+/// Job status → chip tone. `ready` sabse pehle dhyan maangta hai (customer
+/// ko call karna hai), `hold` parts ka intezaar, `delivered/cancelled` band.
+ChipTone repairTone(String status) => switch (status) {
+      'ready' => ChipTone.success,
+      'hold' => ChipTone.warning,
+      'cancelled' => ChipTone.error,
+      'delivered' => ChipTone.neutral,
+      _ => ChipTone.brand,
+    };
+
+String repairLabel(String status) => switch (status) {
+      'received' => 'Received',
+      'repairing' => 'Repairing',
+      'ready' => 'Ready',
+      'hold' => 'On hold',
+      'delivered' => 'Delivered',
+      'cancelled' => 'Cancelled',
+      _ => status,
+    };
 
 class _SummaryRow extends StatelessWidget {
   final Map<String, dynamic> summary;
@@ -295,7 +295,7 @@ class _RepairRow extends StatelessWidget {
             Expanded(child: Text('${row['customer_name'] ?? 'Customer'}', style: t.titleSmall,
               maxLines: 1, overflow: TextOverflow.ellipsis)),
             const SizedBox(width: Space.x8),
-            StatusChip(label: RepairsScreen.labelFor(status).toUpperCase(), tone: RepairsScreen.toneFor(status)),
+            StatusChip(label: repairLabel(status).toUpperCase(), tone: repairTone(status)),
           ]),
           const SizedBox(height: Space.x4),
           Text('${row['job_no'] ?? ''} · $device',

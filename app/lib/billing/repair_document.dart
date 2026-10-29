@@ -220,7 +220,7 @@ class RepairDocument {
         style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey300)),
       pw.SizedBox(height: 4),
       pw.Text(rs(sheet['amount']), textAlign: pw.TextAlign.right,
-        style: pw.TextStyle(font: pw.FontWeight.bold, fontSize: 20, color: PdfColors.white)),
+        style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 20, color: PdfColors.white)),
       pw.SizedBox(height: 10),
       pw.Divider(color: PdfColors.grey700, height: 1),
       pw.SizedBox(height: 8),
@@ -262,7 +262,7 @@ class RepairDocument {
     padding: const pw.EdgeInsets.all(12),
     decoration: pw.BoxDecoration(borderRadius: pw.BorderRadius.circular(7), border: pw.Border.all(color: _line, width: .7)),
     child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-      pw.Text('TERMS', style: pw.TextStyle(font: pw.FontWeight.bold, fontSize: 8.5, color: _indigo, letterSpacing: .6)),
+      pw.Text('TERMS', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8.5, color: _indigo, letterSpacing: .6)),
       pw.SizedBox(height: 6),
       for (final line in [
         'Please collect the device within 30 days. After that a storage charge may apply.',
