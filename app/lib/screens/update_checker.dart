@@ -351,16 +351,18 @@ class _AppBadge extends StatelessWidget {
       width: 56, height: 56,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(Radii.md),
-        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [c.brandInk, c.accent]),
+        // Theme ka CTA gradient (light: deep pair, dark: bright pair) —
+        // bright #29ABE2 par white icon sirf 2.6:1 deta tha.
+        gradient: c.cta,
         boxShadow: [BoxShadow(color: c.brandInk.withValues(alpha: .28), blurRadius: 24, offset: const Offset(0, 8))],
       ),
-      child: Icon(icon, size: 28, color: Colors.white),
+      child: Icon(icon, size: 28, color: Theme.of(context).colorScheme.onPrimary),
     );
     if (phase != UpdatePhase.downloading) return badge;
     return SizedBox(width: 64, height: 64, child: Stack(alignment: Alignment.center, children: [
       SizedBox.expand(child: CircularProgressIndicator(
         value: progress, strokeWidth: 3, strokeCap: StrokeCap.round,
-        color: c.accent, backgroundColor: c.textPrimary.withValues(alpha: .08))),
+        color: c.brandInk, backgroundColor: c.textPrimary.withValues(alpha: .08))),
       Transform.scale(scale: .82, child: badge),
     ]));
   }
@@ -423,7 +425,7 @@ class _DownloadPanel extends StatelessWidget {
             final pct = (v + 1e-6).floor().clamp(0, 100); // 0.29*100 = 28.999… must still read 29%
             return ShaderMask(
             blendMode: BlendMode.srcIn,
-            shaderCallback: (r) => LinearGradient(colors: [c.brandInk, c.accent]).createShader(r),
+            shaderCallback: (r) => c.textGradient.createShader(r),
             child: Text(p == null ? '…' : '$pct%',
                 semanticsLabel: p == null ? 'Downloading' : '$pct percent downloaded',
                 style: t.displaySmall?.copyWith(fontWeight: FontWeight.w800, height: 1, color: Colors.white)),
@@ -502,8 +504,8 @@ class _GradientProgressBarState extends State<_GradientProgressBar> with SingleT
                     child: DecoratedBox(
                       decoration: BoxDecoration(
                         borderRadius: Shapes.pill,
-                        gradient: LinearGradient(colors: [c.brandInk, c.accent]),
-                        boxShadow: [BoxShadow(color: c.accent.withValues(alpha: .45), blurRadius: 10)],
+                        gradient: c.cta,
+                        boxShadow: [BoxShadow(color: c.brandInk.withValues(alpha: .35), blurRadius: 10)],
                       ),
                       child: value == null || fillW < 24 ? null : ClipRRect(
                         borderRadius: Shapes.pill,

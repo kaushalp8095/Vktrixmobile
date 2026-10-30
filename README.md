@@ -29,20 +29,31 @@ grain — flat digital gradient ko texture milta hai.
 
 | Layer | Kya |
 |---|---|
-| Backdrop blur | 26dp (light) / 22dp (dark); ek screen par max 3 blurred nodes |
-| Fill | diagonal white 42% → 16%, neeche brand ka 6–7% tint |
-| Sheen | top-left se specular sweep — isi se "glass" padhta hai, gradient panel nahi |
-| Rim | 1dp top-lit hairline (62% → 10%) |
-| Shadow | aqua-tinted 2-layer soft shadow (light) / brand glow (dark) |
+| Backdrop blur | 28dp (light) / 22dp (dark); ek screen par max 3 blurred nodes |
+| Fill | diagonal white 54% → 22%, neeche brand ka 5% tint |
+| Sheen | top-left se specular sweep (14%) — isi se "glass" padhta hai, gradient panel nahi |
+| Rim | 1dp top-lit hairline (52% → 9%) |
+| Shadow | aqua-tinted 2-layer soft shadow, 40dp blur @ 7.5% (light) / brand glow (dark) |
+
+**Hierarchy (Oct 2026 audit)** — light mode me card aur background ka gap pehle sirf
+~18 luminance tha, isliye card apne glass se nahi, neeche ki kaali shadow se dikhta
+tha ("grey ledge"). Ab **base wash gehra** hai (`#DFEFF2 → #DDEFE6`), **fill bada**
+(54%/22%) aur **shadow halka/soft** — card 40+ luminance upar float karta hai. Goldens
+`app/goldens/` isi ko lock karte hain.
 
 **Accessibility pehle** — brand hues decorative hain (text nahi). Jo bhi colour text
 ban kar padha jaata hai wo `*Ink` token se aata hai, aur `app/test/theme_tokens_test.dart`
 **har token ka contrast (WCAG AA ≥ 4.5:1) lock karta hai** — light + dark dono me. Isliye
 `scheme.primary` deep aqua `#0C7FA8` hai (bright aqua par white text sirf 2.6:1 hota hai).
 
-**CTA** — `PrimaryButton` par aqua→emerald gradient (deep pair, white label 5.7:1 /
-5.1:1). Gradient sirf primary action aur ek hero number (`GradientText`) par — chhote
-labels kabhi gradient nahi hote.
+**CTA** — ek hi action gradient poore app me (`AppColors.cta`): light me deep pair
+(white label 6.7:1 / 5.8:1), dark me bright pair (dark label 8.5:1+). `PrimaryButton`,
+gradient FAB aur update progress bar — sab isi se. Gradient sirf primary action aur ek
+hero number (`GradientText`) par — chhote labels kabhi gradient nahi hote.
+
+**Brand ink** — `#096481` (deep aqua). Ye buttons/icons/chips ka text colour hai, aur
+aurora ke sabse gehere point par bhi 4.7:1 deta hai. Bright `#29ABE2` sirf decoration
+(blobs, tints) hai — white icon uspar 2.6:1 hi deta hai, isliye kabhi text/icon nahi.
 
 **Android splash** — launcher se pehli frame tak wahi brand wash (`values/colors.xml`),
 warna white/grey flash dikhta tha.

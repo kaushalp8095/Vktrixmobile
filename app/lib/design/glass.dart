@@ -35,11 +35,16 @@ class GlassTokens extends ThemeExtension<GlassTokens> {
     required this.glowColor, this.blurSupported = true,
   });
 
+  /// 2026-10 audit tuning. Pehle card ka fill .42/.16 tha aur shadow .13/.07 —
+  /// matlab card background se alag *shadow* se dikhta tha, apne glass se nahi:
+  /// golden me card ke neeche ~-47 luminance ka grey-blue band ban raha tha
+  /// ("grey ledge" look) jabki card khud sirf +18 upar tha. Ab hierarchy
+  /// palat gayi hai — glass sabse loud cue hai (bada, soft, low-alpha shadow).
   static const light = GlassTokens(
-    fillTop: .42, fillBottom: .16, tint: AquaEmerald.emerald, tintAlpha: .07,
-    borderAlpha: .34, borderHighlightStart: .62, borderHighlightEnd: .10, sheenAlpha: .10,
-    scrimAlpha: .04, blurSigma: 26,
-    shadowBlur: 26, shadowAlpha: .13, shadowBlurTight: 8, shadowAlphaTight: .07,
+    fillTop: .54, fillBottom: .22, tint: AquaEmerald.emerald, tintAlpha: .05,
+    borderAlpha: .28, borderHighlightStart: .52, borderHighlightEnd: .09, sheenAlpha: .14,
+    scrimAlpha: .03, blurSigma: 28,
+    shadowBlur: 40, shadowAlpha: .075, shadowBlurTight: 12, shadowAlphaTight: .045,
     glowBlur: 0, glowAlpha: 0, innerHighlightAlpha: 0, glowColor: AquaEmerald.aqua,
   );
   static const dark = GlassTokens(

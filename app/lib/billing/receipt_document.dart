@@ -11,7 +11,7 @@ import '../api.dart';
 /// Purchase cost/profit, internal notes and customer ID proofs are never accepted
 /// by this layout, so they cannot accidentally leak into a sale invoice.
 class ReceiptDocument {
-  static const _indigo = PdfColor.fromInt(0xff0a6e93); // aqua deep — brand ink
+  static const _indigo = PdfColor.fromInt(0xff096481); // brand ink (app ke aquaDeep se match)
   static const _mint = PdfColor.fromInt(0xff12735a); // emerald deep — brand partner
   static const _ink = PdfColor.fromInt(0xff0a1519);
   static const _muted = PdfColor.fromInt(0xff5b727d);

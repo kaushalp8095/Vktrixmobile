@@ -14,7 +14,7 @@ import '../api.dart';
 /// hai: parts cost, diagnosis, device lock note aur internal notes isme kabhi
 /// nahi aate. Wahi niyam jo sale invoice par hai (`receipt_document.dart`).
 class RepairDocument {
-  static const _indigo = PdfColor.fromInt(0xff0a6e93); // aqua deep — brand ink
+  static const _indigo = PdfColor.fromInt(0xff096481); // brand ink (app ke aquaDeep se match)
   static const _mint = PdfColor.fromInt(0xff12735a); // emerald deep — brand partner
   static const _amber = PdfColor.fromInt(0xffb45309);
   static const _ink = PdfColor.fromInt(0xff0a1519);

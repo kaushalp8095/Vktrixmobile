@@ -393,9 +393,12 @@ class _AdminHomeState extends State<AdminHome> {
     final c = context.colors;
     final top = MediaQuery.viewPaddingOf(context).top;
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
+      // Material ka default FAB surface se paint hota hai aur uski shadow pure
+      // black hoti hai — light aurora par moti kaali ring jaisa. GradientFab wahi
+      // CTA language bolta hai jo baaki app me hai.
+      floatingActionButton: GradientFab(
         heroTag: 'new-shop', onPressed: () => _shopForm(),
-        icon: const Icon(Icons.add), label: const Text('New shop'),
+        icon: Icons.add, label: 'New shop',
       ),
       body: AuroraBackground(child: Stack(children: [
         RefreshIndicator(

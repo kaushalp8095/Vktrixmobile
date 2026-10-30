@@ -29,6 +29,11 @@ void main() {
       expect(AppColors.brandGradient.colors, [AquaEmerald.aqua, AquaEmerald.emerald]);
     });
 
+    test('the action gradient follows the theme (light deep, dark bright)', () {
+      expect(AppColors.light.cta.colors, AppColors.ctaGradient.colors);
+      expect(AppColors.dark.cta.colors, [AquaEmerald.primaryDark, AquaEmerald.emeraldLight]);
+    });
+
     test('CTA gradient is the deep pair, so a white label still reads', () {
       for (final stop in AppColors.ctaGradient.colors) {
         expect(contrast(Colors.white, stop), greaterThanOrEqualTo(4.5),
@@ -40,6 +45,20 @@ void main() {
   group('light theme contrast', () {
     final c = AppColors.light;
     final bg = c.backgroundStart;
+
+    /// Aurora ka sabse gehra rendered point (screen ke bottom me radial blobs
+    /// base wash ke upar stack hote hain, isliye token se ~30 luminance neeche
+    /// jaata hai). Ye number `home_light.png` golden se measure kiya gaya hai —
+    /// sirf `backgroundStart` par test karna wahi bug chhupa deta tha jo audit
+    /// me mila (brandInk wahan 4.3:1 tak gir raha tha).
+    const auroraFloor = Color(0xFFB9E1D2);
+
+    test('tokens still clear AA at the darkest aurora point', () {
+      expect(contrast(c.textPrimary, auroraFloor), greaterThanOrEqualTo(7));
+      expect(contrast(c.textSecondary, auroraFloor), greaterThanOrEqualTo(4.5));
+      expect(contrast(c.brandInk, auroraFloor), greaterThanOrEqualTo(4.5),
+          reason: 'brandInk hi buttons/icons/chips ka ink hai');
+    });
 
     test('text tokens clear AA on the aurora wash', () {
       expect(contrast(c.textPrimary, bg), greaterThanOrEqualTo(7));
@@ -102,6 +121,34 @@ void main() {
     });
   });
 
+  group('glass separation', () {
+    /// Light mode ka asli defect: card aur background ka luminance gap itna
+    /// kam tha ki card sirf apni shadow se dikhta tha. Ab card ka fill
+    /// (sabse dark bg par sabse bright corner) clearly float karta hai.
+    test('a light glass card lifts off the darkest wash', () {
+      const floor = Color(0xFFB9E1D2);
+      final cardTop = Color.alphaBlend(
+          AquaEmerald.glassWhite.withValues(alpha: GlassTokens.light.fillTop), floor);
+      final delta = (cardTop.computeLuminance() - floor.computeLuminance()) * 255;
+      expect(delta, greaterThan(18), reason: 'ΔLum ${delta.toStringAsFixed(1)} — card ghus raha hai');
+    });
+
+    test('the shadow is quieter than the surface it lifts', () {
+      // Shadow alpha bada ho to card ke neeche grey band banta hai (purana bug).
+      final g = GlassTokens.light;
+      expect(g.shadowAlpha + g.shadowAlphaTight, lessThan(.16));
+      expect(g.blurSigma, greaterThanOrEqualTo(24));
+    });
+  });
+
+  group('dark theme ink', () {
+    test('error text clears AA on dark glass (#F87171 fails at 3.7:1)', () {
+      const darkGlass = Color(0xFF22473A); // measured dark card
+      expect(contrast(AppColors.dark.errorInk, darkGlass), greaterThanOrEqualTo(4.5));
+      expect(contrast(AppColors.dark.errorInk, AppColors.dark.backgroundStart), greaterThanOrEqualTo(4.5));
+    });
+  });
+
   group('theme wiring', () {
     test('both extensions are installed and the scaffold matches the wash', () {
       for (final (scheme, colors) in [
@@ -137,6 +184,19 @@ void main() {
       ));
       expect(find.text('₹1,24,500'), findsOneWidget);
       expect(find.byType(ShaderMask), findsOneWidget);
+    });
+
+    testWidgets('GradientFab paints the CTA gradient, not a Material FAB', (t) async {
+      await t.pumpWidget(MaterialApp(
+        theme: AppTheme.build(AppTheme.lightScheme),
+        home: Scaffold(
+          body: const SizedBox.expand(),
+          floatingActionButton: GradientFab(icon: Icons.add, label: 'New shop', onPressed: () {}),
+        ),
+      ));
+      expect(find.text('New shop'), findsOneWidget);
+      expect(find.byType(FloatingActionButton), findsNothing);
+      expect(t.takeException(), isNull);
     });
 
     testWidgets('aurora background hosts content without exceptions', (t) async {
