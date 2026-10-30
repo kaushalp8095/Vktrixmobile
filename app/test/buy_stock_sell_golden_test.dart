@@ -6,6 +6,7 @@ import 'package:mobile_shop/screens/buy_form.dart';
 import 'package:mobile_shop/screens/sell_form.dart';
 import 'package:mobile_shop/screens/stock.dart';
 import 'showcase_golden_test.dart' show loadFonts;
+import 'support/golden_shadows.dart';
 
 final _stock = [
   {'id': 1, 'brand': 'Apple', 'model': 'iPhone 13', 'ram': '4GB', 'storage': '128GB', 'condition': 'Excellent', 'buy_price': 31000, 'buy_date': '2026-09-28', 'imei': '353328111234561'},
@@ -14,6 +15,7 @@ final _stock = [
 ];
 
 void main() {
+  setUpAll(useRealShadows);
   final cases = <String, Widget Function(bool dark)>{
     'buy': (dark) => MaterialApp(debugShowCheckedModeBanner: false,
         theme: AppTheme.build(dark ? AppTheme.darkScheme : AppTheme.lightScheme),

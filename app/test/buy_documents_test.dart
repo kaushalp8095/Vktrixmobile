@@ -10,6 +10,7 @@ import 'package:mobile_shop/design/components/components.dart';
 import 'package:mobile_shop/design/design.dart';
 import 'package:mobile_shop/screens/buy_form.dart';
 import 'showcase_golden_test.dart' show loadFonts;
+import 'support/golden_shadows.dart';
 
 final _jpeg = img.encodeJpg(img.Image(width: 160, height: 100));
 
@@ -55,6 +56,7 @@ Future<void> _chooseSource(WidgetTester t, int side, {bool camera = false}) asyn
 }
 
 void main() {
+  setUpAll(useRealShadows);
   test('storage and colour suggestions include requested variants', () {
     expect(kDefaultStorageOptions, contains('2TB'));
     expect(kDefaultStorageOptions, contains('Others'));

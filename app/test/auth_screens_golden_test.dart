@@ -4,8 +4,10 @@ import 'package:mobile_shop/design/design.dart';
 import 'package:mobile_shop/screens/login.dart';
 import 'package:mobile_shop/screens/splash.dart';
 import 'showcase_golden_test.dart' show loadFonts;
+import 'support/golden_shadows.dart';
 
 void main() {
+  setUpAll(useRealShadows);
   final screens = <String, Widget Function()>{
     'splash': () => const SplashScreen(autoRoute: false),
     'login': () => const LoginScreen(),
