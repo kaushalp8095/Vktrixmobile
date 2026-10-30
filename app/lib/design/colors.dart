@@ -17,12 +17,15 @@ abstract final class AquaEmerald {
   static const emerald = Color(0xFF39B54A);
   static const aquaLight = Color(0xFF7DD3F2);
   static const emeraldLight = Color(0xFF6FDC86);
-  static const aquaDeep = Color(0xFF0A6E93);
+  /// Text/icon ink. 2026-10 audit: wash thoda gehra hua, isliye aquaDeep bhi
+  /// ek shade neeche gaya — ab sabse gehere point (screen bottom) par bhi
+  /// 4.6:1+, aur white 6.6:1. (#0A6E93 pe ye 4.0:1 tak gir jaata tha.)
+  static const aquaDeep = Color(0xFF096481);
   static const emeraldDeep = Color(0xFF12735A);
   /// Hero gradient ke stops: deep se thode brighter, par 36px text par bhi
-  /// 3:1 (large-text AA) se upar — 3.7:1 / 4.0:1 on the wash.
-  static const heroAqua = Color(0xFF0C86B4);
-  static const heroEmerald = Color(0xFF1E8A46);
+  /// 3:1 (large-text AA) se upar — deep wash par 3.3:1 / 3.2:1.
+  static const heroAqua = Color(0xFF0B7BA8);
+  static const heroEmerald = Color(0xFF1B8443);
 
   // Brand
   static const primaryLight = Color(0xFF0C7FA8); // 4.55:1 with white
@@ -33,12 +36,18 @@ abstract final class AquaEmerald {
   static const onPrimaryDark = Color(0xFF06232E); // 8.4:1 on primaryDark
   static const accentLight = Color(0xFF29ABE2);
   static const accentDark = Color(0xFF7DD3F2);
-  static const secondaryLight = Color(0xFF1C8F4B); // emerald, text-safe
+  /// Emerald secondary. 2026-10 audit: #1C8F4B glass card par sirf 3.4:1 tha
+  /// ("text-safe" comment galat tha). Deepened — 4.6:1 card par, 5.4:1 white.
+  static const secondaryLight = Color(0xFF127A3E);
   static const secondaryDark = Color(0xFF4ED97A);
 
   // Neutrals — base has a faint aqua cast so glass reads cool, not grey.
-  static const backgroundLight = Color(0xFFEAF5FB);
-  static const backgroundLightEnd = Color(0xFFE8F5EF); // green-leaning bottom
+  /// Aurora base wash. 2026-10 audit: pehla wash (#EAF5FB → #E8F5EF) itna
+  /// halka tha ki light mode me glass card aur background ka luminance gap
+  /// sirf +18 tha — card edge sirf shadow se dikhta tha. Ab wash ~11 shade
+  /// gehra hai, isliye card apne fill se hi float karta hai (ΔLum ~+21..+40).
+  static const backgroundLight = Color(0xFFDFEFF2);
+  static const backgroundLightEnd = Color(0xFFDDEFE6); // green-leaning bottom
   static const backgroundDark = Color(0xFF050C10);
   static const backgroundDarkEnd = Color(0xFF07120F);
   static const surfaceLight = Color(0xFFFFFFFF);
@@ -60,6 +69,9 @@ abstract final class AquaEmerald {
   static const warningDark = Color(0xFFFBBF24);
   static const errorLight = Color(0xFFDC2626);
   static const errorDark = Color(0xFFF87171);
+  /// Error **text** on dark glass. #F87171 card par sirf 3.7:1 deta hai
+  /// (chhota text AA fail) — icon/fill ke liye wahi rehta hai, text ke liye ye.
+  static const errorInkDark = Color(0xFFFCA5A5); // 5.5:1 on dark glass
 
   // Base glass/scrim pigments (alpha applied in GlassTokens only)
   static const glassWhite = Color(0xFFFFFFFF);
@@ -103,7 +115,7 @@ class AppColors extends ThemeExtension<AppColors> {
     textSecondary: AquaEmerald.inkLight.withValues(alpha: AquaEmerald.textSecondaryAlphaLight),
     accent: AquaEmerald.aqua,
     accentAlt: AquaEmerald.emerald,
-    brandInk: AquaEmerald.aquaDeep, // #0A6E93: 5.7:1 on white, 5.3:1 on the wash
+    brandInk: AquaEmerald.aquaDeep, // #096481: 6.6:1 on white, 4.7:1 on the deepest wash
     success: AquaEmerald.successLight, warning: AquaEmerald.warningLight, error: AquaEmerald.errorLight,
     successInk: AquaEmerald.ink(AquaEmerald.successLight, AquaEmerald.inkLight, .30), // 5.0:1+
     warningInk: AquaEmerald.ink(AquaEmerald.warningLight, AquaEmerald.inkLight, .35),
@@ -111,7 +123,7 @@ class AppColors extends ThemeExtension<AppColors> {
     focusRing: AquaEmerald.primaryLight, // 4.2:1 on glass
     backgroundStart: AquaEmerald.backgroundLight, backgroundEnd: AquaEmerald.backgroundLightEnd,
     shadowTint: AquaEmerald.shadowTint, glowTint: AquaEmerald.aqua,
-    // Bright pair 36px par sirf 2.5:1 deta hai; hero pair 3.7:1 / 4.0:1 —
+    // Bright pair 36px par sirf 2.5:1 deta hai; hero pair 3.3:1 / 3.3:1 —
     // bada number hote hue bhi brand ka rang bacha rehta hai.
     textGradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight,
       colors: [AquaEmerald.heroAqua, AquaEmerald.heroEmerald]),
@@ -124,7 +136,7 @@ class AppColors extends ThemeExtension<AppColors> {
     accentAlt: AquaEmerald.emeraldLight,
     brandInk: AquaEmerald.primaryDark,
     success: AquaEmerald.successDark, warning: AquaEmerald.warningDark, error: AquaEmerald.errorDark,
-    successInk: AquaEmerald.successDark, warningInk: AquaEmerald.warningDark, errorInk: AquaEmerald.errorDark,
+    successInk: AquaEmerald.successDark, warningInk: AquaEmerald.warningDark, errorInk: AquaEmerald.errorInkDark,
     focusRing: AquaEmerald.aquaLight,
     backgroundStart: AquaEmerald.backgroundDark, backgroundEnd: AquaEmerald.backgroundDarkEnd,
     shadowTint: AquaEmerald.shadowTint, glowTint: AquaEmerald.aqua,
@@ -146,6 +158,14 @@ class AppColors extends ThemeExtension<AppColors> {
     begin: Alignment.topLeft, end: Alignment.bottomRight,
     colors: [AquaEmerald.aquaDeep, AquaEmerald.emeraldDeep],
   );
+
+  /// Theme-aware action gradient. Light theme = deep pair (white label
+  /// 5.7:1+), dark theme = bright pair (dark label 8.5:1+). PrimaryButton,
+  /// gradient FAB aur progress bars — sab ek hi rasta.
+  LinearGradient get cta => backgroundStart.computeLuminance() < .2
+      ? const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight,
+          colors: [AquaEmerald.primaryDark, AquaEmerald.emeraldLight])
+      : ctaGradient;
 
   @override
   AppColors copyWith() => this;

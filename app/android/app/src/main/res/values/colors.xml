@@ -3,6 +3,6 @@
      backgroundStart/End se match karte hain, taaki launcher se pehli frame tak
      koi grey/white flash na dikhe. -->
 <resources>
-    <color name="launch_bg_start">#EAF5FB</color>
-    <color name="launch_bg_end">#E8F5EF</color>
+    <color name="launch_bg_start">#DFEFF2</color>
+    <color name="launch_bg_end">#DDEFE6</color>
 </resources>
