@@ -1,6 +1,7 @@
-// GlassSurface: the single glass recipe (blur → white gradient fill → optional scrim →
+// GlassSurface: the single glass recipe.
+// backdrop blur → diagonal white/tinted fill → specular sheen → optional scrim
+// → top-lit gradient rim → soft aqua shadow (light) / brand glow (dark).
 import 'dart:ui' show ImageFilter;
-// top-lit gradient border → dark-mode inner highlight). Light: bottom-right shadow; dark: glow.
 import 'package:flutter/material.dart';
 import '../design.dart';
 
@@ -10,10 +11,10 @@ class GlassSurface extends StatelessWidget {
   final EdgeInsetsGeometry padding;
   /// Real backdrop blur. Keep ≤3 blurred nodes per screen; set false for nested glass.
   final bool blur;
-  /// Adds the theme text scrim (black 10% / 38%) for guaranteed text contrast.
+  /// Adds the theme text scrim (black 4% / 30%) for guaranteed text contrast.
   final bool scrim;
   final bool elevated;
-  /// Multiplies border alpha (1 = rest .22, ~1.55 = pressed .34).
+  /// Multiplies border alpha (1 = rest, ~1.5 = pressed).
   final double borderBoost;
   /// Extra white fill (0..1 of max) used by scroll-linked bars.
   final double fillFactor;
@@ -32,16 +33,15 @@ class GlassSurface extends StatelessWidget {
     Widget body = CustomPaint(
       foregroundPainter: _GlassEdgePainter(radius: radius, tokens: g, boost: borderBoost),
       child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: br,
-          gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [
-            IndigoMint.glassWhite.withValues(alpha: g.fillTop * fillFactor),
-            IndigoMint.glassWhite.withValues(alpha: g.fillBottom * fillFactor),
-          ]),
-        ),
+        decoration: BoxDecoration(borderRadius: br, gradient: _fill(g, fillFactor)),
         child: DecoratedBox(
-          decoration: BoxDecoration(borderRadius: br, color: scrim ? g.scrim : Colors.transparent),
-          child: Padding(padding: padding, child: child),
+          // Specular sheen sits above the fill but below content, so text never
+          // loses contrast while the card still catches "light".
+          decoration: BoxDecoration(borderRadius: br, gradient: g.sheen),
+          child: DecoratedBox(
+            decoration: BoxDecoration(borderRadius: br, color: scrim ? g.scrim : Colors.transparent),
+            child: Padding(padding: padding, child: child),
+          ),
         ),
       ),
     );
@@ -54,6 +54,17 @@ class GlassSurface extends StatelessWidget {
         ? CustomPaint(painter: _OuterShadowPainter(radius: radius, shadows: g.elevation), child: body)
         : body;
   }
+
+  LinearGradient _fill(GlassTokens g, double factor) => LinearGradient(
+        begin: Alignment.topLeft, end: Alignment.bottomRight,
+        colors: [
+          AquaEmerald.glassWhite.withValues(alpha: (g.fillTop * factor).clamp(0, 1)),
+          Color.alphaBlend(
+            AquaEmerald.glassWhite.withValues(alpha: (g.fillBottom * factor).clamp(0, 1)),
+            g.tint.withValues(alpha: g.tintAlpha),
+          ),
+        ],
+      );
 }
 
 class _GlassEdgePainter extends CustomPainter {
@@ -65,13 +76,15 @@ class _GlassEdgePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
     final rr = RRect.fromRectAndRadius(rect.deflate(.5), Radius.circular(radius));
+    // Rim brightness is a fraction of the theme's resting border alpha, so the
+    // press animation (boost) keeps working regardless of theme.
     final k = boost * tokens.borderAlpha / GlassTokens.light.borderAlpha;
     canvas.drawRRect(rr, Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1
       ..shader = LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [
-        IndigoMint.glassWhite.withValues(alpha: (tokens.borderHighlightStart * k).clamp(0, 1)),
-        IndigoMint.glassWhite.withValues(alpha: (tokens.borderHighlightEnd * k).clamp(0, 1)),
+        AquaEmerald.glassWhite.withValues(alpha: (tokens.borderHighlightStart * k).clamp(0, 1)),
+        AquaEmerald.glassWhite.withValues(alpha: (tokens.borderHighlightEnd * k).clamp(0, 1)),
       ]).createShader(rect));
     if (tokens.innerHighlightAlpha > 0) {
       // 1dp inner top highlight (dark theme), fading out toward the sides.
@@ -79,9 +92,9 @@ class _GlassEdgePainter extends CustomPainter {
       canvas.drawLine(Offset(inset, y), Offset(size.width - inset, y), Paint()
         ..strokeWidth = 1
         ..shader = LinearGradient(colors: [
-          IndigoMint.glassWhite.withValues(alpha: 0),
-          IndigoMint.glassWhite.withValues(alpha: tokens.innerHighlightAlpha),
-          IndigoMint.glassWhite.withValues(alpha: 0),
+          AquaEmerald.glassWhite.withValues(alpha: 0),
+          AquaEmerald.glassWhite.withValues(alpha: tokens.innerHighlightAlpha),
+          AquaEmerald.glassWhite.withValues(alpha: 0),
         ]).createShader(Rect.fromLTWH(inset, 0, size.width - inset * 2, 2)));
     }
   }

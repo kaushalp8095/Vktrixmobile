@@ -1,7 +1,7 @@
 # Buy form: variants and document photos
 
 - RAM, Storage and Color still accept typed values and server-provided options.
-  Their sheets now use the Indigo/Mint theme in both light and dark modes, show
+  Their sheets now use the Aqua/Emerald theme in both light and dark modes, show
   the current selection, and include an explicit close button.
 - Document front and back have independent camera/gallery, replace, remove and
   zoom-preview controls. Either single side or both sides can be saved. Existing

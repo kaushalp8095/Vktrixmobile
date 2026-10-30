@@ -1,5 +1,5 @@
 // Logout popup: shop side aur Super Admin side — dono ek hi reusable dialog
-// (Indigo/Mint ConfirmDialogCard) use karte hain, aur logout sirf confirm ke baad
+// (Aqua/Emerald ConfirmDialogCard) use karte hain, aur logout sirf confirm ke baad
 // hota hai. "Stay logged in" dabane par screen wahi rehni chahiye.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';

@@ -176,7 +176,8 @@ class _DashboardState extends State<Dashboard> {
               GlassCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('Stock value', style: t.labelLarge?.copyWith(color: c.textSecondary)),
                 const SizedBox(height: Space.x4),
-                Text(rs(_s!['stock']['value']), style: t.displaySmall?.copyWith(color: c.brandInk)),
+                // Ek hi gradient number per screen — yahi "hero" hai.
+                GradientText(rs(_s!['stock']['value']), style: t.displaySmall),
                 const SizedBox(height: Space.x8),
                 Wrap(spacing: Space.x8, children: [
                   StatusChip(label: '${_s!['stock']['count']} in stock', tone: ChipTone.brand, icon: Icons.smartphone_outlined),

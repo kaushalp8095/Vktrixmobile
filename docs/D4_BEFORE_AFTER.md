@@ -1,6 +1,6 @@
 # D4 — Before → After rationale
 
-Old app (v1, functional Material default) vs redesigned app (Indigo Mint design system).
+Old app (v1, functional Material default) vs redesigned app (design system — originally Indigo Mint, since v1.0.0.20788 **Aqua Emerald**).
 Git history shows both: pre-redesign code is in commits up to `2718b79`; redesign starts at `a7b5053`.
 
 Every change below traces to the design brief's locked tokens (D1) and components (D2) — no new color,
@@ -12,7 +12,7 @@ spacing, or timing was invented while redesigning screens (D3).
 
 | Before | After | Why |
 |---|---|---|
-| Default Material theme, Roboto, scaffold grays | Indigo Mint tokens, Manrope 400–800, aurora background | Brand identity + calmer reading; aurora uses radial gradients (zero real-blur cost) |
+| Default Material theme, Roboto, scaffold grays | Aqua Emerald tokens, Manrope 400–800, aurora background | Brand identity + calmer reading; aurora uses radial gradients (zero real-blur cost) |
 | Flat white/colored cards | One glass recipe (GlassSurface) everywhere | One physics model for the whole UI: blur ≤3 nodes/screen, translucent fill, hairline gradient border |
 | Instant/snappy system curves | 4 springs (micro/emphasis/standard/slow) + 320/200ms shared-axis nav | Motion now communicates cause → effect (tap → press, save → success) instead of decoration |
 | `Colors.green/red/orange` ad hoc | `ChipTone` statuses: 12% fill, 24% border, dark ink + icon | Status never relies on color alone (color-blind safe); measured AA contrast |

@@ -1,4 +1,4 @@
-// GLASS DIALOG: `AlertDialog` ki jagah ek hi Indigo/Mint shell — form aur
+// GLASS DIALOG: `AlertDialog` ki jagah ek hi Aqua/Emerald glass shell — form aur
 // message, dono ke liye. Chrome wahi hai jo `ConfirmDialogCard` ka hai: brand
 // hairline → icon disc + title → message → body → footer. Confirm dialogs aur
 // form dialogs ek hi tarah dikhein, isliye dono yahin se bante hain.
@@ -12,7 +12,7 @@ import '../design.dart';
 
 Color _scrim(BuildContext context) {
   final dark = Theme.of(context).brightness == Brightness.dark;
-  return IndigoMint.scrimBlack.withValues(alpha: dark ? .66 : .44);
+  return AquaEmerald.scrimBlack.withValues(alpha: dark ? .66 : .44);
 }
 
 /// Card ka dhaancha — header + optional body + footer. Footer caller banata hai
@@ -53,7 +53,7 @@ class GlassDialogCard extends StatelessWidget {
                 shape: RoundedRectangleBorder(borderRadius: Shapes.xl,
                     side: BorderSide(color: c.textPrimary.withValues(alpha: .08))),
                 child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  // 4dp brand hairline: Indigo → Mint.
+                  // 4dp brand hairline: aqua → emerald.
                   Container(height: 4, decoration: const BoxDecoration(gradient: AppColors.brandGradient)),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(Space.x24, Space.x24, Space.x24, 0),

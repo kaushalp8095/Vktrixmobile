@@ -38,7 +38,7 @@ void _routeToLogin() {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
   @override
-  Widget build(BuildContext context) => IndigoMintTheme(
+  Widget build(BuildContext context) => AquaEmeraldTheme(
         builder: (light, dark) => ValueListenableBuilder<ThemeMode>(
           valueListenable: themeMode,
           builder: (context, mode, _) => MaterialApp(
