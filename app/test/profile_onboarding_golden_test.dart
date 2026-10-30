@@ -7,10 +7,8 @@ import 'package:mobile_shop/screens/onboarding.dart';
 import 'package:mobile_shop/screens/profile.dart';
 import 'fixtures/logo.dart';
 import 'showcase_golden_test.dart' show loadFonts;
-import 'support/golden_shadows.dart';
 
 void main() {
-  setUpAll(useRealShadows);
   setUpAll(() {
     SharedPreferences.setMockInitialValues({});
     // Profile card ka asli roop: shop ka auto-adjusted logo.

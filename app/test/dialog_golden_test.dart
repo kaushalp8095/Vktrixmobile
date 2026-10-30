@@ -7,7 +7,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_shop/design/components/components.dart';
 import 'package:mobile_shop/design/design.dart';
 import 'showcase_golden_test.dart' show loadFonts;
-import 'support/golden_shadows.dart';
 
 Widget _app(bool dark, {required bool form}) => MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -56,7 +55,6 @@ Widget _app(bool dark, {required bool form}) => MaterialApp(
     );
 
 void main() {
-  setUpAll(useRealShadows);
   for (final form in [true, false]) {
     for (final dark in [false, true]) {
       final kind = form ? 'dialog_form' : 'dialog_confirm';

@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_shop/design/design.dart';
 import 'package:mobile_shop/design/showcase.dart';
-import 'support/golden_shadows.dart';
 
 Future<void> loadFonts() async {
   final l = FontLoader('Manrope');
@@ -18,7 +17,6 @@ Future<void> loadFonts() async {
 }
 
 void main() {
-  setUpAll(useRealShadows);
   testWidgets('showcase', (t) async {
     await loadFonts();
     t.view.physicalSize = const Size(1080, 7600);

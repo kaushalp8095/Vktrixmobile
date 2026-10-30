@@ -3,10 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_shop/design/components_gallery.dart';
 import 'package:mobile_shop/design/design.dart';
 import 'showcase_golden_test.dart' show loadFonts;
-import 'support/golden_shadows.dart';
 
 void main() {
-  setUpAll(useRealShadows);
   for (final dark in [false, true]) {
     testWidgets('components ${dark ? 'dark' : 'light'}', (t) async {
       await loadFonts();

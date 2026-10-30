@@ -8,7 +8,6 @@ import 'package:mobile_shop/screens/sales.dart';
 import 'package:mobile_shop/screens/ledger.dart';
 import 'fixtures/logo.dart';
 import 'showcase_golden_test.dart' show loadFonts;
-import 'support/golden_shadows.dart';
 
 final _sales = [
   {'id': 11, 'brand': 'Samsung', 'model': 'Galaxy S23', 'ram': '8GB', 'storage': '256GB', 'imei': '351122334455667',
@@ -69,7 +68,6 @@ final _shops = [
 ];
 
 void main() {
-  setUpAll(useRealShadows);
   final cases = <String, Widget Function(bool)>{
     'sales': (dark) => MaterialApp(debugShowCheckedModeBanner: false,
         theme: AppTheme.build(dark ? AppTheme.darkScheme : AppTheme.lightScheme),

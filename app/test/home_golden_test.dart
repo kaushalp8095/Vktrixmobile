@@ -5,7 +5,6 @@ import 'package:mobile_shop/design/design.dart';
 import 'package:mobile_shop/screens/dashboard.dart';
 import 'fixtures/logo.dart';
 import 'showcase_golden_test.dart' show loadFonts;
-import 'support/golden_shadows.dart';
 
 const _summary = {
   'purchases': {'count': 3, 'amount': 42500},
@@ -38,7 +37,6 @@ void _noop(int _) {}
 void _noopInt(int _) {}
 
 void main() {
-  setUpAll(useRealShadows);
   for (final dark in [false, true]) {
     testWidgets('home ${dark ? 'dark' : 'light'}', (t) async {
       await loadFonts();
