@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dark-mode launch wash: app ka dark aurora base. -->
+<resources>
+    <color name="launch_bg_start">#050C10</color>
+    <color name="launch_bg_end">#07120F</color>
+</resources>

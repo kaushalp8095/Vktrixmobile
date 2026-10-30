@@ -10,47 +10,48 @@ import 'typography.dart';
 abstract final class AppTheme {
   static const lightScheme = ColorScheme(
     brightness: Brightness.light,
-    primary: IndigoMint.primaryLight, onPrimary: IndigoMint.onPrimaryLight,
-    primaryContainer: IndigoMint.primaryContainerLight, onPrimaryContainer: IndigoMint.primaryContainerDark,
-    secondary: IndigoMint.accentLight, onSecondary: IndigoMint.inkLight,
-    secondaryContainer: IndigoMint.surfaceVariantLight, onSecondaryContainer: IndigoMint.inkLight,
-    tertiary: IndigoMint.accentLight, onTertiary: IndigoMint.inkLight,
-    error: IndigoMint.errorLight, onError: IndigoMint.onPrimaryLight,
-    surface: IndigoMint.backgroundLight, onSurface: IndigoMint.inkLight,
-    surfaceContainerLowest: IndigoMint.surfaceLight, surfaceContainerLow: IndigoMint.surfaceLight,
-    surfaceContainer: IndigoMint.surfaceLight, surfaceContainerHigh: IndigoMint.surfaceVariantLight,
-    surfaceContainerHighest: IndigoMint.surfaceVariantLight,
-    onSurfaceVariant: Color(0x9E0E1116), // ink @62%
-    outline: IndigoMint.outlineLight, outlineVariant: IndigoMint.surfaceVariantLight,
-    inverseSurface: IndigoMint.surfaceDark, onInverseSurface: IndigoMint.inkDark, inversePrimary: IndigoMint.primaryDark,
-    shadow: IndigoMint.scrimBlack, scrim: IndigoMint.scrimBlack, surfaceTint: Colors.transparent,
+    primary: AquaEmerald.primaryLight, onPrimary: AquaEmerald.onPrimaryLight,
+    primaryContainer: AquaEmerald.primaryContainerLight, onPrimaryContainer: AquaEmerald.primaryContainerDark,
+    secondary: AquaEmerald.secondaryLight, onSecondary: AquaEmerald.onPrimaryLight,
+    secondaryContainer: AquaEmerald.primaryContainerLight, onSecondaryContainer: AquaEmerald.emeraldDeep,
+    tertiary: AquaEmerald.accentLight, onTertiary: AquaEmerald.inkLight,
+    error: AquaEmerald.errorLight, onError: AquaEmerald.onPrimaryLight,
+    surface: AquaEmerald.backgroundLight, onSurface: AquaEmerald.inkLight,
+    surfaceContainerLowest: AquaEmerald.surfaceLight, surfaceContainerLow: AquaEmerald.surfaceLight,
+    surfaceContainer: AquaEmerald.surfaceLight, surfaceContainerHigh: AquaEmerald.surfaceVariantLight,
+    surfaceContainerHighest: AquaEmerald.surfaceVariantLight,
+    onSurfaceVariant: Color(0x9E0A1519), // ink @62%
+    outline: AquaEmerald.outlineLight, outlineVariant: AquaEmerald.surfaceVariantLight,
+    inverseSurface: AquaEmerald.surfaceDark, onInverseSurface: AquaEmerald.inkDark, inversePrimary: AquaEmerald.primaryDark,
+    shadow: AquaEmerald.shadowTint, scrim: AquaEmerald.scrimBlack, surfaceTint: Colors.transparent,
   );
 
   static const darkScheme = ColorScheme(
     brightness: Brightness.dark,
-    primary: IndigoMint.primaryDark, onPrimary: IndigoMint.onPrimaryDark,
-    primaryContainer: IndigoMint.primaryContainerDark, onPrimaryContainer: IndigoMint.primaryContainerLight,
-    secondary: IndigoMint.accentDark, onSecondary: IndigoMint.backgroundDark,
-    secondaryContainer: IndigoMint.surfaceVariantDark, onSecondaryContainer: IndigoMint.inkDark,
-    tertiary: IndigoMint.accentDark, onTertiary: IndigoMint.backgroundDark,
-    error: IndigoMint.errorDark, onError: IndigoMint.backgroundDark,
-    surface: IndigoMint.backgroundDark, onSurface: IndigoMint.inkDark,
-    surfaceContainerLowest: IndigoMint.backgroundDark, surfaceContainerLow: IndigoMint.surfaceDark,
-    surfaceContainer: IndigoMint.surfaceDark, surfaceContainerHigh: IndigoMint.surfaceVariantDark,
-    surfaceContainerHighest: IndigoMint.surfaceVariantDark,
-    onSurfaceVariant: Color(0xADF2F5F9), // ink @68%
-    outline: IndigoMint.outlineDark, outlineVariant: IndigoMint.surfaceVariantDark,
-    inverseSurface: IndigoMint.surfaceLight, onInverseSurface: IndigoMint.inkLight, inversePrimary: IndigoMint.primaryLight,
-    shadow: IndigoMint.scrimBlack, scrim: IndigoMint.scrimBlack, surfaceTint: Colors.transparent,
+    primary: AquaEmerald.primaryDark, onPrimary: AquaEmerald.onPrimaryDark,
+    primaryContainer: AquaEmerald.primaryContainerDark, onPrimaryContainer: AquaEmerald.primaryContainerLight,
+    secondary: AquaEmerald.secondaryDark, onSecondary: AquaEmerald.backgroundDark,
+    secondaryContainer: AquaEmerald.surfaceVariantDark, onSecondaryContainer: AquaEmerald.inkDark,
+    tertiary: AquaEmerald.accentDark, onTertiary: AquaEmerald.backgroundDark,
+    error: AquaEmerald.errorDark, onError: AquaEmerald.backgroundDark,
+    surface: AquaEmerald.backgroundDark, onSurface: AquaEmerald.inkDark,
+    surfaceContainerLowest: AquaEmerald.backgroundDark, surfaceContainerLow: AquaEmerald.surfaceDark,
+    surfaceContainer: AquaEmerald.surfaceDark, surfaceContainerHigh: AquaEmerald.surfaceVariantDark,
+    surfaceContainerHighest: AquaEmerald.surfaceVariantDark,
+    onSurfaceVariant: Color(0xADEEF6F9), // ink @68%
+    outline: AquaEmerald.outlineDark, outlineVariant: AquaEmerald.surfaceVariantDark,
+    inverseSurface: AquaEmerald.surfaceLight, onInverseSurface: AquaEmerald.inkLight, inversePrimary: AquaEmerald.primaryLight,
+    shadow: AquaEmerald.shadowTint, scrim: AquaEmerald.scrimBlack, surfaceTint: Colors.transparent,
   );
 
-  /// Brand-clamp: take ONLY background/surface/outline from the system (Android 12+),
-  /// keep primary/accent/semantic as Indigo Mint.
-  static ColorScheme clamp(ColorScheme brand, ColorScheme? system) => system == null ? brand : brand.copyWith(
-        surface: system.surface, surfaceContainerLowest: system.surfaceContainerLowest,
-        surfaceContainerLow: system.surfaceContainerLow, surfaceContainer: system.surfaceContainer,
-        surfaceContainerHigh: system.surfaceContainerHigh, surfaceContainerHighest: system.surfaceContainerHighest,
-        outline: system.outline, outlineVariant: system.outlineVariant);
+  /// Brand-lock. Pehle yahan Material You (Android 12+) ke surfaces adopt karte the.
+  /// Aqua/Emerald theme ke saath wo galat lagta hai: system ka wallpaper se aaya
+  /// grey/purple surface aur brand ka aqua/emerald aurora aapas me ladte hain aur
+  /// glass ka tint bhi badal jata hai. Isliye ab **poore app ka palette locked**
+  /// hai (backend/PDF/logo tiles se match karta hua) — sirf `outline` system se
+  /// aata hai taaki high-contrast accessibility settings respect hon.
+  static ColorScheme clamp(ColorScheme brand, ColorScheme? system) =>
+      system == null ? brand : brand.copyWith(outline: system.outline);
 
   static ThemeData build(ColorScheme scheme, {bool blur = true}) {
     final dark = scheme.brightness == Brightness.dark;
@@ -60,7 +61,9 @@ abstract final class AppTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
-      scaffoldBackgroundColor: scheme.surface,
+      // Pehla frame aurora se pehle paint hota hai — base wash ka start colour
+      // hi scaffold rakho, warna ek frame ke liye grey flash dikhta hai.
+      scaffoldBackgroundColor: c.backgroundStart,
       fontFamily: AppType.family,
       textTheme: text,
       extensions: [c, glass],
@@ -78,7 +81,7 @@ abstract final class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         isDense: false,
         filled: true,
-        fillColor: IndigoMint.glassWhite.withValues(alpha: glass.fillTop),
+        fillColor: AquaEmerald.glassWhite.withValues(alpha: glass.fillTop),
         contentPadding: const EdgeInsets.symmetric(horizontal: Space.x16, vertical: Space.x16),
         labelStyle: text.bodyMedium?.copyWith(color: c.textSecondary),
         floatingLabelStyle: text.labelSmall?.copyWith(color: c.brandInk),
@@ -112,10 +115,10 @@ abstract final class AppTheme {
 }
 
 /// Wrap MaterialApp with this: resolves dynamic colour (API 31+) with static fallback.
-class IndigoMintTheme extends StatelessWidget {
+class AquaEmeraldTheme extends StatelessWidget {
   final Widget Function(ThemeData light, ThemeData dark) builder;
   final bool blur;
-  const IndigoMintTheme({super.key, required this.builder, this.blur = true});
+  const AquaEmeraldTheme({super.key, required this.builder, this.blur = true});
   @override
   Widget build(BuildContext context) => DynamicColorBuilder(
         builder: (sysLight, sysDark) => builder(

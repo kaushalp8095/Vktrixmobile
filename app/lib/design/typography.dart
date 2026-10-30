@@ -5,9 +5,11 @@ abstract final class AppType {
   static const family = 'Manrope';
   static const _tabular = [FontFeature.tabularFigures()];
 
-  static const display = TextStyle(fontFamily: family, fontSize: 36, fontWeight: FontWeight.w800, height: 1.15, letterSpacing: -0.6, fontFeatures: _tabular);
-  static const headline = TextStyle(fontFamily: family, fontSize: 28, fontWeight: FontWeight.w600, height: 1.22, letterSpacing: -0.3);
-  static const title = TextStyle(fontFamily: family, fontSize: 21, fontWeight: FontWeight.w600, height: 1.30, letterSpacing: -0.1);
+  // Numbers ke liye tabular figures — jaisa hi paisa badle, digit ki width nahi
+  // badalti, isliye ledger/dashboard me amount "hilta" nahi hai.
+  static const display = TextStyle(fontFamily: family, fontSize: 36, fontWeight: FontWeight.w800, height: 1.10, letterSpacing: -0.9, fontFeatures: _tabular);
+  static const headline = TextStyle(fontFamily: family, fontSize: 28, fontWeight: FontWeight.w600, height: 1.20, letterSpacing: -0.45);
+  static const title = TextStyle(fontFamily: family, fontSize: 21, fontWeight: FontWeight.w600, height: 1.28, letterSpacing: -0.2);
   static const bodyLarge = TextStyle(fontFamily: family, fontSize: 16, fontWeight: FontWeight.w400, height: 1.45);
   static const bodyMedium = TextStyle(fontFamily: family, fontSize: 15, fontWeight: FontWeight.w400, height: 1.40);
   static const labelLarge = TextStyle(fontFamily: family, fontSize: 15, fontWeight: FontWeight.w600, height: 1.20, letterSpacing: 0.1);

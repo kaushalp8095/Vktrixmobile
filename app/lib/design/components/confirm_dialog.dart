@@ -1,4 +1,4 @@
-// CONFIRM DIALOG: ek hi reusable, Indigo/Mint se matched confirmation popup.
+// CONFIRM DIALOG: ek hi reusable, Aqua/Emerald glass shell wala confirmation popup.
 // Shop side aur Super Admin side — dono yahi use karte hain (logout, shop
 // deactivate, delete, support access). Buttons: safe action pehle, confirm baad me.
 //
@@ -11,7 +11,7 @@ import 'glass_dialog.dart';
 
 Color _scrim(BuildContext context) {
   final dark = Theme.of(context).brightness == Brightness.dark;
-  return IndigoMint.scrimBlack.withValues(alpha: dark ? .66 : .44);
+  return AquaEmerald.scrimBlack.withValues(alpha: dark ? .66 : .44);
 }
 
 /// Returns true only when the user chose the confirm action.

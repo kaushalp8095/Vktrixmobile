@@ -70,8 +70,8 @@ isliye ek shop dusri shop ka log nahi dekh sakta).
 
 `app/lib/design/components/confirm_dialog.dart`
 
-- `showConfirmDialog(...)` — generic Indigo/Mint confirmation. Structure: 4dp brand hairline
-  (Indigo→Mint) → icon disc (12% tint + 24% border) → title → message → identity chip → note →
+- `showConfirmDialog(...)` — generic Aqua/Emerald confirmation. Structure: 4dp brand hairline
+  (aqua→emerald) → icon disc (12% tint + 24% border) → title → message → identity chip → note →
   `[safe action] [confirm action]`. Enter: fade + scale .94→1 (320ms, `Curves2.enter`); reduced motion
   par instant. Barrier tap / back = cancel (`false`).
 - `showLogoutDialog(context, identity: ...)` — **Log out?** · *"You'll need your username and password

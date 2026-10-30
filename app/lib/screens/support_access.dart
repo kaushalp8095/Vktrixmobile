@@ -179,7 +179,7 @@ class _StartSupportDialogState extends State<_StartSupportDialog> {
   }
 }
 
-/// Time-limit ki gol chip (Indigo/Mint: 14% brand fill + brand border jab selected ho).
+/// Time-limit ki gol chip (Aqua/Emerald: 14% brand fill + brand border jab selected ho).
 class _DurationTile extends StatelessWidget {
   final String label; final bool selected; final VoidCallback onTap;
   const _DurationTile({required this.label, required this.selected, required this.onTap});

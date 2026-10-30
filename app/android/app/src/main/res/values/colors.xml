@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Aqua Emerald brand wash. Ye colours app ke design/colors.dart ke
+     backgroundStart/End se match karte hain, taaki launcher se pehli frame tak
+     koi grey/white flash na dikhe. -->
+<resources>
+    <color name="launch_bg_start">#EAF5FB</color>
+    <color name="launch_bg_end">#E8F5EF</color>
+</resources>

@@ -56,11 +56,25 @@ class _PrimaryButtonState extends State<PrimaryButton> with TickerProviderStateM
         ButtonPhase.loading => '${widget.label}, loading', ButtonPhase.success => '${widget.label}, done',
         ButtonPhase.error => '${widget.label}, failed, try again', ButtonPhase.idle => widget.label };
 
+  /// Gradient CTA — brand ke do stops, aur label ka colour theme se:
+  ///   light: deep aqua/emerald (white label par 5.7:1 / 5.1:1)
+  ///   dark : light aqua/emerald (dark label par 8.5:1 / 9.5:1)
+  /// Dono case me AA se upar. Gradient sirf primary action par — ek screen par
+  /// ek hi hota hai, isliye "hero" treatment spill nahi karta.
+  LinearGradient get _ctaGradient {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return dark
+        ? const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight,
+            colors: [AquaEmerald.primaryDark, AquaEmerald.emeraldLight])
+        : AppColors.ctaGradient;
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors, s = context.scheme;
     final fg = s.onPrimary;
-    final fill = widget.phase == ButtonPhase.success ? c.success : c.brandInk;
+    final success = widget.phase == ButtonPhase.success;
+    final disabled = widget.onPressed == null;
     return Semantics(
       button: true, enabled: _enabled, liveRegion: widget.phase != ButtonPhase.idle, label: _announce,
       excludeSemantics: true,
@@ -83,13 +97,25 @@ class _PrimaryButtonState extends State<PrimaryButton> with TickerProviderStateM
                   child: ConstrainedBox(
                     constraints: BoxConstraints(minWidth: w ?? 0, minHeight: _h),
                     child: Material(
-                      color: widget.onPressed == null ? s.onSurface.withValues(alpha: .12) : fill,
+                      // Gradient Material ke andar DecoratedBox se aata hai; Material
+                      // khud transparent rehta hai warna gradient chhup jata.
+                      color: disabled
+                          ? s.onSurface.withValues(alpha: .12)
+                          : (success ? c.success : Colors.transparent),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
                       clipBehavior: Clip.antiAlias,
-                      child: InkWell(
-                        onTap: _enabled ? () { Haptics.tap(); widget.onPressed!(); } : null,
-                        onHighlightChanged: _enabled ? (d) => _press.springTo(d ? 1 : 0, Springs.emphasis, Motion.of(context)) : null,
-                        child: Center(child: _content(fg, k)),
+                      // `Ink` (DecoratedBox nahi) — gradient Material ki apni
+                      // surface par paint hota hai, isliye InkWell ka splash
+                      // gradient ke **upar** dikhta hai (warna ripple chhup jata).
+                      child: Ink(
+                        decoration: BoxDecoration(
+                          gradient: disabled || success ? null : _ctaGradient,
+                          borderRadius: BorderRadius.circular(radius)),
+                        child: InkWell(
+                          onTap: _enabled ? () { Haptics.tap(); widget.onPressed!(); } : null,
+                          onHighlightChanged: _enabled ? (d) => _press.springTo(d ? 1 : 0, Springs.emphasis, Motion.of(context)) : null,
+                          child: Center(child: _content(fg, k)),
+                        ),
                       ),
                     ),
                   ),

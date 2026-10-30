@@ -1,5 +1,15 @@
-// AuroraBackground: base colour → 3 drifting brand blobs → 3% grain. Ambient loop
-// runs only while the app is RESUMED and is frozen under reduced motion.
+// AuroraBackground — app ka base wash (Oct 2026 "aurora glass" look).
+//
+// Layering, neeche se upar:
+//   1. vertical base wash (cool aqua-grey → green-leaning bottom)
+//   2. brand radial gradients — exactly the requested shape:
+//        circle at 50% 70%  rgba(41,171,226,0.20) → transparent 50%
+//        circle at 30% 30%  rgba(57,181,74, 0.20) → transparent 50%
+//   3. do chhote ambient bodies jo dheere dheere drift karte hain (glass ko
+//      hamesha kuch "peeche" chahiye warna blur nazar hi nahi aata)
+//   4. 3% grain — flat digital gradient ko photographic texture deta hai
+//
+// Drift sirf tab chalta hai jab app RESUMED ho aur reduced-motion off ho.
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -60,10 +70,15 @@ class _AuroraBackgroundState extends State<AuroraBackground> with SingleTickerPr
   @override
   Widget build(BuildContext context) {
     final s = context.scheme, c = context.colors;
+    final dark = s.brightness == Brightness.dark;
     return Stack(fit: StackFit.expand, children: [
       RepaintBoundary(child: CustomPaint(painter: _AuroraPainter(
-        time: _time, base: s.surface, primary: s.primary, accent: c.accent,
-        grain: _grain, grainOpacity: s.brightness == Brightness.dark ? .04 : .03))),
+        time: _time, start: c.backgroundStart, end: c.backgroundEnd,
+        aqua: AquaEmerald.aqua,
+        emerald: AquaEmerald.emerald,
+        // Dark theme needs a bit more pigment to register at all on near-black.
+        strength: dark ? 1.45 : 1.0,
+        grain: _grain, grainOpacity: dark ? .045 : .03))),
       widget.child,
     ]);
   }
@@ -71,34 +86,54 @@ class _AuroraBackgroundState extends State<AuroraBackground> with SingleTickerPr
 
 class _AuroraPainter extends CustomPainter {
   final ValueNotifier<double> time;
-  final Color base, primary, accent;
+  final Color start, end, aqua, emerald;
+  final double strength;
   final ui.Image? grain;
   final double grainOpacity;
-  _AuroraPainter({required this.time, required this.base, required this.primary, required this.accent, required this.grain, required this.grainOpacity})
+  _AuroraPainter({required this.time, required this.start, required this.end, required this.aqua,
+      required this.emerald, required this.strength, required this.grain, required this.grainOpacity})
       : super(repaint: time);
 
-  // (colour alpha, diameter dp, period s, anchor x/y as fraction, drift radius dp)
-  List<(Color, double, double, Offset, double)> get _blobs => [
-        (primary.withValues(alpha: .55), 340, 22, const Offset(.15, .10), 48),
-        (accent.withValues(alpha: .45), 280, 18, const Offset(.95, .40), 40),
-        (primary.withValues(alpha: .30), 220, 26, const Offset(.30, .85), 56),
+  // Brand fields: (colour, alpha, centre x/y as fraction, radius as fraction of
+  // the long edge, drift radius dp, period s)
+  List<(Color, double, Offset, double, double, double)> get _fields => [
+        (aqua, .20, const Offset(.50, .70), .50, 0, 0),      // requested: circle 50% 70%
+        (emerald, .20, const Offset(.30, .30), .50, 0, 0),   // requested: circle 30% 30%
+        (aqua, .16, const Offset(.92, .06), .34, 26, 24),    // ambient accent
+        (emerald, .14, const Offset(.05, .95), .32, 30, 30), // ambient accent
       ];
 
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.drawRect(Offset.zero & size, Paint()..color = base);
+    final rect = Offset.zero & size;
+    // 1. base wash — aurora ke neeche ek saaf, thanda canvas
+    canvas.drawRect(rect, Paint()
+      ..shader = ui.Gradient.linear(rect.topCenter, rect.bottomCenter, [start, end]));
+
+    // 2. + 3. brand fields
     final t = time.value;
-    for (final (color, d, period, anchor, drift) in _blobs) {
-      final a = t / period * 2 * math.pi;
-      final center = Offset(anchor.dx * size.width + math.cos(a) * drift, anchor.dy * size.height + math.sin(a * 1.3) * drift);
-      // Soft radial falloff = visually equivalent to a 120–180dp gaussian blur, zero blur cost.
-      final r = d / 2 + 90;
+    final long = math.max(size.width, size.height);
+    for (final (color, alpha, anchor, radiusFrac, drift, period) in _fields) {
+      var center = Offset(anchor.dx * size.width, anchor.dy * size.height);
+      if (drift > 0) {
+        final a = t / period * 2 * math.pi;
+        center = center.translate(math.cos(a) * drift, math.sin(a * 1.27) * drift);
+      }
+      final r = long * radiusFrac;
+      // Radial falloff to fully transparent at 50% (0.45 stop keeps the core
+      // solid so the colour still reads as a field, not a haze).
       canvas.drawCircle(center, r, Paint()
-        ..shader = ui.Gradient.radial(center, r, [color, color.withValues(alpha: color.a * .45), color.withValues(alpha: 0)], [0, .45, 1]));
+        ..shader = ui.Gradient.radial(center, r, [
+          color.withValues(alpha: (alpha * strength).clamp(0, 1)),
+          color.withValues(alpha: (alpha * strength * .45).clamp(0, 1)),
+          color.withValues(alpha: 0),
+        ], [0, .45, 1]));
     }
+
+    // 4. grain
     final g = grain;
     if (g != null) {
-      canvas.drawRect(Offset.zero & size, Paint()
+      canvas.drawRect(rect, Paint()
         ..shader = ImageShader(g, TileMode.repeated, TileMode.repeated, Matrix4.identity().storage)
         ..color = Color.fromRGBO(0, 0, 0, grainOpacity)
         ..blendMode = BlendMode.overlay);
@@ -106,5 +141,7 @@ class _AuroraPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_AuroraPainter o) => o.base != base || o.primary != primary || o.accent != accent || o.grain != grain;
+  bool shouldRepaint(_AuroraPainter o) =>
+      o.start != start || o.end != end || o.aqua != aqua || o.emerald != emerald ||
+      o.grain != grain || o.strength != strength;
 }

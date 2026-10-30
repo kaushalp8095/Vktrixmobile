@@ -66,8 +66,13 @@ class _AnimatedTabBarState extends State<AnimatedTabBar> with TickerProviderStat
                   final left = (_pos.value * w - (iw - w) / 2).clamp(0.0, box.maxWidth - iw);
                   return Positioned(left: left, top: 0, bottom: 0, width: iw,
                       child: DecoratedBox(decoration: BoxDecoration(
-                          color: s.primary.withValues(alpha: .16), borderRadius: Shapes.pill,
-                          border: Border.all(color: s.primary.withValues(alpha: .32)))));
+                          // Brand gradient ka halka tint — active tab ko brand se
+                          // jodta hai bina text contrast khoye.
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft, end: Alignment.bottomRight,
+                            colors: [c.accent.withValues(alpha: .18), c.accentAlt.withValues(alpha: .16)]),
+                          borderRadius: Shapes.pill,
+                          border: Border.all(color: s.primary.withValues(alpha: .30)))));
                 },
               ),
               Row(children: [

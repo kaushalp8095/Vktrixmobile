@@ -19,7 +19,7 @@ class DesignSystemShowcase extends StatelessWidget {
             bottom: false,
             sliver: SliverToBoxAdapter(child: Padding(
               padding: const EdgeInsets.fromLTRB(Space.screen, Space.x16, Space.screen, Space.x8),
-              child: Text('Indigo Mint · Design System', style: AppType.headline.copyWith(color: context.colors.textPrimary)),
+              child: Text('Aqua Emerald · Design System', style: AppType.headline.copyWith(color: context.colors.textPrimary)),
             )),
           ),
           SliverToBoxAdapter(child: Theme(data: AppTheme.build(AppTheme.lightScheme), child: const _ThemePanel(label: 'Light'))),
@@ -64,7 +64,7 @@ class _ThemePanel extends StatelessWidget {
           const _Header('Gradient (2 stops, one hero number only)'),
           ShaderMask(
             shaderCallback: (r) => AppColors.brandGradient.createShader(r),
-            child: Text('₹1,24,500', style: AppType.display.copyWith(color: IndigoMint.glassWhite)),
+            child: Text('₹1,24,500', style: AppType.display.copyWith(color: AquaEmerald.glassWhite)),
           ),
           const _Header('Type · Manrope'),
           for (final t in [

@@ -60,7 +60,7 @@ class _ComponentsGalleryState extends State<ComponentsGallery> {
                 Text('Stock value', style: context.type.labelLarge?.copyWith(color: c.textSecondary)),
                 const SizedBox(height: Space.x8),
                 ShaderMask(shaderCallback: (r) => AppColors.brandGradient.createShader(r),
-                    child: Text('₹1,24,500', style: AppType.display.copyWith(color: IndigoMint.glassWhite))),
+                    child: Text('₹1,24,500', style: AppType.display.copyWith(color: AquaEmerald.glassWhite))),
                 const SizedBox(height: Space.x12),
                 const Wrap(spacing: Space.x8, runSpacing: Space.x8, children: [
                   StatusChip(label: '18 in stock', tone: ChipTone.brand, icon: Icons.inventory_2_outlined),

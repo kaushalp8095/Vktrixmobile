@@ -8,6 +8,49 @@
 | **Database** | **PostgreSQL** | Bank-level reliable, free, paise ke hisaab-kitaab ke liye sabse safe (transactions) |
 | Login security | JWT token + bcrypt password hashing | |
 
+## Theme — Aqua Emerald (glassmorphism, Oct 2026)
+
+Poore app ka ek hi locked design system hai: **Aqua Emerald**. Har colour, glass
+recipe, motion aur shape `app/lib/design/` se aata hai — koi screen apna colour nahi
+banati.
+
+**Background** — base wash ke upar do brand radial fields, bilkul isi shape me:
+
+```css
+radial-gradient(circle at 50% 70%, rgba(41, 171, 226, 0.20), transparent 50%),
+radial-gradient(circle at 30% 30%, rgba(57, 181, 74, 0.20), transparent 50%)
+```
+
+Yaani aqua `#29ABE2` aur emerald `#39B54A`. Iske upar do chhote ambient bodies dheere
+drift karte hain (sirf jab app foreground me ho, aur reduced-motion par band) aur 3%
+grain — flat digital gradient ko texture milta hai.
+
+**Glass** — ek hi recipe har card/bar/sheet par:
+
+| Layer | Kya |
+|---|---|
+| Backdrop blur | 26dp (light) / 22dp (dark); ek screen par max 3 blurred nodes |
+| Fill | diagonal white 42% → 16%, neeche brand ka 6–7% tint |
+| Sheen | top-left se specular sweep — isi se "glass" padhta hai, gradient panel nahi |
+| Rim | 1dp top-lit hairline (62% → 10%) |
+| Shadow | aqua-tinted 2-layer soft shadow (light) / brand glow (dark) |
+
+**Accessibility pehle** — brand hues decorative hain (text nahi). Jo bhi colour text
+ban kar padha jaata hai wo `*Ink` token se aata hai, aur `app/test/theme_tokens_test.dart`
+**har token ka contrast (WCAG AA ≥ 4.5:1) lock karta hai** — light + dark dono me. Isliye
+`scheme.primary` deep aqua `#0C7FA8` hai (bright aqua par white text sirf 2.6:1 hota hai).
+
+**CTA** — `PrimaryButton` par aqua→emerald gradient (deep pair, white label 5.7:1 /
+5.1:1). Gradient sirf primary action aur ek hero number (`GradientText`) par — chhote
+labels kabhi gradient nahi hote.
+
+**Android splash** — launcher se pehli frame tak wahi brand wash (`values/colors.xml`),
+warna white/grey flash dikhta tha.
+
+**Material You** — pehle system ke wallpaper se surfaces adopt hote the; aqua/emerald
+aurora ke saath wo ladta tha, isliye ab palette **locked** hai (sirf `outline` system se).
+Verification: `app/test/theme_tokens_test.dart` + goldens (`app/goldens/`).
+
 ## Features
 - **Super Admin**: shops banana, har shop ko alag login dena, shop band/chalu karna, password reset, delete, **Edit details me shop ka bill logo preview** (jo logo upload hua hai wo wahin dikhta hai — Add/Change/Remove wahin se) aur **shop list ke har row me us shop ka chhota logo**, TAC (IMEI model) CSV import + **do free TAC catalog sync**: Osmocom community list aur **extended India-models list** (Redmi/Realme/Poco/Vivo ke naye variants + internal model code, koi API key/paisa nahi). **Shop ka business data (stock, IMEI, sales, profit, payment ledger, customer/ID proof) usse default me nahi dikhta** — uske liye reason ke saath *temporary, read-only support access* lena padta hai (neeche section dekhein).
 - **Shop Login**: sirf apni shop ka data dikhega (dusri shop ka nahi)
@@ -19,7 +62,7 @@
 - **Sales**: list, payment-due status, detail se PDF/payment ledger, aur sale cancel (phone wapas stock me; linked payment history bhi remove hoti hai)
 - **Reports**: Aaj / 7 din / Mahina / Saal / Custom: kharidi, bikri, profit, stock value, payment mode, pending receivables, top models, roz ki sales
 - **Back button (Android)**: Buy/Stock/Sales/Reports tab par back = pehle Home tab; Home par 2 second ke andar dobara back = app band. Super Admin jab support session me kisi shop ka data dekh raha ho, tab back seedha shop list par wapas jata hai.
-- **Logout confirmation (dono side)**: shop owner aur Super Admin — dono ke liye ek hi popup (Indigo/Mint glass card, brand hairline, account identity). Options: **Stay logged in** aur **Log out**. Logout sirf confirm karne ke baad hota hai; Super Admin pehle seedha logout kar deta tha, ab nahi.
+- **Logout confirmation (dono side)**: shop owner aur Super Admin — dono ke liye ek hi popup (Aqua/Emerald glass card, brand hairline, account identity). Options: **Stay logged in** aur **Log out**. Logout sirf confirm karne ke baad hota hai; Super Admin pehle seedha logout kar deta tha, ab nahi.
 
 ### IMEI auto-fill kaise kaam karta hai
 IMEI ke pehle 8 digit (TAC) model batate hain. Database `tac_models` me har row ka `source` save hota hai:
@@ -57,7 +100,7 @@ Isliye app ye karta hai:
    2. usi model ke liye kisi aur TAC par jo bharaa tha
    3. usi brand ke liye jo bharaa tha
    4. ek chhoti static fallback list (taaki dropdown kabhi khaali na rahe)
-3. Flutter me RAM/Storage/Color ek **text field + dropdown arrow** hain: Indigo/Mint theme wali
+3. Flutter me RAM/Storage/Color ek **text field + dropdown arrow** hain: Aqua/Emerald theme wali
    rounded selection sheet (light/dark) me current value highlighted rehti hai. Shop list se
    tap kare ya naya value type kare. Jo bhi save hoga wo agle phone ke liye dropdown me aa jayega.
 

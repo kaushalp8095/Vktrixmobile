@@ -1,33 +1,56 @@
-// INDIGO MINT: locked colour system. Every colour in the app comes from here.
+// AQUA EMERALD — locked colour system (Oct 2026 refresh).
+//
+// Brand do hues par khada hai, exactly waise jaise background gradient me use
+// hote hain:
+//   rgba(41,171,226,·)  → #29ABE2  aqua
+//   rgba(57,181,74, ·)  → #39B54A  emerald
+// Dono decorative hues hain (glass tint, aurora blobs, gradient CTA). Jo bhi
+// colour **text** ban kar padha jaata hai wo neeche `*Ink` tokens se aata hai,
+// jinke contrast ratios comment me likhe hain (WCAG AA: text ≥4.5:1,
+// non-text/icon ≥3:1). Isi wajah se `scheme.primary` deep aqua hai, bright aqua
+// nahi: bright aqua par white text sirf 2.6:1 hota hai.
 import 'package:flutter/material.dart';
 
-abstract final class IndigoMint {
-  // Brand
-  static const primaryLight = Color(0xFF6366F1);
-  static const primaryDark = Color(0xFF818CF8);
-  static const primaryContainerLight = Color(0xFFE0E7FF);
-  static const primaryContainerDark = Color(0xFF1E1B4B);
-  static const onPrimaryLight = Color(0xFFFFFFFF);
-  static const onPrimaryDark = Color(0xFF14163A);
-  static const accentLight = Color(0xFF06B6D4);
-  static const accentDark = Color(0xFF22D3EE);
+abstract final class AquaEmerald {
+  // ---- Brand hues (user palette, never used directly for small text) ----
+  static const aqua = Color(0xFF29ABE2);
+  static const emerald = Color(0xFF39B54A);
+  static const aquaLight = Color(0xFF7DD3F2);
+  static const emeraldLight = Color(0xFF6FDC86);
+  static const aquaDeep = Color(0xFF0A6E93);
+  static const emeraldDeep = Color(0xFF12735A);
 
-  // Neutrals
-  static const backgroundLight = Color(0xFFF4F6FA);
-  static const backgroundDark = Color(0xFF0B0D12);
+  // Brand
+  static const primaryLight = Color(0xFF0C7FA8); // 4.55:1 with white
+  static const primaryDark = Color(0xFF5BC8F0); // 10.3:1 on dark bg
+  static const primaryContainerLight = Color(0xFFD8EFF9);
+  static const primaryContainerDark = Color(0xFF0B2B37);
+  static const onPrimaryLight = Color(0xFFFFFFFF);
+  static const onPrimaryDark = Color(0xFF06232E); // 8.4:1 on primaryDark
+  static const accentLight = Color(0xFF29ABE2);
+  static const accentDark = Color(0xFF7DD3F2);
+  static const secondaryLight = Color(0xFF1C8F4B); // emerald, text-safe
+  static const secondaryDark = Color(0xFF4ED97A);
+
+  // Neutrals — base has a faint aqua cast so glass reads cool, not grey.
+  static const backgroundLight = Color(0xFFEAF5FB);
+  static const backgroundLightEnd = Color(0xFFE8F5EF); // green-leaning bottom
+  static const backgroundDark = Color(0xFF050C10);
+  static const backgroundDarkEnd = Color(0xFF07120F);
   static const surfaceLight = Color(0xFFFFFFFF);
-  static const surfaceDark = Color(0xFF151A22);
-  static const surfaceVariantLight = Color(0xFFE7EBF2);
-  static const surfaceVariantDark = Color(0xFF1D242E);
-  static const inkLight = Color(0xFF0E1116); // text primary @100%
-  static const inkDark = Color(0xFFF2F5F9);
+  static const surfaceDark = Color(0xFF0E1A21);
+  static const surfaceVariantLight = Color(0xFFDCEBF2);
+  static const surfaceVariantDark = Color(0xFF16262F);
+  static const inkLight = Color(0xFF0A1519); // text primary @100%
+  static const inkDark = Color(0xFFEEF6F9);
   static const textSecondaryAlphaLight = 0.62;
   static const textSecondaryAlphaDark = 0.68;
-  static const outlineLight = Color(0xFFC6CEDA);
-  static const outlineDark = Color(0xFF3A4453);
+  static const outlineLight = Color(0xFFBFD6E0);
+  static const outlineDark = Color(0xFF2C414C);
 
-  // Semantic (never re-hued)
-  static const successLight = Color(0xFF16A34A);
+  // Semantic (never re-hued, and deliberately deeper than the brand emerald so
+  // "success" never looks like decoration)
+  static const successLight = Color(0xFF14934A);
   static const successDark = Color(0xFF4ADE80);
   static const warningLight = Color(0xFFD97706);
   static const warningDark = Color(0xFFFBBF24);
@@ -37,10 +60,11 @@ abstract final class IndigoMint {
   // Base glass/scrim pigments (alpha applied in GlassTokens only)
   static const glassWhite = Color(0xFFFFFFFF);
   static const scrimBlack = Color(0xFF000000);
+  /// Shadow/glow pigment. Black shadows on a coloured aurora look muddy; a
+  /// deep aqua keeps the depth while staying on-brand.
+  static const shadowTint = Color(0xFF062B3A);
 
   /// Contrast-safe "ink" tone: same hue, pulled toward text-primary.
-  /// Used only where the raw brand/semantic colour fails 4.5:1 as TEXT
-  /// (measured: #6366F1 on white = 4.47, success-on-chip = 2.89).
   static Color ink(Color c, Color toward, double t) => Color.lerp(c, toward, t)!;
 }
 
@@ -48,50 +72,77 @@ abstract final class IndigoMint {
 @immutable
 class AppColors extends ThemeExtension<AppColors> {
   final Color textPrimary, textSecondary;
-  final Color accent;
-  final Color brandInk; // primary as text / filled-button fill (≥4.5:1 guaranteed)
+  final Color accent; // brand aqua (decorative: blobs, tints, charts)
+  final Color accentAlt; // brand emerald (decorative partner)
+  final Color brandInk; // primary as TEXT / filled control (≥4.5:1 guaranteed)
   final Color success, warning, error; // icon / fill base
   final Color successInk, warningInk, errorInk; // text on 12% tinted chips
   final Color focusRing;
+  /// Aurora base wash (top → bottom), drawn behind every screen.
+  final Color backgroundStart, backgroundEnd;
+  /// Glass shadow pigment (aqua-tinted, never pure black in light theme).
+  final Color shadowTint, glowTint;
 
   const AppColors({
-    required this.textPrimary, required this.textSecondary, required this.accent, required this.brandInk,
-    required this.success, required this.warning, required this.error,
+    required this.textPrimary, required this.textSecondary, required this.accent, required this.accentAlt,
+    required this.brandInk, required this.success, required this.warning, required this.error,
     required this.successInk, required this.warningInk, required this.errorInk, required this.focusRing,
+    required this.backgroundStart, required this.backgroundEnd, required this.shadowTint, required this.glowTint,
   });
 
   static final light = AppColors(
-    textPrimary: IndigoMint.inkLight,
-    textSecondary: IndigoMint.inkLight.withValues(alpha: IndigoMint.textSecondaryAlphaLight),
-    accent: IndigoMint.accentLight,
-    brandInk: IndigoMint.ink(IndigoMint.primaryLight, IndigoMint.inkLight, .10), // #5B5EDB: 5.16:1 w/ white
-    success: IndigoMint.successLight, warning: IndigoMint.warningLight, error: IndigoMint.errorLight,
-    successInk: IndigoMint.ink(IndigoMint.successLight, IndigoMint.inkLight, .35), // 5.0:1+
-    warningInk: IndigoMint.ink(IndigoMint.warningLight, IndigoMint.inkLight, .35),
-    errorInk: IndigoMint.ink(IndigoMint.errorLight, IndigoMint.inkLight, .20),
-    focusRing: IndigoMint.ink(IndigoMint.accentLight, IndigoMint.inkLight, .32), // 3.2:1+ on glass (raw #06B6D4 = 2.27)
+    textPrimary: AquaEmerald.inkLight,
+    textSecondary: AquaEmerald.inkLight.withValues(alpha: AquaEmerald.textSecondaryAlphaLight),
+    accent: AquaEmerald.aqua,
+    accentAlt: AquaEmerald.emerald,
+    brandInk: AquaEmerald.aquaDeep, // #0A6E93: 5.7:1 on white, 5.3:1 on the wash
+    success: AquaEmerald.successLight, warning: AquaEmerald.warningLight, error: AquaEmerald.errorLight,
+    successInk: AquaEmerald.ink(AquaEmerald.successLight, AquaEmerald.inkLight, .30), // 5.0:1+
+    warningInk: AquaEmerald.ink(AquaEmerald.warningLight, AquaEmerald.inkLight, .35),
+    errorInk: AquaEmerald.ink(AquaEmerald.errorLight, AquaEmerald.inkLight, .20),
+    focusRing: AquaEmerald.primaryLight, // 4.2:1 on glass
+    backgroundStart: AquaEmerald.backgroundLight, backgroundEnd: AquaEmerald.backgroundLightEnd,
+    shadowTint: AquaEmerald.shadowTint, glowTint: AquaEmerald.aqua,
   );
 
   static final dark = AppColors(
-    textPrimary: IndigoMint.inkDark,
-    textSecondary: IndigoMint.inkDark.withValues(alpha: IndigoMint.textSecondaryAlphaDark),
-    accent: IndigoMint.accentDark,
-    brandInk: IndigoMint.primaryDark, // 6.5:1 on bg already
-    success: IndigoMint.successDark, warning: IndigoMint.warningDark, error: IndigoMint.errorDark,
-    successInk: IndigoMint.successDark, warningInk: IndigoMint.warningDark, errorInk: IndigoMint.errorDark,
-    focusRing: IndigoMint.accentDark,
+    textPrimary: AquaEmerald.inkDark,
+    textSecondary: AquaEmerald.inkDark.withValues(alpha: AquaEmerald.textSecondaryAlphaDark),
+    accent: AquaEmerald.accentDark,
+    accentAlt: AquaEmerald.emeraldLight,
+    brandInk: AquaEmerald.primaryDark,
+    success: AquaEmerald.successDark, warning: AquaEmerald.warningDark, error: AquaEmerald.errorDark,
+    successInk: AquaEmerald.successDark, warningInk: AquaEmerald.warningDark, errorInk: AquaEmerald.errorDark,
+    focusRing: AquaEmerald.aquaLight,
+    backgroundStart: AquaEmerald.backgroundDark, backgroundEnd: AquaEmerald.backgroundDarkEnd,
+    shadowTint: AquaEmerald.shadowTint, glowTint: AquaEmerald.aqua,
   );
 
-  /// Brand gradient: exactly 2 stops, hue gap ≤45°. Only for ONE hero number/headline.
-  static const brandGradient = LinearGradient(colors: [IndigoMint.primaryLight, IndigoMint.accentDark]);
+  /// Hero gradient — decor only (big numbers/headlines, CTA). Two stops, and the
+  /// hue travel stays inside the brand family (aqua → emerald).
+  static const brandGradient = LinearGradient(
+    begin: Alignment.topLeft, end: Alignment.bottomRight,
+    colors: [AquaEmerald.aqua, AquaEmerald.emerald],
+  );
+
+  /// CTA gradient — same hue family but dark enough for white 15px labels
+  /// (5.7:1 and 5.1:1 at the two ends). PrimaryButton isi ka use karta hai.
+  static const ctaGradient = LinearGradient(
+    begin: Alignment.topLeft, end: Alignment.bottomRight,
+    colors: [AquaEmerald.aquaDeep, AquaEmerald.emeraldDeep],
+  );
 
   @override
   AppColors copyWith() => this;
   @override
   AppColors lerp(AppColors? o, double t) => o == null ? this : AppColors(
         textPrimary: Color.lerp(textPrimary, o.textPrimary, t)!, textSecondary: Color.lerp(textSecondary, o.textSecondary, t)!,
-        accent: Color.lerp(accent, o.accent, t)!, brandInk: Color.lerp(brandInk, o.brandInk, t)!,
+        accent: Color.lerp(accent, o.accent, t)!, accentAlt: Color.lerp(accentAlt, o.accentAlt, t)!,
+        brandInk: Color.lerp(brandInk, o.brandInk, t)!,
         success: Color.lerp(success, o.success, t)!, warning: Color.lerp(warning, o.warning, t)!, error: Color.lerp(error, o.error, t)!,
         successInk: Color.lerp(successInk, o.successInk, t)!, warningInk: Color.lerp(warningInk, o.warningInk, t)!,
-        errorInk: Color.lerp(errorInk, o.errorInk, t)!, focusRing: Color.lerp(focusRing, o.focusRing, t)!);
+        errorInk: Color.lerp(errorInk, o.errorInk, t)!, focusRing: Color.lerp(focusRing, o.focusRing, t)!,
+        backgroundStart: Color.lerp(backgroundStart, o.backgroundStart, t)!,
+        backgroundEnd: Color.lerp(backgroundEnd, o.backgroundEnd, t)!,
+        shadowTint: Color.lerp(shadowTint, o.shadowTint, t)!, glowTint: Color.lerp(glowTint, o.glowTint, t)!);
 }

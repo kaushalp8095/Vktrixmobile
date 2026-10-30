@@ -9,7 +9,7 @@ PDF bill, TAC (IMEI) catalog, aur Super Admin ka shop management.
 lib/
   api.dart                     HTTP client + session (token, user, support session)
   main.dart                    MaterialApp, theme, splash → login/shop/admin routing
-  design/                      Indigo Mint design system (locked tokens, glass, motion)
+  design/                      Aqua Emerald design system (locked tokens, glass, motion)
     colors.dart dimens.dart theme.dart typography.dart glass.dart motion.dart
     components/                GlassCard, PrimaryButton, StatusChip, AnimatedTabBar,
                                AuroraBackground, GlassTopBar, ConfirmDialog, …

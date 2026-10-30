@@ -42,7 +42,7 @@ class GlassTopBar extends StatelessWidget implements PreferredSizeWidget {
         final g = context.glass;
         Widget content = DecoratedBox(
           decoration: BoxDecoration(
-            color: IndigoMint.glassWhite.withValues(alpha: MotionValues.topBarMaxFill * t),
+            color: AquaEmerald.glassWhite.withValues(alpha: MotionValues.topBarMaxFill * t),
             border: Border(bottom: BorderSide(color: g.border.withValues(alpha: g.borderAlpha * t))),
           ),
           child: child,
