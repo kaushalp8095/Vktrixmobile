@@ -57,8 +57,10 @@ class _GradientFabState extends State<GradientFab> {
               // golden me pill ke neeche ek solid darker band aa gaya (wahi
               // "grey ledge" jo light glass cards me fix kiya) — shadow ko
               // shape ke saath compete nahi karna chahiye, sirf lift dena.
-              BoxShadow(color: c.brandInk.withValues(alpha: .16), blurRadius: 36, offset: const Offset(0, 14)),
-              BoxShadow(color: c.brandInk.withValues(alpha: .10), blurRadius: 12, offset: const Offset(0, 4)),
+              // Glass cards ke elevation ke saath match (.075 @ 40dp) — isse
+              // zyada alpha par pill ke neeche doosra pill jaisa band dikhta hai.
+              BoxShadow(color: c.brandInk.withValues(alpha: .10), blurRadius: 44, offset: const Offset(0, 12)),
+              BoxShadow(color: c.brandInk.withValues(alpha: .06), blurRadius: 14, offset: const Offset(0, 3)),
             ],
           ),
           child: Material(
