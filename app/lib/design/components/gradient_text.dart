@@ -28,8 +28,12 @@ class GradientText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final base = style ?? context.type.titleLarge!;
-    final paint = gradient ?? context.colors.textGradient;
+    // Theme extension missing ho (preview/test widget bina AppTheme.build) to
+    // crash na ho — brand gradient par gir jao.
+    final theme = Theme.of(context);
+    final colors = theme.extension<AppColors>();
+    final base = style ?? theme.textTheme.titleLarge ?? AppType.title;
+    final paint = gradient ?? colors?.textGradient ?? AppColors.brandGradient;
     return ShaderMask(
       // srcIn: sirf text ke andar gradient dikhe, baaki transparent.
       blendMode: BlendMode.srcIn,

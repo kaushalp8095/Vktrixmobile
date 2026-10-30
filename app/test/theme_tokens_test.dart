@@ -131,8 +131,9 @@ void main() {
 
   group('widgets', () {
     testWidgets('GradientText paints the brand gradient over its label', (t) async {
-      await t.pumpWidget(const MaterialApp(
-        home: Scaffold(body: Center(child: GradientText('₹1,24,500', style: AppType.display))),
+      await t.pumpWidget(MaterialApp(
+        theme: AppTheme.build(AppTheme.lightScheme),
+        home: const Scaffold(body: Center(child: GradientText('₹1,24,500', style: AppType.display))),
       ));
       expect(find.text('₹1,24,500'), findsOneWidget);
       expect(find.byType(ShaderMask), findsOneWidget);
