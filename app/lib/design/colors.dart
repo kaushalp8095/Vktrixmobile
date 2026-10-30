@@ -19,6 +19,10 @@ abstract final class AquaEmerald {
   static const emeraldLight = Color(0xFF6FDC86);
   static const aquaDeep = Color(0xFF0A6E93);
   static const emeraldDeep = Color(0xFF12735A);
+  /// Hero gradient ke stops: deep se thode brighter, par 36px text par bhi
+  /// 3:1 (large-text AA) se upar — 3.7:1 / 4.0:1 on the wash.
+  static const heroAqua = Color(0xFF0C86B4);
+  static const heroEmerald = Color(0xFF1E8A46);
 
   // Brand
   static const primaryLight = Color(0xFF0C7FA8); // 4.55:1 with white
@@ -107,9 +111,10 @@ class AppColors extends ThemeExtension<AppColors> {
     focusRing: AquaEmerald.primaryLight, // 4.2:1 on glass
     backgroundStart: AquaEmerald.backgroundLight, backgroundEnd: AquaEmerald.backgroundLightEnd,
     shadowTint: AquaEmerald.shadowTint, glowTint: AquaEmerald.aqua,
-    // 36px hero number bhi readable rahe: 5.7:1 → 5.3:1.
+    // Bright pair 36px par sirf 2.5:1 deta hai; hero pair 3.7:1 / 4.0:1 —
+    // bada number hote hue bhi brand ka rang bacha rehta hai.
     textGradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight,
-      colors: [AquaEmerald.aquaDeep, AquaEmerald.emeraldDeep]),
+      colors: [AquaEmerald.heroAqua, AquaEmerald.heroEmerald]),
   );
 
   static final dark = AppColors(
