@@ -80,6 +80,9 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color focusRing;
   /// Aurora base wash (top → bottom), drawn behind every screen.
   final Color backgroundStart, backgroundEnd;
+  /// Gradient for *text* (hero numbers). Decorative `brandGradient` bright hues
+  /// large-text (3:1) par bhi fail karte hain, isliye text ke liye deep pair.
+  final LinearGradient textGradient;
   /// Glass shadow pigment (aqua-tinted, never pure black in light theme).
   final Color shadowTint, glowTint;
 
@@ -88,6 +91,7 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.brandInk, required this.success, required this.warning, required this.error,
     required this.successInk, required this.warningInk, required this.errorInk, required this.focusRing,
     required this.backgroundStart, required this.backgroundEnd, required this.shadowTint, required this.glowTint,
+    required this.textGradient,
   });
 
   static final light = AppColors(
@@ -103,6 +107,9 @@ class AppColors extends ThemeExtension<AppColors> {
     focusRing: AquaEmerald.primaryLight, // 4.2:1 on glass
     backgroundStart: AquaEmerald.backgroundLight, backgroundEnd: AquaEmerald.backgroundLightEnd,
     shadowTint: AquaEmerald.shadowTint, glowTint: AquaEmerald.aqua,
+    // 36px hero number bhi readable rahe: 5.7:1 → 5.3:1.
+    textGradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight,
+      colors: [AquaEmerald.aquaDeep, AquaEmerald.emeraldDeep]),
   );
 
   static final dark = AppColors(
@@ -116,6 +123,9 @@ class AppColors extends ThemeExtension<AppColors> {
     focusRing: AquaEmerald.aquaLight,
     backgroundStart: AquaEmerald.backgroundDark, backgroundEnd: AquaEmerald.backgroundDarkEnd,
     shadowTint: AquaEmerald.shadowTint, glowTint: AquaEmerald.aqua,
+    // Dark aurora par bright pair hi chalta hai (10.3:1 → 10.8:1).
+    textGradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight,
+      colors: [AquaEmerald.primaryDark, AquaEmerald.emeraldLight]),
   );
 
   /// Hero gradient — decor only (big numbers/headlines, CTA). Two stops, and the
@@ -144,5 +154,6 @@ class AppColors extends ThemeExtension<AppColors> {
         errorInk: Color.lerp(errorInk, o.errorInk, t)!, focusRing: Color.lerp(focusRing, o.focusRing, t)!,
         backgroundStart: Color.lerp(backgroundStart, o.backgroundStart, t)!,
         backgroundEnd: Color.lerp(backgroundEnd, o.backgroundEnd, t)!,
-        shadowTint: Color.lerp(shadowTint, o.shadowTint, t)!, glowTint: Color.lerp(glowTint, o.glowTint, t)!);
+        shadowTint: Color.lerp(shadowTint, o.shadowTint, t)!, glowTint: Color.lerp(glowTint, o.glowTint, t)!,
+        textGradient: t < .5 ? textGradient : o.textGradient);
 }

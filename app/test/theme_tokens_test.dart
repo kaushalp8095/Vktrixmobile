@@ -77,6 +77,17 @@ void main() {
       expect(contrast(c.brandInk, bg), greaterThanOrEqualTo(4.5));
     });
 
+    test('hero gradient text clears large-text AA (3:1) at every stop', () {
+      // display 36px = large text. Bright brand hues yahan fail hote hain,
+      // isliye text ke liye alag `textGradient` token hai.
+      for (final (label, c) in [('light', AppColors.light), ('dark', AppColors.dark)]) {
+        for (final stop in c.textGradient.colors) {
+          expect(contrast(stop, c.backgroundStart), greaterThanOrEqualTo(3.0),
+              reason: '$label hero stop $stop');
+        }
+      }
+    });
+
     test('dark CTA carries the dark onPrimary ink', () {
       final onPrimary = AppTheme.darkScheme.onPrimary;
       for (final stop in [AquaEmerald.primaryDark, AquaEmerald.emeraldLight]) {

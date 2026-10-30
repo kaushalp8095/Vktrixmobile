@@ -10,7 +10,8 @@ import '../design.dart';
 class GradientText extends StatelessWidget {
   final String text;
   final TextStyle? style;
-  final Gradient gradient;
+  /// `null` = theme ka `textGradient` (light: deep pair, dark: bright pair).
+  final Gradient? gradient;
   final TextAlign textAlign;
   final int? maxLines;
   final bool softWrap;
@@ -19,7 +20,7 @@ class GradientText extends StatelessWidget {
     this.text, {
     super.key,
     this.style,
-    this.gradient = AppColors.brandGradient,
+    this.gradient,
     this.textAlign = TextAlign.start,
     this.maxLines,
     this.softWrap = true,
@@ -28,10 +29,11 @@ class GradientText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final base = style ?? context.type.titleLarge!;
+    final paint = gradient ?? context.colors.textGradient;
     return ShaderMask(
       // srcIn: sirf text ke andar gradient dikhe, baaki transparent.
       blendMode: BlendMode.srcIn,
-      shaderCallback: (bounds) => gradient.createShader(Offset.zero & bounds.size),
+      shaderCallback: (bounds) => paint.createShader(Offset.zero & bounds.size),
       child: Text(
         text,
         textAlign: textAlign,
