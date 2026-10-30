@@ -1,6 +1,7 @@
 // GlassSurface: the single glass recipe.
 // backdrop blur → diagonal white/tinted fill → specular sheen → optional scrim
 // → top-lit gradient rim → soft aqua shadow (light) / brand glow (dark).
+import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import '../design.dart';
@@ -112,9 +113,14 @@ class _OuterShadowPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final rr = RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(radius));
     canvas.save();
+    // Clip ko shadow ke *poora khatam hone* tak khula rakho. Pehle 80dp tha
+    // aur blur 40dp ka Gaussian wahan tak pahunchta hi nahi tha, isliye card ke
+    // neeche shadow ka ek dumdum **kaat** dikhta tha (golden me saaf edge).
+    // 2.5× blur + offset — uske aage alpha waise bhi invisible hai.
+    final reach = shadows.fold(80.0, (m, s) => math.max(m, s.blurRadius * 2.5 + s.offset.dy.abs() + s.spreadRadius));
     canvas.clipPath(Path()
       ..fillType = PathFillType.evenOdd
-      ..addRect((Offset.zero & size).inflate(80))
+      ..addRect((Offset.zero & size).inflate(reach))
       ..addRRect(rr));
     for (final s in shadows) {
       canvas.drawRRect(rr.shift(s.offset).inflate(s.spreadRadius), s.toPaint());
