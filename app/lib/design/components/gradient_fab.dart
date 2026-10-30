@@ -53,10 +53,12 @@ class _GradientFabState extends State<GradientFab> {
             borderRadius: Shapes.pill,
             gradient: c.cta,
             boxShadow: [
-              // Wide, soft, brand-tinted: coloured aurora par black shadow maila
-              // dikhta hai aur "grey ledge" jaisa band bana deta hai.
-              BoxShadow(color: c.brandInk.withValues(alpha: .26), blurRadius: 28, offset: const Offset(0, 10)),
-              BoxShadow(color: c.brandInk.withValues(alpha: .16), blurRadius: 6, offset: const Offset(0, 2)),
+              // Wide + soft + *low* alpha. Pehla attempt .26 @ 28dp tha aur
+              // golden me pill ke neeche ek solid darker band aa gaya (wahi
+              // "grey ledge" jo light glass cards me fix kiya) — shadow ko
+              // shape ke saath compete nahi karna chahiye, sirf lift dena.
+              BoxShadow(color: c.brandInk.withValues(alpha: .16), blurRadius: 36, offset: const Offset(0, 14)),
+              BoxShadow(color: c.brandInk.withValues(alpha: .10), blurRadius: 12, offset: const Offset(0, 4)),
             ],
           ),
           child: Material(
